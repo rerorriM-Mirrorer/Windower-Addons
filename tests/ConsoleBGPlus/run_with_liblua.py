@@ -11,6 +11,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 os.chdir(root)
 (root / 'reference').mkdir(exist_ok=True)
+os.environ['CBGPLUS_EXPORT_LAYOUT'] = '1'
 library = ctypes.util.find_library('lua5.4')
 if not library:
     raise SystemExit('Lua 5.4 shared library not found; use a Lua CLI for run.lua.')
