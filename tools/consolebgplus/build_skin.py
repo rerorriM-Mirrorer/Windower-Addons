@@ -15,12 +15,14 @@ from PIL import Image, ImageDraw
 def build(source: Path, destination: Path):
     tiles = {}
     middle = None
+    top = None
     for name in ('top', 'mid', 'bottom'):
         path = source / (name + '.png')
         if not path.exists():
             path = source / ('Bg' + name.title() + '.png')
         image = Image.open(path).convert('RGBA')
         if name == 'mid': middle = image
+        if name == 'top': top = image
         # The native right fade occupies 64px. Taking only its final 20px
         # starts almost transparent and leaves a visible step at the join.
         left_cap = 3 if name == 'mid' else 20
@@ -62,18 +64,40 @@ def build(source: Path, destination: Path):
     title_plate.save(stream, 'PNG')
     tiles['title_plate'] = base64.b64encode(stream.getvalue()).decode('ascii')
 
+    # Fade the rail into the title notch on both sides. The layout leaves
+    # out the original rail under these caps, so a translucent cap cannot
+    # reveal a solid silver line beneath the title.
+    for name, reverse in (('title_left', False), ('title_right', True)):
+        cap = Image.new('RGBA', (8, 10))
+        for y in range(10):
+            for x in range(8):
+                r, g, b, a = top.getpixel((208 + x % 4, y))
+                strength = x / 7 if reverse else 1 - x / 7
+                cap.putpixel((x, y), (r, g, b, round(a * strength)))
+        stream = io.BytesIO()
+        cap.save(stream, 'PNG')
+        tiles[name] = base64.b64encode(stream.getvalue()).decode('ascii')
+
     # The native input tab is a short grey plaque above the divider. Keep
     # the little corner caps fixed-size when its centre is resized.
-    tab = Image.new('RGBA', (64, 12))
+    tab = Image.new('RGBA', (40, 14))
     draw = ImageDraw.Draw(tab)
-    draw.rounded_rectangle((0, 0, 63, 13), radius=2, fill=(125, 126, 144, 255),
+    draw.rounded_rectangle((0, 0, 39, 15), radius=2, fill=(125, 126, 144, 255),
                            outline=(167, 168, 181, 255), width=1)
-    for name, rectangle in {'tab_left': (0, 0, 3, 12),
-                            'tab_center': (30, 0, 31, 12),
-                            'tab_right': (60, 0, 64, 12)}.items():
+    for name, rectangle in {'tab_left': (0, 0, 3, 14),
+                            'tab_center': (20, 0, 21, 14),
+                            'tab_right': (36, 0, 40, 14)}.items():
         stream = io.BytesIO()
         tab.crop(rectangle).save(stream, 'PNG')
         tiles[name] = base64.b64encode(stream.getvalue()).decode('ascii')
+
+    handle = Image.new('RGBA', (14, 14))
+    draw = ImageDraw.Draw(handle)
+    for offset in (2, 6, 10):
+        draw.line((offset, 12, 12, offset), fill=(198, 199, 217, 240), width=1)
+    stream = io.BytesIO()
+    handle.save(stream, 'PNG')
+    tiles['resize_handle'] = base64.b64encode(stream.getvalue()).decode('ascii')
 
     entries = '\n'.join("    %s = '%s'," % (name, value) for name, value in sorted(tiles.items()))
     module = """-- Generated texture bundle. Do not edit the base64 payloads by hand.
@@ -108,7 +132,7 @@ function skin.prepare(root)
     if windower.create_dir then windower.create_dir(directory) end
     local paths = {}
     for name, encoded in pairs(images) do
-        local path = directory .. 'cbgplus_v2_' .. name .. '.png'
+        local path = directory .. 'cbgplus_v3_' .. name .. '.png'
         local bytes = decode(encoded)
         local existing = io.open(path, 'rb')
         local unchanged = false

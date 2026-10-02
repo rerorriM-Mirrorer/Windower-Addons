@@ -36,7 +36,10 @@ def render(layout_path, output_path):
                 draw.rectangle((x, y, x + 31, y + 31), fill=(53, 53, 56, 255))
     for piece in data['pieces']:
         source = Image.open(root / 'addons/ConsoleBGPlus/assets' /
-                            ('cbgplus_v2_' + piece['texture'] + '.png')).convert('RGBA')
+                            ('cbgplus_v3_' + piece['texture'] + '.png')).convert('RGBA')
+        tile_width = max(1, round(piece['width'] / piece['repeat_x']))
+        tile_height = max(1, round(piece['height'] / piece['repeat_y']))
+        source = source.resize((tile_width, tile_height), Image.Resampling.NEAREST)
         patch = Image.new('RGBA', (piece['width'], piece['height']))
         for y in range(0, patch.height, source.height):
             for x in range(0, patch.width, source.width):
@@ -51,16 +54,19 @@ def render(layout_path, output_path):
     # Verdana remains the user's in-game console font. This local fallback
     # shows alignment only; Windows/Windower supplies the actual typeface.
     console_font = font('DejaVuSans.ttf', 14)
-    lines = ['> ConsoleBG+ v0.1.1', '> Full native edge fade and a subtle bottom glow.',
-             '> cbg width screen', '> The title and the input tab are separate.',
-             '> cbg input on 26', '> cbg tab right']
+    lines = ['> ConsoleBG+ v0.1.2', '> Linked movement, a compact tab, and softly capped title.',
+             '> cbg edit on', '> Drag the top edge and resize the lower-right corner.',
+             '> cbg diagnose', '> screenshot jpg']
     for index, line in enumerate(lines):
         draw.text((50, 210 + index * 17), line, font=console_font, fill=(238, 238, 238, 255))
-    draw.text((50, 329), '$', font=console_font, fill=(238, 238, 238, 255))
+    draw.text((50, 329), '$ type something with a j', font=console_font, fill=(238, 238, 238, 255))
     for label in data['labels']:
-        label_font = font('DejaVuSans-Oblique.ttf', max(8, round(label['size'] * 1.4)))
-        draw.text((label['x'], label['y'] - 2), label['text'], font=label_font,
-                  fill=(label['red'], label['green'], label['blue'], 255))
+        label_font = font('DejaVuSans-BoldOblique.ttf', max(8, round(label['size'] * 1.4)))
+        overlay = Image.new('RGBA', canvas.size)
+        ImageDraw.Draw(overlay).text((label['x'], label['y']), label['text'], font=label_font,
+                  anchor='lt', fill=(label['red'], label['green'], label['blue'], label['alpha']),
+                  stroke_width=label['stroke'], stroke_fill=(15, 14, 28, label['alpha']))
+        canvas.alpha_composite(overlay)
     canvas.convert('RGB').save(output_path)
     return canvas
 
