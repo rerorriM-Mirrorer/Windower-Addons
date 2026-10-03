@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.7'
+_addon.version = '0.1.8'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -136,7 +136,6 @@ end
 new_label('title', 'Console', 8, 235, 234, 245, 1)
 new_label('input', 'Input', 7, 233, 107, 124, 1)
 new_label('edit', 'Drag from top edge / Resize lower-right corner', 8, 255, 104, 125, 1)
-new_label('edit_exit', '//cbg edit off', 8, 255, 104, 125, 1)
 
 local function sync_console(rect, screen)
     if settings.console.linked ~= true then return end
@@ -254,18 +253,12 @@ refresh = function(screen)
     label_visibility(input, shown and input_shown and input.enabled)
     local edit = labels.edit
     local edit_width, edit_height = edit.width, edit.height
-    local hint = labels.edit_exit
-    edit.enabled = editing and rect.width >= math.max(edit_width, hint.width) + 24
-        and rect.height >= edit_height + hint.height + 28
-    hint.enabled = edit.enabled
+    edit.enabled = editing and rect.width >= edit_width + 24
+        and rect.height >= edit_height + 28
     windower.text.set_location(edit.name, math.max(rect.x + 12, rect.x + rect.width - edit_width - 16),
         rect.y + 14)
-    windower.text.set_location(hint.name, math.max(rect.x + 12, rect.x + rect.width - hint.width - 16),
-        rect.y + 14 + edit_height)
     tint_label(edit)
-    tint_label(hint)
     label_visibility(edit, shown and edit.enabled)
-    label_visibility(hint, shown and hint.enabled)
     sync_console(rect, screen)
     last_viewport = screen
 end

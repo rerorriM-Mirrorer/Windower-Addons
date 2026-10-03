@@ -102,9 +102,12 @@ def build(source: Path, destination: Path):
     handle.save(stream, 'PNG')
     tiles['resize_handle'] = base64.b64encode(stream.getvalue()).decode('ascii')
 
-    # Repeat the same pale diagonal motif along the top drag edge in edit mode.
-    grip = Image.new('RGBA', (10, 6))
-    ImageDraw.Draw(grip).line((2, 5, 7, 0), fill=(198, 199, 217, 240), width=1)
+    # Match the corner handle's slope, four-pixel spacing, and pale color.
+    grip = Image.new('RGBA', (4, 6))
+    for y in range(6):
+        for x in range(4):
+            if (x + y) % 4 == 2:
+                grip.putpixel((x, y), (198, 199, 217, 240))
     stream = io.BytesIO()
     grip.save(stream, 'PNG')
     tiles['drag_grip'] = base64.b64encode(stream.getvalue()).decode('ascii')

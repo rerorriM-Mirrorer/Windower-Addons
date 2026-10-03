@@ -251,9 +251,8 @@ assert(grip and grip.visible and grip.x == r.x + 4 and grip.y == r.y + 8
     and grip.width == r.width - 8 and grip.height == 6,
     'Edit-mode diagonal grip should span the full draggable top edge')
 assert(text_objects.ConsoleBGPlus_label_edit.red == 255
-    and text_objects.ConsoleBGPlus_label_edit_exit.visible
-    and text_objects.ConsoleBGPlus_label_edit_exit.text == '//cbg edit off'
-    and text_objects.ConsoleBGPlus_label_edit_exit.y > text_objects.ConsoleBGPlus_label_edit.y)
+    and text_objects.ConsoleBGPlus_label_edit.visible
+    and text_objects.ConsoleBGPlus_label_edit_exit == nil)
 assert(not mouse(1, r.x + 30, r.y + 2, true))
 assert(not mouse(1, r.x + 100, r.y + 100))
 assert(not mouse(3, r.x + 30, r.y + 2))
@@ -603,7 +602,6 @@ console_open = true; tick()
 run('preview', 'on'); run('edit', 'on')
 console_open = false; tick()
 assert(not text_objects.ConsoleBGPlus_label_edit.visible
-    and not text_objects.ConsoleBGPlus_label_edit_exit.visible
     and text_objects.ConsoleBGPlus_label_title.visible,
     'Closing the console must finish edit and preview modes but still fade the frame')
 run('diagnose')

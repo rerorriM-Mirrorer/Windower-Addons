@@ -10,7 +10,7 @@ Fresh settings start at **16,48** with equal left and right margins, a 344-pixel
 
 ## Move and resize
 
-Run **//cbg edit on**. A band of pale diagonal lines marks the draggable top edge; drag anywhere along it to move the frame. The matching mark at the lower-right corner resizes it. Release the mouse to save. The red hint includes **//cbg edit off** for when you finish. Closing the native console with Insert also ends edit and preview modes and fades the frame.
+Run **//cbg edit** to toggle edit mode. A band of pale diagonal lines marks the draggable top edge; drag anywhere along it to move the frame. The matching mark at the lower-right corner resizes it. Release the mouse to save. Run **//cbg edit** again when you finish. Closing the native console with Insert also ends edit and preview modes and fades the frame.
 
 In screen-width mode, dragging left or right keeps matching side margins. Resizing sets a fixed width; **//cbg width screen** returns to screen-width mode. When console movement is linked, the native text follows the frame.
 
