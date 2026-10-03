@@ -13,11 +13,12 @@ end
 
 local function sample(context)
     local r, v = context.rectangle, context.viewport
-    return string.format('console_visible=%s frame_visible=%s preview=%s edit=%s auto_visible=%s activity_changes=%d frame=%d,%d,%d,%d viewport=%d,%d output_only=%s frame_alpha=%d activity_phase=%s log_bytes=%s',
+    return string.format('console_visible=%s frame_visible=%s preview=%s edit=%s auto_visible=%s activity_changes=%d frame=%d,%d,%d,%d viewport=%d,%d output_only=%s frame_alpha=%d startup_alpha=%d activity_phase=%s log_bytes=%s',
         tostring(context.console_visible), tostring(context.frame_visible), tostring(context.preview),
         tostring(context.edit), tostring(context.activity.alpha > 0), context.activity.changes,
         r.x, r.y, r.width, r.height, v.width, v.height, tostring(context.output_only),
-        context.frame_alpha, context.activity.phase, tostring(context.activity.size or 'unavailable'))
+        context.frame_alpha, context.startup_alpha, context.activity.phase,
+        tostring(context.activity.size or 'unavailable'))
 end
 
 local function header(context, version)

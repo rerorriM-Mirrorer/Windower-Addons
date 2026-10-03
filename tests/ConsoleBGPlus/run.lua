@@ -194,6 +194,12 @@ assert(#played_sounds == 0, 'Loading should not play either manual cue')
 assert(text_objects.ConsoleBGPlus_label_title.font == 'Verdana')
 assert(not text_objects.ConsoleBGPlus_label_input.visible)
 all_visible(false)
+tick(0.01)
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 322
+    and not text_objects.ConsoleBGPlus_label_input.visible and #played_sounds == 0,
+    'Loading shows a silent compact output frame without relying on log activity')
+run('diagnose')
+assert(diagnostic_files[addon_path .. 'data/diagnostics.txt'].text:find('startup_alpha=255', 1, true))
 console_open = true; tick(); all_visible(true)
 settle()
 local title = text_objects.ConsoleBGPlus_label_title
@@ -582,9 +588,21 @@ assert(queued[#queued] == 'console_log 1')
 run('activity', 'off')
 run('input', 'on', '15')
 local inactive_polls = log_polls
+tick(0.5)
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 322
+    and objects.ConsoleBGPlus_1.alpha > 0,
+    'Startup frame should hold even when console logging is disabled')
+local startup_full_alpha = objects.ConsoleBGPlus_1.alpha
+tick(1.0)
+assert(text_objects.ConsoleBGPlus_label_title.visible
+    and objects.ConsoleBGPlus_1.alpha > 0 and objects.ConsoleBGPlus_1.alpha < startup_full_alpha,
+    'Startup frame should fade after its saved 1000 ms hold')
+tick(0.6)
+assert(not text_objects.ConsoleBGPlus_label_title.visible,
+    'Startup frame should hide after the saved 1000 ms fade')
 for _ = 1, 30 do tick() end
 assert(log_polls == inactive_polls and not text_objects.ConsoleBGPlus_label_title.visible,
-    'Log watching must be opt-in, with no reads while disabled')
+    'Startup pulse must not poll the log when activity is off')
 run('activity', 'on')
 assert(queued[#queued] == 'console_log 1')
 run('fade', '3000', '450')
@@ -708,6 +726,17 @@ dofile(addon_path .. 'ConsoleBGPlus.lua')
 assert(queued[#queued - 2] == 'console_fadedelay 2000'
     and queued[#queued] == 'console_log 1',
     'The native profile should be restored after reload')
+tick(0.01)
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 322)
+local reload_full_alpha = objects.ConsoleBGPlus_1.alpha
+tick(1.8)
+assert(objects.ConsoleBGPlus_1.alpha == reload_full_alpha,
+    'Reload pulse should use the saved 2000 ms hold')
+tick(0.5)
+assert(objects.ConsoleBGPlus_1.alpha > 0 and objects.ConsoleBGPlus_1.alpha < reload_full_alpha,
+    'Reload pulse should use the saved 600 ms fade')
+tick(0.31)
+assert(not text_objects.ConsoleBGPlus_label_title.visible)
 local sound_count = #played_sounds
 focused = false
 console_open = true; tick()
@@ -720,6 +749,8 @@ local sound_count_at_reload = #played_sounds
 dofile(addon_path .. 'ConsoleBGPlus.lua'); tick()
 assert(#played_sounds == sound_count_at_reload,
     'Loading while the console is already open must not play the opening cue')
+assert(rectangle().height == saved.extents.y + saved.input.padding,
+    'An already open native console should begin with the full manual frame')
 callbacks.unload()
 io.open = real_open
-print('PASS: title caps and position, native console profile/load/reload, delayed/hidden label bounds, automatic tab resizing, text-only red style, optional divider, log growth, no replay, fade/manual focus, rotation, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
+print('PASS: startup hold/fade and manual takeover, native profile/load/reload, delayed/hidden label bounds, automatic tab resizing, text-only red style, optional divider, log growth, no replay, fade/manual focus, rotation, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')

@@ -54,7 +54,7 @@ def render(layout_path, output_path):
     # This local fallback shows alignment only; Windows/Windower supplies
     # the native Verdana console font and its actual metrics in game.
     console_font = font('DejaVuSans.ttf', 14)
-    lines = ['> ConsoleBG+ v0.1.12', '> A raised native Input tab and manual-open cue.',
+    lines = ['> ConsoleBG+ v0.1.13', '> A compact load-in frame pulse.',
              '> cbg edit on', '> Drag the top edge and resize the lower-right corner.',
              '> cbg diagnose', '> screenshot jpg']
     for index, line in enumerate(lines):

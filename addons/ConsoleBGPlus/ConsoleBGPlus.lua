@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.12'
+_addon.version = '0.1.13'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -39,6 +39,8 @@ local watcher = activity.new(windower.addon_path)
 local auto_alpha, close_alpha, draw_alpha = 0, 0, 255
 local input_shown, manual_was_open, output_only, closing_since =
     false, windower.console.visible(), false, nil
+local startup_since = not manual_was_open and watcher.now() or nil
+local startup_alpha = startup_since and 255 or 0
 local opening_stage = false
 local measurement_cache, measurement_order = {}, {}
 local refresh
@@ -119,13 +121,14 @@ local function update_visibility()
     local console_visible = windower.console.visible()
     local manual = preview or editing or console_visible
     local staged = opening_stage and console_visible and not preview and not editing
-    local compact = staged or (not manual and (close_alpha > 0 or auto_alpha > 0))
+    local passive_alpha = math.max(startup_alpha, auto_alpha, close_alpha)
+    local compact = staged or (not manual and passive_alpha > 0)
     if compact ~= output_only then
         output_only = compact
         refresh()
     end
-    apply_alpha(manual and 255 or math.max(auto_alpha, close_alpha))
-    visibility(manual or close_alpha > 0 or auto_alpha > 0, manual and not staged)
+    apply_alpha(manual and 255 or passive_alpha)
+    visibility(manual or passive_alpha > 0, manual and not staged)
 end
 
 local function new_label(key, text, size, red, green, blue, stroke)
@@ -353,7 +356,7 @@ local function context(console_visible)
         settings = settings, native_settings = windower.get_windower_settings() or {},
         rectangle = actual_rectangle, viewport = last_viewport, console_visible = console_visible,
         frame_visible = shown, preview = preview, edit = editing, frame = frame,
-        frame_alpha = draw_alpha, output_only = output_only,
+        frame_alpha = draw_alpha, output_only = output_only, startup_alpha = startup_alpha,
         native_position = native_position, primitive_count = #primitives,
         activity = {path = watcher.path, available = watcher.available,
             clock = watcher.clock, clock_time = now,
@@ -696,6 +699,7 @@ windower.register_event('addon command', command)
 windower.register_event('prerender', function()
     frame = frame + 1
     local console_visible = windower.console.visible()
+    if console_visible then startup_since, startup_alpha = nil, 0 end
     if manual_was_open and not console_visible then
         opening_stage = false
         play_console_sound('close')
@@ -720,9 +724,18 @@ windower.register_event('prerender', function()
         close_alpha = math.floor(255 * (1 - eased) + 0.5)
         if progress >= 1 then closing_since = nil end
     end
+    if startup_since then
+        local hold = math.max(0, settings.activity.delay_ms / 1000)
+        local duration = math.max(0.05, settings.activity.fade_ms / 1000)
+        local progress = math.max(0, math.min(1,
+            (watcher.now() - startup_since - hold) / duration))
+        local eased = progress * progress * (3 - 2 * progress)
+        startup_alpha = math.floor(255 * (1 - eased) + 0.5)
+        if progress >= 1 then startup_since = nil end
+    end
     auto_alpha = watcher.poll(settings.activity)
     local manual = preview or editing or console_visible
-    local wanted = manual or close_alpha > 0 or auto_alpha > 0
+    local wanted = manual or math.max(startup_alpha, close_alpha, auto_alpha) > 0
     if wanted then
         local screen = viewport()
         if screen.width ~= last_viewport.width or screen.height ~= last_viewport.height then
