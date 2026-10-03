@@ -10,6 +10,7 @@ local diagnostic_files, fail_diagnostics = {}, false
 local render_frame, style_calls, measurement_calls = 0, 0, 0
 local render_latency = 2
 local test_seconds, fake_log_size, log_polls = 1791050000, nil, 0
+local played_sounds, focused = {}, true
 package.preload.socket = function() return {gettime = function() return test_seconds end} end
 local real_open = io.open
 -- Keep diagnostic I/O deterministic, including open failures. PNG files
@@ -72,6 +73,13 @@ windower = {
             future_setting = 'must not be copied as a value'}
     end,
     add_to_chat = function(color, text) logs[#logs + 1] = {color, text} end,
+    has_focus = function() return focused end,
+    file_exists = function(path)
+        local file = real_open(path, 'rb')
+        if not file then return false end
+        file:close(); return true
+    end,
+    play_sound = function(path) played_sounds[#played_sounds + 1] = path end,
     register_event = function(name, fn) callbacks[name] = fn end,
 }
 function windower.prim.create(name) assert(not objects[name]); objects[name] = {} end
@@ -182,6 +190,7 @@ run('status'); assert(logs[#logs][2]:find('1888x344 (screen width)', 1, true)
     and logs[#logs][2]:find('input on (15 + 0 padding)', 1, true)
     and logs[#logs][2]:find('log activity on', 1, true))
 assert(positions[#positions].x == 66 and positions[#positions].y == 63)
+assert(#played_sounds == 0, 'Loading should not play the close cue')
 assert(text_objects.ConsoleBGPlus_label_title.font == 'Verdana')
 assert(not text_objects.ConsoleBGPlus_label_input.visible)
 all_visible(false)
@@ -355,6 +364,7 @@ run('alpha', '255'); run('gradient', '80', '230'); run('border', 'free'); run('p
 run('diagnose')
 local report = diagnostic_files[addon_path .. 'data/diagnostics.txt']
 assert(report.closed and report.text:find('hook_version=mock-hook', 1, true))
+assert(report.text:find('sound.close=true', 1, true))
 assert(report.text:find('future_setting', 1, true) and not report.text:find('must not be copied', 1, true))
 assert(report.text:find('native_position_written=16,24', 1, true))
 run('trace', 'on')
@@ -431,7 +441,8 @@ assert(saved.activity.enabled == true and saved.input.enabled == true
     and saved.input.height == 15 and saved.input.padding == 0
     and saved.labels.offset_y == 2 and saved.labels.input_size == 8
     and saved.activity.delay_ms == 1000
-    and saved.activity.fade_ms == 1000 and saved.native.font == 'Verdana')
+    and saved.activity.fade_ms == 1000 and saved.native.font == 'Verdana'
+    and saved.sound.close == true)
 run('alpha', '0')
 for _, object in pairs(objects) do
     if object.texture:find('_mid_', 1, true) then assert(object.alpha == 0) end
@@ -541,11 +552,13 @@ assert(queued[#queued] == 'console_log 1')
 run('fade', '3000', '450')
 run('trace', 'on')
 trace = diagnostic_files[addon_path .. 'data/visibility.log']
+local sound_count_before_output = #played_sounds
 fake_log_size = 10000; tick(0.16)
 assert(not text_objects.ConsoleBGPlus_label_title.visible,
     'An existing log must start at EOF rather than replaying old output')
 fake_log_size = 10014; tick(0.16)
 assert(text_objects.ConsoleBGPlus_label_title.visible)
+assert(#played_sounds == sound_count_before_output, 'Automatic output must be silent')
 local compact_height = rectangle().height
 assert(compact_height == saved.extents.y + saved.input.padding - saved.input.height,
     'Automatic output should remove exactly the configured input strip height')
@@ -588,8 +601,12 @@ assert(text_objects.ConsoleBGPlus_label_title.visible)
 console_open = true; tick(0.01)
 assert(text_objects.ConsoleBGPlus_label_input.visible and objects[top_name].alpha == original_alpha,
     'Manual opening always shows the input and full-strength frame')
+assert(#played_sounds == sound_count_before_output, 'Opening the console must be silent')
 assert(rectangle().height == compact_height + saved.input.height)
 console_open = false; tick(0.01)
+assert(#played_sounds == sound_count_before_output + 1
+    and played_sounds[#played_sounds] == addon_path .. 'assets/closeconsole.wav',
+    'Only a manual open-to-closed transition plays the bundled WAV')
 assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == compact_height + saved.input.height,
     'Closing must fade the full manual frame before hiding it')
 tick(0.22)
@@ -598,9 +615,13 @@ assert(text_objects.ConsoleBGPlus_label_title.alpha > 0
 tick(0.3)
 assert(not text_objects.ConsoleBGPlus_label_title.visible)
 run('trace', 'off')
+run('closesound', 'off'); assert(saved.sound.close == false)
 console_open = true; tick()
 run('preview', 'on'); run('edit', 'on')
 console_open = false; tick()
+assert(#played_sounds == sound_count_before_output + 1,
+    'Close sound off must silence later manual closures')
+run('closesound', 'on'); assert(saved.sound.close == true)
 assert(not text_objects.ConsoleBGPlus_label_edit.visible
     and text_objects.ConsoleBGPlus_label_title.visible,
     'Closing the console must finish edit and preview modes but still fade the frame')
@@ -632,6 +653,12 @@ dofile(addon_path .. 'ConsoleBGPlus.lua')
 assert(queued[#queued - 2] == 'console_fadedelay 2000'
     and queued[#queued] == 'console_log 1',
     'The native profile should be restored after reload')
+local sound_count = #played_sounds
+focused = false
+console_open = true; tick()
+console_open = false; tick()
+assert(#played_sounds == sound_count, 'Background game windows must stay silent')
+focused = true
 callbacks.unload()
 io.open = real_open
 print('PASS: title caps and position, native console profile/load/reload, delayed/hidden label bounds, automatic tab resizing, text-only red style, optional divider, log growth, no replay, fade/manual focus, rotation, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')

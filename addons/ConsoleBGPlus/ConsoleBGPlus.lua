@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.8'
+_addon.version = '0.1.9'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -24,6 +24,7 @@ local defaults = {
     native = {font = 'Verdana', size = 12, alpha = 255, red = 250, green = 250, blue = 250},
     activity = {enabled = true, delay_ms = 1000, fade_ms = 1000,
         native_delay_owned = false},
+    sound = {close = true},
 }
 local settings = config.load(defaults)
 local primitives, shown, preview, editing = {}, false, false, false
@@ -41,6 +42,14 @@ local refresh
 
 local function message(text, is_error)
     windower.add_to_chat(is_error and 123 or 207, '[ConsoleBG+] ' .. text)
+end
+
+local function play_close_sound()
+    if not settings.sound.close or type(windower.play_sound) ~= 'function' then return end
+    if windower.has_focus and not windower.has_focus() then return end
+    local path = windower.addon_path .. 'assets/closeconsole.wav'
+    if windower.file_exists and not windower.file_exists(path) then return end
+    pcall(windower.play_sound, path)
 end
 
 local textures, texture_error = skin.prepare(windower.addon_path)
@@ -582,6 +591,12 @@ local function command(action, ...)
         save()
         message(windower.send_command and 'Native hold and frame fade timing saved.'
             or 'Frame timing saved; native console command API unavailable.', not windower.send_command)
+    elseif action == 'closesound' then
+        local mode = args[1] and args[1]:lower()
+        if #args ~= 1 or (mode ~= 'on' and mode ~= 'off') then return usage('closesound on|off') end
+        settings.sound.close = mode == 'on'
+        save()
+        message('Manual console close sound ' .. mode .. '.')
     elseif action == 'edit' then
         local mode = args[1] and args[1]:lower()
         if #args > 1 or (mode and mode ~= 'on' and mode ~= 'off') then return usage('edit [on|off]') end
@@ -652,6 +667,7 @@ local function command(action, ...)
         message('//cbg diagnose | trace on|off. Files go to ConsoleBGPlus/data/.')
         message('//cbg preview [on|off] | status | reset. Changes save to data/settings.xml.')
         message('//cbg activity on|off | fade <hold ms> [fade ms]')
+        message('//cbg closesound on|off. Plays only when the focused manual console closes.')
     else
         message('Unknown command. Use //cbg help.', true)
     end
@@ -672,6 +688,7 @@ windower.register_event('prerender', function()
     frame = frame + 1
     local console_visible = windower.console.visible()
     if manual_was_open and not console_visible then
+        play_close_sound()
         watcher.suppress()
         local was_editing = editing
         editing, preview = false, false

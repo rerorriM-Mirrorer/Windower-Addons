@@ -5,7 +5,7 @@ local native_fields = {
     'profile_name', 'branch', 'ffxi_version', 'launcher_version', 'hook_version',
     'x_res', 'y_res', 'ui_x_res', 'ui_y_res', 'window_x_pos', 'window_y_pos',
 }
-local setting_groups = {'pos', 'extents', 'bg', 'gradient', 'border', 'glow', 'input', 'labels', 'console', 'native', 'activity'}
+local setting_groups = {'pos', 'extents', 'bg', 'gradient', 'border', 'glow', 'input', 'labels', 'console', 'native', 'activity', 'sound'}
 
 local function clean(value)
     return tostring(value):gsub('[\r\n\t]', ' ')
