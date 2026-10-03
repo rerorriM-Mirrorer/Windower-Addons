@@ -25,6 +25,7 @@ local function header(context, version)
         'Native position below is the last position written by this addon, not a queried position.',
         'Native console font, input text, output buffer, fade delay, and fade opacity: no documented getters.',
         'Input visibility currently follows console visibility; it does not establish typing focus.',
+        'Layout uses retained positive label bounds; raw native bounds can be 0x0 while hidden.',
         'No console input or output text is recorded.', '', '[Windower settings]'}
     for _, key in ipairs(native_fields) do
         if context.native_settings[key] ~= nil then
@@ -53,8 +54,12 @@ local function header(context, version)
     lines[#lines + 1] = 'native_position_written=' .. (p and (p.x .. ',' .. p.y) or 'none')
     lines[#lines + 1] = 'position_setter=' .. clean(context.position_setter)
     lines[#lines + 1] = 'divider_y=' .. clean(context.rectangle.divider_y or 'hidden')
+    lines[#lines + 1] = 'divider_visible=' .. clean(context.rectangle.divider_visible or false)
     for name, label in pairs(context.label_measurements) do
         lines[#lines + 1] = name .. '_label=' .. label.width .. 'x' .. label.height
+            .. ' (' .. clean(label.source) .. ')'
+        lines[#lines + 1] = name .. '_native_bounds=' .. clean(label.native_width)
+            .. 'x' .. clean(label.native_height)
     end
     lines[#lines + 1] = 'primitive_count=' .. context.primitive_count
     return table.concat(lines, '\n') .. '\n'

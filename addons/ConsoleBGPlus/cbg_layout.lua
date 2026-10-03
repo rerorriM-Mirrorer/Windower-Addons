@@ -23,11 +23,11 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     local height = bounded((tonumber(settings.extents.y) or 344) + padding, 348,
         minimum_height, screen_height - y)
     local fill_alpha = bounded(settings.bg.alpha, 255, 0, 255)
-    local top_alpha = bounded(settings.gradient.top, 110, 0, 255)
-    local bottom_alpha = bounded(settings.gradient.bottom, 235, 0, 255)
+    local top_alpha = bounded(settings.gradient.top, 100, 0, 255)
+    local bottom_alpha = bounded(settings.gradient.bottom, 250, 0, 255)
     local border_alpha = bounded(settings.border.alpha, 240, 0, 255)
     local glow = settings.glow or {}
-    local glow_alpha = bounded(glow.alpha, 36, 0, 255)
+    local glow_alpha = bounded(glow.alpha, 200, 0, 255)
     local red = bounded(settings.bg.red, 255, 0, 255)
     local green = bounded(settings.bg.green, 255, 0, 255)
     local blue = bounded(settings.bg.blue, 255, 0, 255)
@@ -59,8 +59,10 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     end
 
     local top_height, bottom_height, side_width, left_cap, right_cap = 10, 8, 3, 20, 64
-    local body_y = y + top_height
-    local body_height = height - top_height - bottom_height
+    -- Draw one continuous fill, including beneath the rails. The rail
+    -- textures contain only the silver pixels, so their opacity cannot
+    -- introduce a second dark strip or cut off the bottom glow.
+    local body_y, body_height = y, height
     -- At most 56 bands. Multiples of four preserve the horizontal stripe phase.
     local band_height = math.max(4, math.ceil(body_height / 224) * 4)
     local offset = 0
@@ -101,18 +103,16 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     title_width = bounded(title_width, 40, 1, 256)
     local top_start, top_end = x + left_cap, x + width - right_cap
     if width >= title_width + left_cap + right_cap + 40 then
-        local core_width = title_width + 8
+        local core_width = title_width + 4
         local core_x = top_end - core_width - 16
         local notch_x, notch_end = core_x - 8, core_x + core_width + 8
         piece('top_center', top_start, y, notch_x - top_start, top_height,
             top_rail_alpha, (notch_x - top_start) / 4, 1)
-        piece('title_plate', notch_x, y, notch_end - notch_x, top_height,
-            top_alpha * fill_alpha / 255, (notch_end - notch_x) / 4, 1)
         piece('title_left', notch_x, y, 8, top_height, top_rail_alpha)
         piece('title_right', core_x + core_width, y, 8, top_height, top_rail_alpha)
         piece('top_center', notch_end, y, top_end - notch_end, top_height,
             top_rail_alpha, (top_end - notch_end) / 4, 1)
-        rectangle.title_slot = {x = core_x + 4, y = math.max(0, y - 4)}
+        rectangle.title_slot = {x = core_x + 2, y = math.max(0, y - 4)}
     else
         piece('top_center', top_start, y, top_end - top_start,
             top_height, top_rail_alpha, (top_end - top_start) / 4, 1)
@@ -126,27 +126,34 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
         right_cap, bottom_height, bottom_rail_alpha)
 
     if settings.input.enabled == true then
-        local input_height = bounded(settings.input.height, 14, 6, math.max(6, body_height - 4))
-        local divider_y = math.max(body_y, bottom_y - input_height)
+        local inside_top = y + top_height
+        local input_height = bounded(settings.input.height, 14, 6,
+            math.max(6, height - top_height - bottom_height - 4))
+        local divider_y = math.max(inside_top, bottom_y - input_height)
         local divider_alpha = rail_alpha((divider_y - body_y) / body_height)
         rectangle.divider_y = divider_y
+        rectangle.divider_visible = settings.input.divider ~= false
         rectangle.input_alpha = bounded(divider_alpha, 240, 0, 255)
-        piece('divider_left', x, divider_y, left_cap, 2, divider_alpha)
-        piece('divider_center', x + left_cap, divider_y, width - left_cap - right_cap, 2,
-            divider_alpha, (width - left_cap - right_cap) / 4, 1)
-        piece('divider_right', x + width - right_cap, divider_y, right_cap, 2, divider_alpha)
-        local tab_height = math.max(14, bounded(input_text_height, 10, 1, 60) + 4)
-        if divider_y - body_y >= tab_height then
+        if rectangle.divider_visible then
+            piece('divider_left', x, divider_y, left_cap, 2, divider_alpha)
+            piece('divider_center', x + left_cap, divider_y, width - left_cap - right_cap, 2,
+                divider_alpha, (width - left_cap - right_cap) / 4, 1)
+            piece('divider_right', x + width - right_cap, divider_y, right_cap, 2, divider_alpha)
+        end
+        local tab_height = math.max(10, bounded(input_text_height, 10, 1, 60))
+        if divider_y - inside_top >= tab_height then
             local tab_width = math.min(bounded(input_width, 25, 1, 256) + 8,
                 width - side_width - right_cap - 4)
             tab_width = math.max(8, tab_width)
             local tab_x = settings.input.tab == 'left' and (x + side_width)
                 or math.max(x + side_width, x + width - right_cap - tab_width - 8)
             local tab_y = divider_y - tab_height
-            piece('tab_left', tab_x, tab_y, 3, tab_height, divider_alpha)
-            piece('tab_center', tab_x + 3, tab_y, tab_width - 7, tab_height, divider_alpha,
-                tab_width - 7, tab_height / 14)
-            piece('tab_right', tab_x + tab_width - 4, tab_y, 4, tab_height, divider_alpha)
+            if settings.labels.input_style == 'native' then
+                piece('tab_left', tab_x, tab_y, 3, tab_height, divider_alpha)
+                piece('tab_center', tab_x + 3, tab_y, tab_width - 7, tab_height, divider_alpha,
+                    tab_width - 7, 1)
+                piece('tab_right', tab_x + tab_width - 4, tab_y, 4, tab_height, divider_alpha)
+            end
             rectangle.input_tab = {x = tab_x, y = tab_y, width = tab_width, height = tab_height}
         end
     end

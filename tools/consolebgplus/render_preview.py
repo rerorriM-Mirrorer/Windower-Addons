@@ -36,7 +36,7 @@ def render(layout_path, output_path):
                 draw.rectangle((x, y, x + 31, y + 31), fill=(53, 53, 56, 255))
     for piece in data['pieces']:
         source = Image.open(root / 'addons/ConsoleBGPlus/assets' /
-                            ('cbgplus_v3_' + piece['texture'] + '.png')).convert('RGBA')
+                            ('cbgplus_v4_' + piece['texture'] + '.png')).convert('RGBA')
         tile_width = max(1, round(piece['width'] / piece['repeat_x']))
         tile_height = max(1, round(piece['height'] / piece['repeat_y']))
         source = source.resize((tile_width, tile_height), Image.Resampling.NEAREST)
@@ -54,7 +54,7 @@ def render(layout_path, output_path):
     # Verdana remains the user's in-game console font. This local fallback
     # shows alignment only; Windows/Windower supplies the actual typeface.
     console_font = font('DejaVuSans.ttf', 14)
-    lines = ['> ConsoleBG+ v0.1.2', '> Linked movement, a compact tab, and softly capped title.',
+    lines = ['> ConsoleBG+ v0.1.3', '> Stable label bounds, text-only red input, and continuous glow.',
              '> cbg edit on', '> Drag the top edge and resize the lower-right corner.',
              '> cbg diagnose', '> screenshot jpg']
     for index, line in enumerate(lines):

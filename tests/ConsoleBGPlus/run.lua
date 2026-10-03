@@ -7,6 +7,8 @@ local console_open, screen_width, screen_height = false, 1920, 1080
 local visibility_calls, geometry_calls = 0, 0
 local save_calls, positions, console_writes = 0, {}, 0
 local diagnostic_files, fail_diagnostics = {}, false
+local render_frame, style_calls, measurement_calls = 0, 0, 0
+local render_latency = 2
 local real_open = io.open
 -- Keep diagnostic I/O deterministic, including open failures. PNG files
 -- still use the real filesystem and must contain valid image bytes.
@@ -99,9 +101,14 @@ function windower.text.set_visibility(name, value)
     assert(type(value) == 'boolean'); text_objects[name].visible = value
     visibility_calls = visibility_calls + 1
 end
-function windower.text.set_font(name, value) text_objects[name].font = value end
-function windower.text.set_font_size(name, value) text_objects[name].size = value end
-function windower.text.set_text(name, value) text_objects[name].text = value end
+local function native_style(name, key, value)
+    local object = text_objects[name]
+    object[key], object.ready = value, render_frame + render_latency
+    style_calls = style_calls + 1
+end
+function windower.text.set_font(name, value) native_style(name, 'font', value) end
+function windower.text.set_font_size(name, value) native_style(name, 'size', value) end
+function windower.text.set_text(name, value) native_style(name, 'text', value) end
 function windower.text.set_italic(name, value) text_objects[name].italic = value end
 function windower.text.set_bold(name, value) text_objects[name].bold = value end
 function windower.text.set_right_justified(name, value) text_objects[name].right = value end
@@ -119,7 +126,9 @@ function windower.text.set_location(name, x, y)
 end
 function windower.text.get_extents(name)
     local object = text_objects[name]
-    return math.ceil(#object.text * object.size * 0.8), math.ceil(object.size * 1.4)
+    measurement_calls = measurement_calls + 1
+    if not object.visible then return 0, 0 end
+    return object.rendered_width or 0, object.rendered_height or 0
 end
 
 local function count()
@@ -133,7 +142,19 @@ local function all_visible(value)
     if not value then assert(not text_objects.ConsoleBGPlus_label_input.visible) end
 end
 local function run(...) callbacks['addon command'](...) end
-local function tick() callbacks.prerender() end
+local function tick()
+    callbacks.prerender()
+    render_frame = render_frame + 1
+    for _, object in pairs(text_objects) do
+        if object.visible and render_frame >= object.ready then
+            local width_factor = object.font == 'Meiryo' and 0.9 or 0.8
+            local height_factor = object.font == 'Meiryo' and 2.4 or 1.4
+            object.rendered_width = math.ceil(#object.text * object.size * width_factor)
+            object.rendered_height = math.ceil(object.size * height_factor)
+        end
+    end
+end
+local function settle() for _ = 1, 16 do tick() end end
 local function mouse(kind, x, y, blocked) return callbacks.mouse(kind, x, y, 0, blocked) end
 local function rectangle()
     local top, bottom, right
@@ -149,19 +170,28 @@ end
 dofile(addon_path .. 'ConsoleBGPlus.lua')
 assert(count() > 10 and count() <= 199)
 run('status'); assert(logs[#logs][2]:find('1856x348 (screen width)', 1, true))
-assert(positions[#positions].x == 32 and positions[#positions].y == 16)
+assert(positions[#positions].x == 82 and positions[#positions].y == 31)
 assert(text_objects.ConsoleBGPlus_label_title.font == 'Verdana')
 assert(not text_objects.ConsoleBGPlus_label_input.visible)
 all_visible(false)
 console_open = true; tick(); all_visible(true)
+settle()
 local calls = visibility_calls
 local geometry = geometry_calls
+local styles, measurements = style_calls, measurement_calls
 local native_calls = #positions
 for _ = 1, 60 do tick() end
 assert(visibility_calls == calls and geometry_calls == geometry,
     'An unchanged frame should not redraw its primitives on every tick')
 assert(#positions == native_calls, 'An unchanged frame must not rewrite console position')
+assert(style_calls == styles and measurement_calls == measurements,
+    'Settled labels must not reset fonts or poll native measurements on idle frames')
 console_open = false; tick(); all_visible(false)
+run('diagnose')
+local hidden_report = diagnostic_files[addon_path .. 'data/diagnostics.txt'].text
+assert(hidden_report:find('title_label=45x12 (measured)', 1, true)
+    and hidden_report:find('title_native_bounds=0x0', 1, true),
+    'A hidden zero must not overwrite the retained positive title bounds')
 run('preview', 'on'); all_visible(true)
 run('preview', 'off'); all_visible(false)
 
@@ -172,7 +202,7 @@ assert(saved.pos.x == 16 and saved.pos.y == 24)
 assert(saved.extents.x == 960 and saved.extents.y + saved.input.padding == 320)
 assert(saved.gradient.top == 80 and saved.gradient.bottom == 230)
 local old_count = count()
-run('input', 'on', '26'); assert(count() == old_count + 6 and saved.input.enabled)
+run('input', 'on', '26'); assert(count() == old_count + 3 and saved.input.enabled)
 run('preview', 'on'); assert(text_objects.ConsoleBGPlus_label_input.visible)
 run('tab', 'right')
 local right_tab_x = text_objects.ConsoleBGPlus_label_input.x
@@ -196,7 +226,7 @@ local saves_before_drag = save_calls
 assert(mouse(1, r.x + 30, r.y + 2))
 assert(mouse(0, r.x + 110, r.y + 62))
 assert(save_calls == saves_before_drag, 'Dragging must not write XML on every mouse move')
-assert(positions[#positions].x == r.x + 80 and positions[#positions].y == r.y + 60)
+assert(positions[#positions].x == r.x + 130 and positions[#positions].y == r.y + 75)
 assert(mouse(2, -10, -10))
 assert(save_calls == saves_before_drag + 1 and saved.pos.x == r.x + 80 and saved.pos.y == r.y + 60)
 
@@ -236,6 +266,36 @@ run('label', '$'); assert(text_objects.ConsoleBGPlus_label_input.text == '$')
 run('tabstyle', 'native'); assert(text_objects.ConsoleBGPlus_label_input.stroke == 0)
 run('labelfont', 'Meiryo'); assert(text_objects.ConsoleBGPlus_label_title.font == 'Meiryo')
 run('labelsize', '8', '10'); assert(text_objects.ConsoleBGPlus_label_input.visible)
+settle()
+local function plaque()
+    local left, right
+    for _, object in pairs(objects) do
+        if object.texture:find('_tab_left.png', 1, true) then left = object end
+        if object.texture:find('_tab_right.png', 1, true) then right = object end
+    end
+    return left and {x = left.x, y = left.y, width = right.x + right.width - left.x, height = left.height}
+end
+run('label', 'Input'); settle()
+assert(plaque().width == 53 and plaque().height == 24,
+    'The native plaque should fit rendered Meiryo text without extra vertical padding')
+run('label', '$'); settle(); assert(plaque().width == 17)
+render_latency = 7
+run('label', 'Input'); settle(); assert(plaque().width == 53,
+    'Changing $ back to Input must recover the new size without a second command')
+render_latency = 2
+-- Reopening and unrelated commands while hidden keep the last good bounds.
+run('preview', 'off'); console_open = false; tick()
+run('position', '17', '24'); assert(plaque().width == 53)
+run('preview', 'on'); settle(); assert(plaque().width == 53)
+run('tabstyle', 'red'); settle(); assert(not plaque(), 'Red mode should have no plaque primitives')
+local with_divider = count()
+local input_x, input_y = text_objects.ConsoleBGPlus_label_input.x, text_objects.ConsoleBGPlus_label_input.y
+run('divider', 'off')
+assert(count() == with_divider - 3 and text_objects.ConsoleBGPlus_label_input.visible)
+assert(text_objects.ConsoleBGPlus_label_input.x == input_x and text_objects.ConsoleBGPlus_label_input.y == input_y,
+    'Hiding the divider must preserve the input label anchor')
+run('divider', 'on'); assert(count() == with_divider)
+run('position', '16', '24')
 run('labeloffset', '-1')
 run('label', 'Input'); run('labelfont', 'Verdana'); run('labelsize', '8', '7')
 run('labeloffset', '-2'); run('tabstyle', 'red'); run('input', 'off'); run('preview', 'off')
@@ -296,6 +356,7 @@ run('tab', 'centre')
 run('inputpad', '33')
 run('labeloffset', '-13')
 run('console', 'sometimes')
+run('divider', 'sometimes')
 run('offset', 'NaN', '0')
 assert(saved.extents.x == before.extents.x and saved.gradient.top == before.gradient.top)
 assert(saved.pos.x == before.pos.x and saved.bg.red == before.bg.red)
@@ -315,13 +376,15 @@ callbacks.unload(); assert(count() == 0 and next(text_objects) == nil)
 -- A v0.1.0 settings file retains the user's colors/position while new
 -- fields receive their defaults from Windower's config library.
 saved.extents.mode, saved.glow, saved.input.tab = nil, nil, nil
-saved.input.padding, saved.labels, saved.console, saved.border.linked = nil, nil, nil, nil
+saved.input.padding, saved.input.divider, saved.labels, saved.console, saved.border.linked = nil, nil, nil, nil, nil
 dofile(addon_path .. 'ConsoleBGPlus.lua')
 run('status'); assert(logs[#logs][2]:find('1888x320 (screen width)', 1, true))
 assert(logs[#logs][2]:find('gradient 80 to 230', 1, true))
 config.callback()
 run('reset')
-assert(saved.pos.x == 32 and saved.extents.x == 1070 and saved.extents.mode == 'screen' and saved.gradient.top == 110)
+assert(saved.pos.x == 32 and saved.extents.x == 1070 and saved.extents.mode == 'screen' and saved.gradient.top == 100)
+assert(saved.gradient.bottom == 250 and saved.glow.alpha == 200 and saved.glow.height == 24)
+assert(saved.console.offset_x == 50 and saved.console.offset_y == 15 and saved.input.divider)
 run('alpha', '0')
 for _, object in pairs(objects) do
     if object.texture:find('_mid_', 1, true) then assert(object.alpha == 0) end
@@ -358,7 +421,7 @@ local function export(path, viewport)
     file:write(']}'); file:close()
 end
 run('position', '0', '0'); run('input', 'on', '14')
-console_open = true; tick()
+console_open = true; tick(); settle()
 export('reference/layout.json', {width = 1920, height = 1080})
 run('size', '1070', '348')
 export('reference/layout_fixed.json', {width = 1920, height = 1080})
@@ -368,6 +431,10 @@ run('edit', 'on')
 export('reference/layout_edit.json', {width = 1920, height = 1080})
 run('edit', 'off'); run('border', 'link')
 export('reference/layout_linked.json', {width = 1920, height = 1080})
+run('glow', '200', '24'); run('tabstyle', 'native'); settle()
+export('reference/layout_native.json', {width = 1920, height = 1080})
+run('tabstyle', 'red'); run('divider', 'off'); settle()
+export('reference/layout_plain.json', {width = 1920, height = 1080})
 run('reset'); run('input', 'on')
 for _, viewport in ipairs({{width=120,height=40}, {width=80,height=30}, {width=1,height=1}, {width=640,height=240}, {width=3840,height=2160}}) do
     local pieces = layout.build(saved, viewport, 40, 25, true)
@@ -385,11 +452,11 @@ local queued = {}
 windower.console.set_position = nil
 windower.send_command = function(value) queued[#queued + 1] = value end
 dofile(addon_path .. 'ConsoleBGPlus.lua')
-assert(queued[1] == 'console_position 32 16')
+assert(queued[1] == 'console_position 82 31')
 for _ = 1, 60 do tick() end
 assert(#queued == 1)
 run('trace', 'on')
 trace = diagnostic_files[addon_path .. 'data/visibility.log']
 callbacks.unload(); assert(trace.closed and count() == 0 and next(text_objects) == nil)
 io.open = real_open
-print('PASS: mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, font/tab controls, legacy settings, idle rendering, API fallback, and unload cleanup.')
+print('PASS: delayed/hidden label bounds, automatic tab resizing, text-only red style, optional divider, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')

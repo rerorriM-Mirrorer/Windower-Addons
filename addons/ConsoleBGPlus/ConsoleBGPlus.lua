@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.2'
+_addon.version = '0.1.3'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -13,13 +13,13 @@ local defaults = {
     bg = {alpha = 255, red = 255, green = 255, blue = 255},
     pos = {x = 32, y = 16},
     extents = {x = 1070, y = 344, mode = 'screen'},
-    gradient = {top = 110, bottom = 235},
+    gradient = {top = 100, bottom = 250},
     border = {alpha = 240, linked = false},
-    glow = {alpha = 36, height = 24},
-    input = {enabled = false, height = 14, padding = 4, tab = 'left'},
+    glow = {alpha = 200, height = 24},
+    input = {enabled = false, height = 14, padding = 4, tab = 'left', divider = true},
     labels = {font = 'Verdana', title_size = 8, input_size = 7,
         input_text = 'Input', input_style = 'red', offset_y = -2},
-    console = {linked = true, offset_x = 0, offset_y = 0},
+    console = {linked = true, offset_x = 50, offset_y = 15},
 }
 local settings = config.load(defaults)
 local primitives, shown, preview, editing = {}, false, false, false
@@ -29,6 +29,7 @@ local drag, native_position, position_warning = nil, nil, false
 local position_dirty = true
 local frame = 0
 local recorder = diagnostics.new(windower.addon_path, _addon.version)
+local measurement_cache, measurement_order = {}, {}
 
 local function message(text, is_error)
     windower.add_to_chat(is_error and 123 or 207, '[ConsoleBG+] ' .. text)
@@ -48,12 +49,23 @@ local function viewport()
     }
 end
 
+local function label_visibility(label, visible)
+    if label.visible == visible then return end
+    windower.text.set_visibility(label.name, visible)
+    label.visible = visible
+    if visible then
+        -- Hidden text can report 0x0. Keep its previous bounds, then allow
+        -- fresh render passes before reading the native measurement again.
+        label.pending, label.wait, label.stable = true, 0, 0
+    end
+end
+
 local function visibility(visible)
     for _, primitive in ipairs(primitives) do
         windower.prim.set_visibility(primitive.name, visible)
     end
     for _, label in pairs(labels) do
-        windower.text.set_visibility(label.name, visible and label.enabled)
+        label_visibility(label, visible and label.enabled)
     end
     shown = visible
 end
@@ -73,7 +85,8 @@ local function new_label(key, text, size, red, green, blue, stroke)
     windower.text.set_color(name, 240, red, green, blue)
     windower.text.set_stroke_width(name, stroke)
     windower.text.set_stroke_color(name, 220, 15, 14, 28)
-    labels[key] = {name = name, enabled = false}
+    labels[key] = {name = name, enabled = false, visible = false,
+        font = 'Verdana', size = size, text = text, stroke = stroke}
 end
 
 new_label('title', 'Console', 8, 235, 234, 245, 1)
@@ -98,24 +111,53 @@ local function sync_console(rect, screen)
     position_dirty = false
 end
 
+local function label_metrics(label)
+    local key = table.concat({label.font, label.size, label.text, label.stroke}, '\0')
+    if label.measurement_key == key then return end
+    label.measurement_key = key
+    local cached = measurement_cache[key]
+    -- Estimates only cover the first visible render or a new font/text.
+    -- Native positive measurements replace them without another command.
+    label.width = cached and cached.width or math.max(1, math.ceil(#label.text * label.size * 0.8))
+    label.height = cached and cached.height or math.max(1, math.ceil(label.size * 1.8))
+    label.source = cached and 'cached' or 'estimated'
+    label.pending, label.wait, label.stable = true, 0, 0
+end
+
 local function style_labels()
     for _, key in ipairs({'title', 'input'}) do
         local label = labels[key]
-        windower.text.set_font(label.name, settings.labels.font)
-        windower.text.set_font_size(label.name, settings.labels[key .. '_size'])
+        local font, size = settings.labels.font, settings.labels[key .. '_size']
+        if label.font ~= font then
+            windower.text.set_font(label.name, font)
+            label.font = font
+        end
+        if label.size ~= size then
+            windower.text.set_font_size(label.name, size)
+            label.size = size
+        end
     end
-    windower.text.set_text(labels.input.name, settings.labels.input_text)
+    local input = labels.input
+    if input.text ~= settings.labels.input_text then
+        windower.text.set_text(input.name, settings.labels.input_text)
+        input.text = settings.labels.input_text
+    end
     local native = settings.labels.input_style == 'native'
-    windower.text.set_stroke_width(labels.input.name, native and 0 or 1)
-    labels.input.red, labels.input.green, labels.input.blue = native and 25 or 233,
+    local stroke = native and 0 or 1
+    if input.stroke ~= stroke then
+        windower.text.set_stroke_width(input.name, stroke)
+        input.stroke = stroke
+    end
+    input.red, input.green, input.blue = native and 25 or 233,
         native and 24 or 107, native and 43 or 124
+    for _, label in pairs(labels) do label_metrics(label) end
 end
 
 local function refresh(screen)
     screen = screen or viewport()
     style_labels()
-    local title_width, title_height = windower.text.get_extents(labels.title.name)
-    local input_width, input_height = windower.text.get_extents(labels.input.name)
+    local title_width, title_height = labels.title.width, labels.title.height
+    local input_width, input_height = labels.input.width, labels.input.height
     local pieces
     pieces, actual_rectangle = layout.build(settings, screen, title_width, input_width, editing, input_height)
     for index, piece in ipairs(pieces) do
@@ -149,7 +191,7 @@ local function refresh(screen)
     if rect.title_slot then
         windower.text.set_location(title.name, rect.title_slot.x, rect.title_slot.y)
     end
-    windower.text.set_visibility(title.name, shown and title.enabled)
+    label_visibility(title, shown and title.enabled)
     local input = labels.input
     local tab = rect.input_tab
     input.enabled = tab ~= nil and input_width + 8 <= tab.width and input_height <= tab.height
@@ -159,14 +201,54 @@ local function refresh(screen)
         windower.text.set_location(input.name, tab.x + 4,
             math.max(0, tab.y + math.floor((tab.height - input_height) / 2) + settings.labels.offset_y))
     end
-    windower.text.set_visibility(input.name, shown and input.enabled)
+    label_visibility(input, shown and input.enabled)
     local edit = labels.edit
-    local edit_width, edit_height = windower.text.get_extents(edit.name)
+    local edit_width, edit_height = edit.width, edit.height
     edit.enabled = editing and rect.width >= edit_width + 24 and rect.height >= edit_height + 30
-    windower.text.set_location(edit.name, rect.x + 12, rect.y + 12)
-    windower.text.set_visibility(edit.name, shown and edit.enabled)
+    windower.text.set_location(edit.name, math.max(rect.x + 12, rect.x + rect.width - edit_width - 16),
+        rect.y + 14)
+    label_visibility(edit, shown and edit.enabled)
     sync_console(rect, screen)
     last_viewport = screen
+end
+
+local function measure_labels()
+    local changed = false
+    for _, label in pairs(labels) do
+        if label.visible and label.pending then
+            label.wait = label.wait + 1
+            -- Font/text setters may not have reached the renderer in the
+            -- same callback. A hidden zero or stale prior extent never
+            -- replaces the layout immediately after a style change.
+            if label.wait >= 3 then
+                local width, height = windower.text.get_extents(label.name)
+                if type(width) == 'number' and type(height) == 'number'
+                    and width > 0 and height > 0 and width < 65536 and height < 65536 then
+                    width, height = math.ceil(width), math.ceil(height)
+                    if width ~= label.width or height ~= label.height then
+                        label.width, label.height, label.stable = width, height, 0
+                        changed = true
+                    else
+                        label.stable = label.stable + 1
+                    end
+                    label.source = 'settling'
+                    if label.wait >= 12 and label.stable >= 3 then
+                        local key = label.measurement_key
+                        if not measurement_cache[key] then
+                            measurement_order[#measurement_order + 1] = key
+                            if #measurement_order > 64 then
+                                measurement_cache[table.remove(measurement_order, 1)] = nil
+                            end
+                        end
+                        measurement_cache[key] = {width = width, height = height}
+                        label.source, label.pending = 'measured', false
+                    end
+                end
+            end
+            if label.wait >= 60 then label.pending = false end
+        end
+    end
+    if changed then refresh() end
 end
 
 local function save()
@@ -186,6 +268,13 @@ local function end_drag()
 end
 
 local function context(console_visible)
+    local measurements = {}
+    for _, key in ipairs({'title', 'input'}) do
+        local label = labels[key]
+        local native_width, native_height = windower.text.get_extents(label.name)
+        measurements[key] = {width = label.width, height = label.height, source = label.source,
+            native_width = native_width, native_height = native_height}
+    end
     return {
         settings = settings, native_settings = windower.get_windower_settings() or {},
         rectangle = actual_rectangle, viewport = last_viewport, console_visible = console_visible,
@@ -193,12 +282,7 @@ local function context(console_visible)
         native_position = native_position, primitive_count = #primitives,
         position_setter = windower.console.set_position and 'console.set_position'
             or (windower.send_command and 'console_position command' or 'unavailable'),
-        label_measurements = {
-            title = {width = select(1, windower.text.get_extents(labels.title.name)),
-                height = select(2, windower.text.get_extents(labels.title.name))},
-            input = {width = select(1, windower.text.get_extents(labels.input.name)),
-                height = select(2, windower.text.get_extents(labels.input.name))},
-        },
+        label_measurements = measurements,
     }
 end
 
@@ -303,7 +387,13 @@ local function command(action, ...)
         settings.input.enabled = mode == 'on'
         if height then settings.input.height = height end
         save()
-        message('Input strip and tab ' .. mode .. ' (shown with the console).')
+        message('Input label ' .. mode .. ' (shown with the console).')
+    elseif action == 'divider' then
+        local mode = args[1] and args[1]:lower()
+        if #args ~= 1 or (mode ~= 'on' and mode ~= 'off') then return usage('divider on|off') end
+        settings.input.divider = mode == 'on'
+        save()
+        message('Input divider ' .. mode .. '.')
     elseif action == 'inputpad' then
         local value = numbers(args, 1, 0, 32)
         if not value then return usage('inputpad <bottom padding 0-32>') end
@@ -418,7 +508,7 @@ local function command(action, ...)
         message('//cbg width screen|<pixels> | glow <alpha> [height]')
         message('//cbg gradient <top> <bottom> | alpha <0-255> | border <0-255>|link|free')
         message('//cbg color <alpha> <red> <green> <blue> | input on|off [height] | tab left|right')
-        message('//cbg inputpad <0-32> | tabstyle red|native | label <text>')
+        message('//cbg inputpad <0-32> | divider on|off | tabstyle red|native | label <text>')
         message('//cbg labelfont <font> | labelsize <title> <input> | labeloffset <-12 to 12>')
         message('//cbg diagnose | trace on|off. Files go to ConsoleBGPlus/data/.')
         message('//cbg preview [on|off] | status | reset. Changes save to data/settings.xml.')
@@ -440,10 +530,14 @@ windower.register_event('prerender', function()
     if wanted then
         local screen = viewport()
         if screen.width ~= last_viewport.width or screen.height ~= last_viewport.height then
+            for _, label in pairs(labels) do
+                label.pending, label.wait, label.stable = true, 0, 0
+            end
             refresh(screen)
         end
     end
     if wanted ~= shown then visibility(wanted) end
+    if wanted then measure_labels() end
     if recorder.active then
         local ok, err = recorder.observe(context(console_visible))
         if err then message('Visibility trace: ' .. tostring(err), true) end

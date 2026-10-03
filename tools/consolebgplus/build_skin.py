@@ -14,14 +14,27 @@ from PIL import Image, ImageDraw
 
 def build(source: Path, destination: Path):
     tiles = {}
-    middle = None
     top = None
     for name in ('top', 'mid', 'bottom'):
         path = source / (name + '.png')
         if not path.exists():
             path = source / ('Bg' + name.title() + '.png')
         image = Image.open(path).convert('RGBA')
-        if name == 'mid': middle = image
+        if name == 'mid':
+            # The fill starts at the outer top instead of below the 10px
+            # rail. Rotate by two rows to keep the native body stripe phase.
+            original = image.copy()
+            for y in range(image.height):
+                image.paste(original.crop((0, (y + 2) % 4, image.width, (y + 2) % 4 + 1)), (0, y))
+        else:
+            # Only the silver rail is overlaid on the continuous fill.
+            # Its baked background would darken the first/last stripe rows.
+            rail_rows = range(3) if name == 'top' else range(5, 8)
+            for y in range(image.height):
+                if y not in rail_rows:
+                    for x in range(image.width):
+                        r, g, b, _ = image.getpixel((x, y))
+                        image.putpixel((x, y), (r, g, b, 0))
         if name == 'top': top = image
         # The native right fade occupies 64px. Taking only its final 20px
         # starts almost transparent and leaves a visible step at the join.
@@ -53,16 +66,6 @@ def build(source: Path, destination: Path):
                 stream = io.BytesIO()
                 glow.save(stream, 'PNG')
                 tiles[tile_name.replace('mid_', 'glow_')] = base64.b64encode(stream.getvalue()).decode('ascii')
-
-    # A small stripe-only patch makes a notch in the silver rail behind the
-    # title. Its rows remain aligned with the body below the ten-pixel cap.
-    title_plate = Image.new('RGBA', (4, 10))
-    for y in range(10):
-        for x in range(4):
-            title_plate.putpixel((x, y), middle.getpixel((208 + x, (y - 10) % 4)))
-    stream = io.BytesIO()
-    title_plate.save(stream, 'PNG')
-    tiles['title_plate'] = base64.b64encode(stream.getvalue()).decode('ascii')
 
     # Fade the rail into the title notch on both sides. The layout leaves
     # out the original rail under these caps, so a translucent cap cannot
@@ -132,7 +135,7 @@ function skin.prepare(root)
     if windower.create_dir then windower.create_dir(directory) end
     local paths = {}
     for name, encoded in pairs(images) do
-        local path = directory .. 'cbgplus_v3_' .. name .. '.png'
+        local path = directory .. 'cbgplus_v4_' .. name .. '.png'
         local bytes = decode(encoded)
         local existing = io.open(path, 'rb')
         local unchanged = false
