@@ -216,7 +216,7 @@ assert(#positions == native_calls, 'An unchanged frame must not rewrite console 
 assert(style_calls == styles and measurement_calls == measurements,
     'Settled labels must not reset fonts or poll native measurements on idle frames')
 console_open = false; tick()
-assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 329
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 322
     and not text_objects.ConsoleBGPlus_label_input.visible,
     'Manual close must immediately use the compact output frame')
 for _, object in pairs(objects) do
@@ -536,7 +536,8 @@ for _, viewport in ipairs({{width=120,height=40}, {width=80,height=30}, {width=1
     local pieces, full_rect = layout.build(saved, viewport, 40, 25, true)
     local _, compact_rect = layout.build(saved, viewport, 40, 25, false, 12, true)
     assert(compact_rect.height == math.max(math.min(40, viewport.height),
-        full_rect.height - saved.input.height), 'Compact height must follow the clipped full frame')
+        full_rect.height - saved.input.height - 7),
+        'Compact height must follow the clipped full frame and seven-pixel trim')
     for _, piece in ipairs(pieces) do
         assert(piece.x >= 0 and piece.y >= 0)
         assert(piece.x + piece.width <= viewport.width and piece.y + piece.height <= viewport.height,
@@ -596,8 +597,8 @@ fake_log_size = 10014; tick(0.16)
 assert(text_objects.ConsoleBGPlus_label_title.visible)
 assert(#played_sounds == sound_count_before_output, 'Automatic output must be silent')
 local compact_height = rectangle().height
-assert(compact_height == saved.extents.y + saved.input.padding - saved.input.height,
-    'Automatic output should remove exactly the configured input strip height')
+assert(compact_height == saved.extents.y + saved.input.padding - saved.input.height - 7,
+    'Automatic output should remove the input strip plus seven pixels')
 assert(not text_objects.ConsoleBGPlus_label_input.visible,
     'Automatic output must not imply typing focus or show the input label')
 for _, object in pairs(objects) do
@@ -635,10 +636,14 @@ assert(not text_objects.ConsoleBGPlus_label_title.visible,
 fake_log_size = 30; tick(0.16)
 assert(text_objects.ConsoleBGPlus_label_title.visible)
 console_open = true; tick(0.01)
-assert(text_objects.ConsoleBGPlus_label_input.visible and objects[top_name].alpha == original_alpha,
-    'Manual opening always shows the input and full-strength frame')
+assert(not text_objects.ConsoleBGPlus_label_input.visible and rectangle().height == compact_height
+    and objects[top_name].alpha == original_alpha,
+    'The first manual-open frame shows only the compact body at full strength')
 assert(#played_sounds == sound_count_before_output, 'Opening the console must be silent')
-assert(rectangle().height == compact_height + saved.input.height)
+tick(1 / 30)
+assert(text_objects.ConsoleBGPlus_label_input.visible
+    and rectangle().height == compact_height + saved.input.height + 7,
+    'The following frame expands and adds the Input strip')
 console_open = false; tick(0.01)
 assert(#played_sounds == sound_count_before_output + 1
     and played_sounds[#played_sounds] == addon_path .. 'assets/closeconsole.wav',

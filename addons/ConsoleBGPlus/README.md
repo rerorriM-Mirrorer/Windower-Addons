@@ -6,7 +6,7 @@ An FFXI-style frame for the Windower 4 console, with XIVParty's violet stripes, 
 
 Extract the ConsoleBGPlus folder into Windower/addons. When updating, replace the addon files and **keep your data folder**; the ZIP contains no settings file. In FFXI chat, run **//lua load ConsoleBGPlus** for a first install or **//lua reload ConsoleBGPlus** after updating. Unload the original ConsoleBG addon if it is running.
 
-Fresh settings start at **16,48** with equal left and right margins, a 344-pixel full height, Verdana 12 native console text, and a 15-pixel Input strip. Automatic output shows a 329-pixel frame without the Input label. Existing saved positions, input heights, colors, and activity choices stay as they are. **//cbg reset** applies the new defaults if you want to start over.
+Fresh settings start at **16,48** with equal left and right margins, a 344-pixel full height, Verdana 12 native console text, and a 15-pixel Input strip. Automatic output shows a 322-pixel frame without the Input area: the 15-pixel strip plus 7 extra pixels are removed. Existing saved positions, input heights, colors, and activity choices stay as they are. **//cbg reset** applies the new defaults if you want to start over.
 
 ## Move and resize
 
@@ -57,7 +57,7 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
     //cbg reset                                 Apply fresh defaults
     //cbg help                                  Show command groups in game
 
-The default native font is Verdana 12 with color 255 250 250 250. The Input and Console labels use Verdana 8. **//cbg fade 1000 1000** gives automatic output a 1000 ms hold followed by a 1000 ms frame fade. Closing a manually opened console immediately removes the Input strip, divider, and tab, shortens the frame by the saved Input height, then fades that output-only frame over the saved 1000 ms duration. **//cbg activity on** also enables native console_log 1, which the output watcher needs. The watcher checks only the file's byte length, about eight times per second, and restarts the full hold whenever it sees growth. Activity off turns native logging off for this addon.
+The default native font is Verdana 12 with color 255 250 250 250. The Input and Console labels use Verdana 8. **//cbg fade 1000 1000** gives automatic output a 1000 ms hold followed by a 1000 ms frame fade. On manual opening, the first rendered frame shows the compact output body; the next frame expands to full height with the Input area. Closing a manually opened console immediately removes the Input strip, divider, and tab, returns to the same compact output height, then fades over the saved 1000 ms duration. **//cbg activity on** also enables native console_log 1, which the output watcher needs. The watcher checks only the file's byte length, about eight times per second, and restarts the full hold whenever it sees growth. Activity off turns native logging off for this addon.
 
 The bundled close cue plays once when a manually open native console closes in the focused game window. It does not play for automatic output fading or for opening the console. Use **//cbg closesound off** to silence it, or replace **assets/closeconsole.wav** with another short PCM WAV. The addon detects the native open-to-closed transition; Windower does not identify which key closed it.
 

@@ -23,7 +23,8 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     local full_height = bounded((tonumber(settings.extents.y) or 344) + padding, 344,
         minimum_height, screen_height - y)
     local strip_height = settings.input.enabled == true and bounded(settings.input.height, 15, 6, 256) or 0
-    local height = output_only and math.max(minimum_height, full_height - strip_height) or full_height
+    -- A little breathing room below the last output row, beyond the Input strip.
+    local height = output_only and math.max(minimum_height, full_height - strip_height - 7) or full_height
     local fill_alpha = bounded(settings.bg.alpha, 255, 0, 255)
     local top_alpha = bounded(settings.gradient.top, 100, 0, 255)
     local bottom_alpha = bounded(settings.gradient.bottom, 250, 0, 255)

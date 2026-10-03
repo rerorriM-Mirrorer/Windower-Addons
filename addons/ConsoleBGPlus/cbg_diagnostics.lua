@@ -23,7 +23,7 @@ end
 local function header(context, version)
     local lines = {'ConsoleBG+ v' .. version,
         'UTC: ' .. os.date('!%Y-%m-%dT%H:%M:%SZ'), sample(context),
-        'The full frame includes input.padding; output-only activity removes the saved input height.',
+        'The full frame includes input.padding; output-only mode removes the saved input height plus 7 pixels.',
         'Native position below is the last position written by this addon, not a queried position.',
         'Native console font, input text, output buffer, fade delay, and fade opacity: no documented getters.',
         'Input styling follows manual console opening; log growth only controls the output frame.',

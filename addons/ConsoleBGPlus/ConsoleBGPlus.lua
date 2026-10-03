@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.10'
+_addon.version = '0.1.11'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -38,6 +38,7 @@ local recorder = diagnostics.new(windower.addon_path, _addon.version)
 local watcher = activity.new(windower.addon_path)
 local auto_alpha, close_alpha, draw_alpha = 0, 0, 255
 local input_shown, manual_was_open, output_only, closing_since = false, false, false, nil
+local opening_stage = false
 local measurement_cache, measurement_order = {}, {}
 local refresh
 
@@ -113,14 +114,16 @@ local function visibility(visible, input_mode)
 end
 
 local function update_visibility()
-    local manual = preview or editing or windower.console.visible()
-    local compact = not manual and (close_alpha > 0 or auto_alpha > 0)
+    local console_visible = windower.console.visible()
+    local manual = preview or editing or console_visible
+    local staged = opening_stage and console_visible and not preview and not editing
+    local compact = staged or (not manual and (close_alpha > 0 or auto_alpha > 0))
     if compact ~= output_only then
         output_only = compact
         refresh()
     end
     apply_alpha(manual and 255 or math.max(auto_alpha, close_alpha))
-    visibility(manual or close_alpha > 0 or auto_alpha > 0, manual)
+    visibility(manual or close_alpha > 0 or auto_alpha > 0, manual and not staged)
 end
 
 local function new_label(key, text, size, red, green, blue, stroke)
@@ -679,7 +682,7 @@ end
 refresh()
 sync_native_profile()
 local registration = config.register(settings, function()
-    drag, hover_target, position_dirty = nil, nil, true
+    drag, hover_target, position_dirty, opening_stage = nil, nil, true, false
     watcher.restart()
     auto_alpha = 0
     refresh()
@@ -691,6 +694,7 @@ windower.register_event('prerender', function()
     frame = frame + 1
     local console_visible = windower.console.visible()
     if manual_was_open and not console_visible then
+        opening_stage = false
         play_close_sound()
         watcher.suppress()
         local was_editing = editing
@@ -699,6 +703,7 @@ windower.register_event('prerender', function()
         if was_editing then refresh() end
         closing_since, close_alpha = watcher.now(), 255
     elseif console_visible then
+        if not manual_was_open and not preview and not editing then opening_stage = true end
         closing_since, close_alpha = nil, 0
     end
     manual_was_open = console_visible
@@ -722,6 +727,7 @@ windower.register_event('prerender', function()
         end
     end
     update_visibility()
+    opening_stage = false
     if wanted then measure_labels() end
     if recorder.active then
         local ok, err = recorder.observe(context(console_visible))
