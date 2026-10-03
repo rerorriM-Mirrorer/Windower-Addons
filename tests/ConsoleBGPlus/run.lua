@@ -185,6 +185,15 @@ assert(not text_objects.ConsoleBGPlus_label_input.visible)
 all_visible(false)
 console_open = true; tick(); all_visible(true)
 settle()
+local title = text_objects.ConsoleBGPlus_label_title
+local title_left, title_right
+for _, object in pairs(objects) do
+    if object.texture:find('_title_left.png', 1, true) then title_left = object end
+    if object.texture:find('_title_right.png', 1, true) then title_right = object end
+end
+assert(title_left and title_right and title.x < title_left.x + title_left.width
+    and title.x + title.rendered_width > title_right.x
+    and title.y == 10, 'Title text should float over both end caps and sit two pixels higher')
 local calls = visibility_calls
 local geometry = geometry_calls
 local styles, measurements = style_calls, measurement_calls
@@ -386,7 +395,8 @@ callbacks.unload(); assert(count() == 0 and next(text_objects) == nil)
 -- A v0.1.0 settings file retains the user's colors/position while new
 -- fields receive their defaults from Windower's config library.
 saved.extents.mode, saved.glow, saved.input.tab = nil, nil, nil
-saved.input.padding, saved.input.divider, saved.labels, saved.console, saved.border.linked, saved.activity = nil, nil, nil, nil, nil, nil
+saved.input.padding, saved.input.divider, saved.labels, saved.console, saved.native,
+    saved.border.linked, saved.activity = nil, nil, nil, nil, nil, nil, nil
 dofile(addon_path .. 'ConsoleBGPlus.lua')
 run('status'); assert(logs[#logs][2]:find('1888x320 (screen width)', 1, true))
 assert(logs[#logs][2]:find('gradient 80 to 230', 1, true))
@@ -395,7 +405,8 @@ run('reset')
 assert(saved.pos.x == 32 and saved.extents.x == 1070 and saved.extents.mode == 'screen' and saved.gradient.top == 100)
 assert(saved.gradient.bottom == 250 and saved.glow.alpha == 200 and saved.glow.height == 24)
 assert(saved.console.offset_x == 50 and saved.console.offset_y == 15 and saved.input.divider)
-assert(saved.activity.enabled == false and saved.activity.delay_ms == 3000)
+assert(saved.activity.enabled == false and saved.activity.delay_ms == 1000
+    and saved.activity.fade_ms == 1000 and saved.native.font == 'Verdana')
 run('alpha', '0')
 for _, object in pairs(objects) do
     if object.texture:find('_mid_', 1, true) then assert(object.alpha == 0) end
@@ -464,8 +475,18 @@ windower.console.set_position = nil
 windower.send_command = function(value) queued[#queued + 1] = value end
 dofile(addon_path .. 'ConsoleBGPlus.lua')
 assert(queued[1] == 'console_position 82 31')
+assert(queued[2] == 'console_font Verdana 12'
+    and queued[3] == 'console_color 255 250 250 250'
+    and queued[4] == 'console_fadedelay 1000'
+    and queued[5] == 'console_displayactivity 1'
+    and queued[6] == 'console_log 0', 'Loading should establish the complete native profile')
 for _ = 1, 60 do tick() end
-assert(#queued == 1)
+assert(#queued == 6, 'Idle frames must not rewrite the native profile')
+run('nativefont', 'Trebuchet', 'MS', '11')
+assert(saved.native.font == 'Trebuchet MS' and saved.native.size == 11
+    and queued[#queued - 4] == 'console_font "Trebuchet MS" 11')
+run('nativecolor', '255', '230', '231', '232')
+assert(saved.native.red == 230 and queued[#queued - 3] == 'console_color 255 230 231 232')
 run('trace', 'on')
 trace = diagnostic_files[addon_path .. 'data/visibility.log']
 callbacks.unload(); assert(trace.closed and count() == 0 and next(text_objects) == nil)
@@ -478,12 +499,15 @@ assert(require('cbg_activity').new('C:\\Windower4\\Addons\\ConsoleBGPlus\\').pat
 windower.console.set_position = function(x, y) positions[#positions + 1] = {x = x, y = y} end
 saved, fake_log_size, console_open = nil, nil, false
 dofile(addon_path .. 'ConsoleBGPlus.lua')
+assert(queued[#queued] == 'console_log 0')
 run('input', 'on', '14')
 local inactive_polls = log_polls
 for _ = 1, 30 do tick() end
 assert(log_polls == inactive_polls and not text_objects.ConsoleBGPlus_label_title.visible,
     'Log watching must be opt-in, with no reads while disabled')
 run('activity', 'on')
+assert(queued[#queued] == 'console_log 1')
+run('fade', '3000', '450')
 fake_log_size = 10000; tick(0.16)
 assert(not text_objects.ConsoleBGPlus_label_title.visible,
     'An existing log must start at EOF rather than replaying old output')
@@ -518,9 +542,11 @@ console_open = false; tick(0.01)
 assert(not text_objects.ConsoleBGPlus_label_title.visible,
     'Closing the manual console must not keep the prior command frame open')
 run('activity', 'off')
+assert(queued[#queued] == 'console_log 0')
 fake_log_size = 40; tick(0.16)
 assert(not text_objects.ConsoleBGPlus_label_title.visible)
 run('activity', 'on'); tick(0.16)
+assert(queued[#queued] == 'console_log 1')
 assert(not text_objects.ConsoleBGPlus_label_title.visible,
     'Re-enabling must baseline the current file, not play missed lines')
 run('fade', '2000', '600')
@@ -528,15 +554,17 @@ assert(saved.activity.delay_ms == 2000 and saved.activity.fade_ms == 600)
 assert(queued[#queued] == 'console_fadedelay 2000')
 local queued_before_character_change = #queued
 config.callback()
-assert(#queued == queued_before_character_change + 1
-    and queued[#queued] == 'console_fadedelay 2000',
-    'A per-character setting change must reapply the owned native delay')
+assert(#queued == queued_before_character_change + 5
+    and queued[#queued - 2] == 'console_fadedelay 2000'
+    and queued[#queued] == 'console_log 1',
+    'A per-character setting change must reapply the saved native profile')
 run('diagnose')
 assert(diagnostic_files[addon_path .. 'data/diagnostics.txt'].text:find('activity_available=true', 1, true))
 callbacks.unload(); assert(count() == 0 and next(text_objects) == nil)
 dofile(addon_path .. 'ConsoleBGPlus.lua')
-assert(queued[#queued] == 'console_fadedelay 2000',
-    'A user-owned native delay should be restored after reload')
+assert(queued[#queued - 2] == 'console_fadedelay 2000'
+    and queued[#queued] == 'console_log 1',
+    'The native profile should be restored after reload')
 callbacks.unload()
 io.open = real_open
-print('PASS: delayed/hidden label bounds, automatic tab resizing, text-only red style, optional divider, log growth, no replay, fade/manual focus, rotation, reload, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
+print('PASS: title caps and position, native console profile/load/reload, delayed/hidden label bounds, automatic tab resizing, text-only red style, optional divider, log growth, no replay, fade/manual focus, rotation, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')

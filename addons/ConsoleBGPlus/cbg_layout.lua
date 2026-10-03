@@ -103,7 +103,8 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     title_width = bounded(title_width, 40, 1, 256)
     local top_start, top_end = x + left_cap, x + width - right_cap
     if width >= title_width + left_cap + right_cap + 40 then
-        local core_width = title_width + 4
+        -- Let the fading end caps sit just behind the title lettering.
+        local core_width = math.max(8, title_width - 4)
         local core_x = top_end - core_width - 16
         local notch_x, notch_end = core_x - 8, core_x + core_width + 8
         piece('top_center', top_start, y, notch_x - top_start, top_height,
@@ -112,7 +113,8 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
         piece('title_right', core_x + core_width, y, 8, top_height, top_rail_alpha)
         piece('top_center', notch_end, y, top_end - notch_end, top_height,
             top_rail_alpha, (top_end - notch_end) / 4, 1)
-        rectangle.title_slot = {x = core_x + 2, y = math.max(0, y - 4)}
+        rectangle.title_slot = {x = core_x + math.floor((core_width - title_width) / 2),
+            y = math.max(0, y - 6)}
     else
         piece('top_center', top_start, y, top_end - top_start,
             top_height, top_rail_alpha, (top_end - top_start) / 4, 1)

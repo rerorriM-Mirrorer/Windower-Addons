@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.4'
+_addon.version = '0.1.5'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -21,7 +21,8 @@ local defaults = {
     labels = {font = 'Verdana', title_size = 8, input_size = 7,
         input_text = 'Input', input_style = 'red', offset_y = -2},
     console = {linked = true, offset_x = 50, offset_y = 15},
-    activity = {enabled = false, delay_ms = 3000, fade_ms = 450,
+    native = {font = 'Verdana', size = 12, alpha = 255, red = 250, green = 250, blue = 250},
+    activity = {enabled = false, delay_ms = 1000, fade_ms = 1000,
         native_delay_owned = false},
 }
 local settings = config.load(defaults)
@@ -352,6 +353,33 @@ local function usage(text)
     message('Usage: //cbg ' .. text, true)
 end
 
+local function safe_native_font(name)
+    if type(name) ~= 'string' or #name < 1 or #name > 64
+        or not name:match('^[%w_][%w_ %-]*$') then return nil end
+    return name:find(' ', 1, true) and ('"' .. name .. '"') or name
+end
+
+local function sync_native_profile()
+    if not windower.send_command then
+        settings.activity.native_delay_owned = false
+        return false
+    end
+    local native = settings.native
+    local font = safe_native_font(native.font) or defaults.native.font
+    local size = integer(native.size, 6, 24) or defaults.native.size
+    local function color(key)
+        return integer(native[key], 0, 255) or defaults.native[key]
+    end
+    windower.send_command('console_font ' .. font .. ' ' .. size)
+    windower.send_command(string.format('console_color %d %d %d %d',
+        color('alpha'), color('red'), color('green'), color('blue')))
+    windower.send_command('console_fadedelay ' .. settings.activity.delay_ms)
+    windower.send_command('console_displayactivity 1')
+    windower.send_command('console_log ' .. (settings.activity.enabled and '1' or '0'))
+    settings.activity.native_delay_owned = true
+    return true
+end
+
 local aliases = {p = 'position', s = 'size', c = 'color', pos = 'position'}
 local function command(action, ...)
     action = (action or 'help'):lower()
@@ -492,15 +520,36 @@ local function command(action, ...)
         position_dirty = true
         save()
         message('Console offset saved: ' .. value[1] .. ', ' .. value[2] .. '.')
+    elseif action == 'nativefont' then
+        local size = args[#args] and integer(args[#args], 6, 24)
+        local font = table.concat(args, ' ', 1, #args - 1)
+        if not size or not safe_native_font(font) then
+            return usage('nativefont <font name> <size 6-24>')
+        end
+        settings.native.font, settings.native.size = font, size
+        sync_native_profile()
+        save()
+        message('Native console font saved: ' .. font .. ' ' .. size .. '.')
+    elseif action == 'nativecolor' then
+        local value = numbers(args, 4, 0, 255)
+        if not value then return usage('nativecolor <alpha> <red> <green> <blue> (0-255)') end
+        settings.native.alpha, settings.native.red, settings.native.green, settings.native.blue =
+            value[1], value[2], value[3], value[4]
+        sync_native_profile()
+        save()
+        message('Native console text color saved.')
     elseif action == 'activity' then
         local mode = args[1] and args[1]:lower()
         if #args ~= 1 or (mode ~= 'on' and mode ~= 'off') then return usage('activity on|off') end
         settings.activity.enabled = mode == 'on'
         watcher.restart()
         auto_alpha = 0
+        if windower.send_command then
+            windower.send_command('console_log ' .. (settings.activity.enabled and '1' or '0'))
+        end
         save()
         update_visibility()
-        message('Log activity ' .. mode .. '. Windower console_log 1 is needed for automatic output.')
+        message('Log activity ' .. mode .. '. Native console logging follows this setting.')
     elseif action == 'fade' then
         local delay = args[1] and integer(args[1], 0, 60000)
         local duration = args[2] and integer(args[2], 50, 4000)
@@ -555,6 +604,7 @@ local function command(action, ...)
         watcher.restart()
         auto_alpha = 0
         position_dirty = true
+        sync_native_profile()
         save()
         update_visibility()
         message('Default frame settings restored.')
@@ -574,6 +624,7 @@ local function command(action, ...)
         if #args ~= 0 then return usage('help') end
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] | console on|off | offset <x> <y>')
+        message('//cbg nativefont <font> <size> | nativecolor <alpha> <red> <green> <blue>')
         message('//cbg width screen|<pixels> | glow <alpha> [height]')
         message('//cbg gradient <top> <bottom> | alpha <0-255> | border <0-255>|link|free')
         message('//cbg color <alpha> <red> <green> <blue> | input on|off [height] | tab left|right')
@@ -581,24 +632,20 @@ local function command(action, ...)
         message('//cbg labelfont <font> | labelsize <title> <input> | labeloffset <-12 to 12>')
         message('//cbg diagnose | trace on|off. Files go to ConsoleBGPlus/data/.')
         message('//cbg preview [on|off] | status | reset. Changes save to data/settings.xml.')
-        message('//cbg activity on|off (with //console_log 1) | fade <hold ms> [fade ms]')
+        message('//cbg activity on|off | fade <hold ms> [fade ms]')
     else
         message('Unknown command. Use //cbg help.', true)
     end
 end
 
 refresh()
-if settings.activity.native_delay_owned and windower.send_command then
-    windower.send_command('console_fadedelay ' .. settings.activity.delay_ms)
-end
+sync_native_profile()
 local registration = config.register(settings, function()
     drag, position_dirty = nil, true
     watcher.restart()
     auto_alpha = 0
-    if settings.activity.native_delay_owned and windower.send_command then
-        windower.send_command('console_fadedelay ' .. settings.activity.delay_ms)
-    end
     refresh()
+    sync_native_profile()
     update_visibility()
 end)
 windower.register_event('addon command', command)
