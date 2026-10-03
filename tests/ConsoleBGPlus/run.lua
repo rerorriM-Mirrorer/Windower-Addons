@@ -9,7 +9,7 @@ local save_calls, positions, console_writes = 0, {}, 0
 local diagnostic_files, fail_diagnostics = {}, false
 local render_frame, style_calls, measurement_calls = 0, 0, 0
 local render_latency = 2
-local test_seconds, fake_log_size, log_polls = 0, nil, 0
+local test_seconds, fake_log_size, log_polls = 1791050000, nil, 0
 package.preload.socket = function() return {gettime = function() return test_seconds end} end
 local real_open = io.open
 -- Keep diagnostic I/O deterministic, including open failures. PNG files
@@ -178,10 +178,10 @@ end
 
 dofile(addon_path .. 'ConsoleBGPlus.lua')
 assert(count() > 10 and count() <= 199)
-run('status'); assert(logs[#logs][2]:find('1856x344 (screen width)', 1, true)
+run('status'); assert(logs[#logs][2]:find('1888x344 (screen width)', 1, true)
     and logs[#logs][2]:find('input on (15 + 0 padding)', 1, true)
     and logs[#logs][2]:find('log activity on', 1, true))
-assert(positions[#positions].x == 82 and positions[#positions].y == 31)
+assert(positions[#positions].x == 66 and positions[#positions].y == 63)
 assert(text_objects.ConsoleBGPlus_label_title.font == 'Verdana')
 assert(not text_objects.ConsoleBGPlus_label_input.visible)
 all_visible(false)
@@ -195,7 +195,7 @@ for _, object in pairs(objects) do
 end
 assert(title_left and title_right and title.x < title_left.x + title_left.width
     and title.x + title.rendered_width > title_right.x
-    and title.y == 10, 'Title text should float over both end caps and sit two pixels higher')
+    and title.y == 42, 'Title text should float over both end caps and sit two pixels higher')
 local calls = visibility_calls
 local geometry = geometry_calls
 local styles, measurements = style_calls, measurement_calls
@@ -243,6 +243,13 @@ local r = rectangle()
 assert(not mouse(1, r.x + 30, r.y + 2))
 run('edit', 'on')
 assert(text_objects.ConsoleBGPlus_label_edit.visible)
+local grip
+for _, object in pairs(objects) do
+    if object.texture:find('_drag_grip.png', 1, true) then grip = object end
+end
+assert(grip and grip.visible and grip.x == r.x + 4 and grip.y == r.y + 8
+    and grip.width == r.width - 8 and grip.height == 6,
+    'Edit-mode diagonal grip should span the full draggable top edge')
 assert(text_objects.ConsoleBGPlus_label_edit.red == 255
     and text_objects.ConsoleBGPlus_label_edit_exit.visible
     and text_objects.ConsoleBGPlus_label_edit_exit.text == '//cbg edit off'
@@ -283,6 +290,10 @@ run('offset', '5', '-3'); run('console', 'on')
 assert(positions[#positions].x == 25 and positions[#positions].y == 25)
 run('offset', '0', '0'); run('position', '16', '24')
 run('edit', 'off'); assert(not text_objects.ConsoleBGPlus_label_edit.visible)
+for _, object in pairs(objects) do
+    assert(not object.texture:find('_drag_grip.png', 1, true),
+        'Grip should disappear when editing is off')
+end
 
 run('input', 'on', '8')
 assert(saved.input.height == 8, 'Values below the former 12-pixel limit should work')
@@ -413,7 +424,8 @@ run('status'); assert(logs[#logs][2]:find('1888x320 (screen width)', 1, true))
 assert(logs[#logs][2]:find('gradient 80 to 230', 1, true))
 config.callback()
 run('reset')
-assert(saved.pos.x == 32 and saved.extents.x == 1070 and saved.extents.mode == 'screen' and saved.gradient.top == 100)
+assert(saved.pos.x == 16 and saved.pos.y == 48 and saved.extents.x == 1070
+    and saved.extents.mode == 'screen' and saved.gradient.top == 100)
 assert(saved.gradient.bottom == 250 and saved.glow.alpha == 200 and saved.glow.height == 24)
 assert(saved.console.offset_x == 50 and saved.console.offset_y == 15 and saved.input.divider)
 assert(saved.activity.enabled == true and saved.input.enabled == true
@@ -493,7 +505,7 @@ local queued = {}
 windower.console.set_position = nil
 windower.send_command = function(value) queued[#queued + 1] = value end
 dofile(addon_path .. 'ConsoleBGPlus.lua')
-assert(queued[1] == 'console_position 82 31')
+assert(queued[1] == 'console_position 66 63')
 assert(queued[2] == 'console_font Verdana 12'
     and queued[3] == 'console_color 255 250 250 250'
     and queued[4] == 'console_fadedelay 1000'
@@ -558,8 +570,14 @@ assert(objects[top_name].alpha == original_alpha and rectangle().height == compa
     'A second output burst must restore a full hold without resizing the compact frame')
 assert(trace.text:find('activity_changes=2', 1, true)
     and trace.text:find('since_output_ms=0', 1, true)
-    and trace.text:find('clock_ms=', 1, true),
+    and trace.text:find('clock_ms=', 1, true)
+    and not trace.text:find('clock_ms=-', 1, true),
     'Trace must expose subsecond timing and repeated growth without recording text')
+local trace_marks = {}
+for value in trace.text:gmatch('clock_ms=(%d+)') do trace_marks[#trace_marks + 1] = tonumber(value) end
+assert(#trace_marks > 2 and trace_marks[1] == 0
+    and trace_marks[#trace_marks] > trace_marks[1],
+    'Trace milliseconds must advance relative to its start even with an epoch-scale clock')
 tick(3.25)
 tick(0.3)
 assert(not text_objects.ConsoleBGPlus_label_title.visible)

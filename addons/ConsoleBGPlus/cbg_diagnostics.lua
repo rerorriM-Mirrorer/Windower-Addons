@@ -79,7 +79,7 @@ function diagnostics.new(root, version)
     if root:sub(-1) ~= '/' and root:sub(-1) ~= '\\' then root = root .. '/' end
     local directory = root .. 'data/'
     local recorder = {path = directory .. 'visibility.log', active = false}
-    local file, previous, entries = nil, nil, 0
+    local file, previous, entries, start_clock = nil, nil, 0, nil
 
     local function open(path)
         if windower.create_dir then windower.create_dir(directory) end
@@ -90,7 +90,7 @@ function diagnostics.new(root, version)
         recorder.active = false
         local result, err = true, nil
         if file then result, err = file:close() end
-        file, previous = nil, nil
+        file, previous, start_clock = nil, nil, nil
         return result, err
     end
 
@@ -108,8 +108,9 @@ function diagnostics.new(root, version)
         if not recorder.active then return end
         local state = sample(context)
         if state == previous then return end
+        local relative_ms = math.max(0, math.floor((context.activity.clock_time - start_clock) * 1000 + 0.5))
         local written, err = file:write(string.format('%s clock_ms=%d frame=%d since_output_ms=%s %s\n',
-            os.date('!%Y-%m-%dT%H:%M:%SZ'), context.activity.clock_ms, context.frame,
+            os.date('!%Y-%m-%dT%H:%M:%SZ'), relative_ms, context.frame,
             tostring(context.activity.age_ms or 'none'), state))
         local flushed, flush_error
         if written then flushed, flush_error = file:flush() end
@@ -134,7 +135,7 @@ function diagnostics.new(root, version)
         if not file then return nil, err end
         local written, write_error = file:write(header(context, version), '\n[Visibility and layout transitions]\n')
         if not written then recorder.stop(); return nil, write_error end
-        recorder.active, previous, entries = true, nil, 0
+        recorder.active, previous, entries, start_clock = true, nil, 0, context.activity.clock_time
         return recorder.observe(context)
     end
 

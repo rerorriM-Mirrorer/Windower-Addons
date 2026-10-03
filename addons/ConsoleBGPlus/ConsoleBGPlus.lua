@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.6'
+_addon.version = '0.1.7'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -12,7 +12,7 @@ local diagnostics = require('cbg_diagnostics')
 local activity = require('cbg_activity')
 local defaults = {
     bg = {alpha = 255, red = 255, green = 255, blue = 255},
-    pos = {x = 32, y = 16},
+    pos = {x = 16, y = 48},
     extents = {x = 1070, y = 344, mode = 'screen'},
     gradient = {top = 100, bottom = 250},
     border = {alpha = 240, linked = false},
@@ -347,7 +347,7 @@ local function context(console_visible)
         frame_alpha = draw_alpha, output_only = output_only,
         native_position = native_position, primitive_count = #primitives,
         activity = {path = watcher.path, available = watcher.available,
-            clock = watcher.clock, clock_ms = math.floor(now * 1000 + 0.5),
+            clock = watcher.clock, clock_time = now,
             changes = watcher.changes, alpha = auto_alpha, phase = phase,
             age_ms = age_ms, size = watcher.size},
         position_setter = windower.console.set_position and 'console.set_position'

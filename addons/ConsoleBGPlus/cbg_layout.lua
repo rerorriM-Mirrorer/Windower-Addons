@@ -163,6 +163,8 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     end
 
     if editing then
+        -- A pale grip marks the complete top drag edge while editing.
+        piece('drag_grip', x + 4, y + 8, width - 8, 6, 255, (width - 8) / 10, 1)
         piece('resize_handle', x + width - 16, y + height - 16, 14, 14, 255)
     end
 

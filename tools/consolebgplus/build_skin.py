@@ -102,6 +102,13 @@ def build(source: Path, destination: Path):
     handle.save(stream, 'PNG')
     tiles['resize_handle'] = base64.b64encode(stream.getvalue()).decode('ascii')
 
+    # Repeat the same pale diagonal motif along the top drag edge in edit mode.
+    grip = Image.new('RGBA', (10, 6))
+    ImageDraw.Draw(grip).line((2, 5, 7, 0), fill=(198, 199, 217, 240), width=1)
+    stream = io.BytesIO()
+    grip.save(stream, 'PNG')
+    tiles['drag_grip'] = base64.b64encode(stream.getvalue()).decode('ascii')
+
     entries = '\n'.join("    %s = '%s'," % (name, value) for name, value in sorted(tiles.items()))
     module = """-- Generated texture bundle. Do not edit the base64 payloads by hand.
 -- Source: Tylas11/XivParty assets/ffxi/BgTop.png, BgMid.png, BgBottom.png.
