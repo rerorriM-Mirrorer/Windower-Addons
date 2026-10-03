@@ -190,7 +190,7 @@ run('status'); assert(logs[#logs][2]:find('1888x344 (screen width)', 1, true)
     and logs[#logs][2]:find('input on (15 + 0 padding)', 1, true)
     and logs[#logs][2]:find('log activity on', 1, true))
 assert(positions[#positions].x == 66 and positions[#positions].y == 63)
-assert(#played_sounds == 0, 'Loading should not play the close cue')
+assert(#played_sounds == 0, 'Loading should not play either manual cue')
 assert(text_objects.ConsoleBGPlus_label_title.font == 'Verdana')
 assert(not text_objects.ConsoleBGPlus_label_input.visible)
 all_visible(false)
@@ -395,7 +395,8 @@ run('alpha', '255'); run('gradient', '80', '230'); run('border', 'free'); run('p
 run('diagnose')
 local report = diagnostic_files[addon_path .. 'data/diagnostics.txt']
 assert(report.closed and report.text:find('hook_version=mock-hook', 1, true))
-assert(report.text:find('sound.close=true', 1, true))
+assert(report.text:find('sound.open=true', 1, true)
+    and report.text:find('sound.close=true', 1, true))
 assert(report.text:find('future_setting', 1, true) and not report.text:find('must not be copied', 1, true))
 assert(report.text:find('native_position_written=16,24', 1, true))
 run('trace', 'on')
@@ -473,7 +474,7 @@ assert(saved.activity.enabled == true and saved.input.enabled == true
     and saved.labels.offset_y == 2 and saved.labels.input_size == 8
     and saved.activity.delay_ms == 1000
     and saved.activity.fade_ms == 1000 and saved.native.font == 'Verdana'
-    and saved.sound.close == true)
+    and saved.sound.open == true and saved.sound.close == true)
 run('alpha', '0')
 for _, object in pairs(objects) do
     if object.texture:find('_mid_', 1, true) then assert(object.alpha == 0) end
@@ -639,15 +640,19 @@ console_open = true; tick(0.01)
 assert(not text_objects.ConsoleBGPlus_label_input.visible and rectangle().height == compact_height
     and objects[top_name].alpha == original_alpha,
     'The first manual-open frame shows only the compact body at full strength')
-assert(#played_sounds == sound_count_before_output, 'Opening the console must be silent')
+assert(#played_sounds == sound_count_before_output + 1
+    and played_sounds[#played_sounds] == addon_path .. 'assets/consoleopen.wav',
+    'Manual opening plays the supplied cue once')
 tick(1 / 30)
+assert(#played_sounds == sound_count_before_output + 1,
+    'The next open frame must not repeat the cue')
 assert(text_objects.ConsoleBGPlus_label_input.visible
     and rectangle().height == compact_height + saved.input.height + 7,
     'The following frame expands and adds the Input strip')
 console_open = false; tick(0.01)
-assert(#played_sounds == sound_count_before_output + 1
+assert(#played_sounds == sound_count_before_output + 2
     and played_sounds[#played_sounds] == addon_path .. 'assets/closeconsole.wav',
-    'Only a manual open-to-closed transition plays the bundled WAV')
+    'Manual closing plays its bundled WAV')
 assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == compact_height
     and not text_objects.ConsoleBGPlus_label_input.visible,
     'Closing must switch to compact output before fading')
@@ -661,12 +666,16 @@ assert(text_objects.ConsoleBGPlus_label_title.alpha > 0
 tick(0.3)
 assert(not text_objects.ConsoleBGPlus_label_title.visible)
 run('trace', 'off')
+run('opensound', 'off'); assert(saved.sound.open == false)
 run('closesound', 'off'); assert(saved.sound.close == false)
 console_open = true; tick()
+assert(#played_sounds == sound_count_before_output + 2,
+    'Open sound off must silence later manual openings')
 run('preview', 'on'); run('edit', 'on')
 console_open = false; tick()
-assert(#played_sounds == sound_count_before_output + 1,
+assert(#played_sounds == sound_count_before_output + 2,
     'Close sound off must silence later manual closures')
+run('opensound', 'on'); assert(saved.sound.open == true)
 run('closesound', 'on'); assert(saved.sound.close == true)
 assert(not text_objects.ConsoleBGPlus_label_edit.visible
     and text_objects.ConsoleBGPlus_label_title.visible,
@@ -705,6 +714,12 @@ console_open = true; tick()
 console_open = false; tick()
 assert(#played_sounds == sound_count, 'Background game windows must stay silent')
 focused = true
+callbacks.unload()
+console_open = true
+local sound_count_at_reload = #played_sounds
+dofile(addon_path .. 'ConsoleBGPlus.lua'); tick()
+assert(#played_sounds == sound_count_at_reload,
+    'Loading while the console is already open must not play the opening cue')
 callbacks.unload()
 io.open = real_open
 print('PASS: title caps and position, native console profile/load/reload, delayed/hidden label bounds, automatic tab resizing, text-only red style, optional divider, log growth, no replay, fade/manual focus, rotation, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')

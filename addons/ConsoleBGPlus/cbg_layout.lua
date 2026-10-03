@@ -157,7 +157,7 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
             if settings.labels.input_style == 'native' then
                 piece('tab_left', tab_x, tab_y, 3, tab_height, divider_alpha)
                 piece('tab_center', tab_x + 3, tab_y, tab_width - 7, tab_height, divider_alpha,
-                    tab_width - 7, 1)
+                    1, 1)
                 piece('tab_right', tab_x + tab_width - 4, tab_y, 4, tab_height, divider_alpha)
             end
             rectangle.input_tab = {x = tab_x, y = tab_y, width = tab_width, height = tab_height}

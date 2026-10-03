@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.11'
+_addon.version = '0.1.12'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -24,7 +24,7 @@ local defaults = {
     native = {font = 'Verdana', size = 12, alpha = 255, red = 250, green = 250, blue = 250},
     activity = {enabled = true, delay_ms = 1000, fade_ms = 1000,
         native_delay_owned = false},
-    sound = {close = true},
+    sound = {open = true, close = true},
 }
 local settings = config.load(defaults)
 local primitives, shown, preview, editing = {}, false, false, false
@@ -37,7 +37,8 @@ local frame = 0
 local recorder = diagnostics.new(windower.addon_path, _addon.version)
 local watcher = activity.new(windower.addon_path)
 local auto_alpha, close_alpha, draw_alpha = 0, 0, 255
-local input_shown, manual_was_open, output_only, closing_since = false, false, false, nil
+local input_shown, manual_was_open, output_only, closing_since =
+    false, windower.console.visible(), false, nil
 local opening_stage = false
 local measurement_cache, measurement_order = {}, {}
 local refresh
@@ -46,10 +47,11 @@ local function message(text, is_error)
     windower.add_to_chat(is_error and 123 or 207, '[ConsoleBG+] ' .. text)
 end
 
-local function play_close_sound()
-    if not settings.sound.close or type(windower.play_sound) ~= 'function' then return end
+local function play_console_sound(kind)
+    if not settings.sound[kind] or type(windower.play_sound) ~= 'function' then return end
     if windower.has_focus and not windower.has_focus() then return end
-    local path = windower.addon_path .. 'assets/closeconsole.wav'
+    local path = windower.addon_path .. (kind == 'open'
+        and 'assets/consoleopen.wav' or 'assets/closeconsole.wav')
     if windower.file_exists and not windower.file_exists(path) then return end
     pcall(windower.play_sound, path)
 end
@@ -596,12 +598,13 @@ local function command(action, ...)
         save()
         message(windower.send_command and 'Native hold and frame fade timing saved.'
             or 'Frame timing saved; native console command API unavailable.', not windower.send_command)
-    elseif action == 'closesound' then
+    elseif action == 'opensound' or action == 'closesound' then
         local mode = args[1] and args[1]:lower()
-        if #args ~= 1 or (mode ~= 'on' and mode ~= 'off') then return usage('closesound on|off') end
-        settings.sound.close = mode == 'on'
+        if #args ~= 1 or (mode ~= 'on' and mode ~= 'off') then return usage(action .. ' on|off') end
+        local kind = action == 'opensound' and 'open' or 'close'
+        settings.sound[kind] = mode == 'on'
         save()
-        message('Manual console close sound ' .. mode .. '.')
+        message('Manual console ' .. kind .. ' sound ' .. mode .. '.')
     elseif action == 'edit' then
         local mode = args[1] and args[1]:lower()
         if #args > 1 or (mode and mode ~= 'on' and mode ~= 'off') then return usage('edit [on|off]') end
@@ -673,7 +676,7 @@ local function command(action, ...)
         message('//cbg diagnose | trace on|off. Files go to ConsoleBGPlus/data/.')
         message('//cbg preview [on|off] | status | reset. Changes save to data/settings.xml.')
         message('//cbg activity on|off | fade <hold ms> [fade ms]')
-        message('//cbg closesound on|off. Plays only when the focused manual console closes.')
+        message('//cbg opensound on|off | closesound on|off. Focused manual console cues.')
     else
         message('Unknown command. Use //cbg help.', true)
     end
@@ -695,7 +698,7 @@ windower.register_event('prerender', function()
     local console_visible = windower.console.visible()
     if manual_was_open and not console_visible then
         opening_stage = false
-        play_close_sound()
+        play_console_sound('close')
         watcher.suppress()
         local was_editing = editing
         editing, preview, hover_target = false, false, nil
@@ -703,7 +706,10 @@ windower.register_event('prerender', function()
         if was_editing then refresh() end
         closing_since, close_alpha = watcher.now(), 255
     elseif console_visible then
-        if not manual_was_open and not preview and not editing then opening_stage = true end
+        if not manual_was_open then
+            play_console_sound('open')
+            if not preview and not editing then opening_stage = true end
+        end
         closing_since, close_alpha = nil, 0
     end
     manual_was_open = console_visible

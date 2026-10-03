@@ -81,15 +81,40 @@ def build(source: Path, destination: Path):
         cap.save(stream, 'PNG')
         tiles[name] = base64.b64encode(stream.getvalue()).decode('ascii')
 
-    # The native input tab is a short grey plaque above the divider. Keep
-    # the little corner caps fixed-size when its centre is resized.
-    tab = Image.new('RGBA', (40, 14))
-    draw = ImageDraw.Draw(tab)
-    draw.rounded_rectangle((0, 0, 39, 15), radius=2, fill=(125, 126, 144, 255),
-                           outline=(167, 168, 181, 255), width=1)
+    # Native Input plaque: rounded dark outer top/sides, a raised inner
+    # top/left edge, shaded right edge, and a gentle left-to-right fill.
+    # The 3px and 4px corner caps stay fixed while the whole centre
+    # stretches, so the gradient still spans a renamed or resized label.
+    tab = Image.new('RGBA', (48, 14))
+    dark = (22, 20, 34, 255)
+    inner_left = (170, 170, 182, 255)
+    inner_right = (93, 92, 104, 255)
+    for y in range(tab.height):
+        for x in range(tab.width):
+            if y == 0:
+                if 3 <= x <= 44: tab.putpixel((x, y), dark)
+                continue
+            if y == 1 and not 2 <= x <= 45: continue
+            if y == 2 and not 1 <= x <= 46: continue
+            t = x / (tab.width - 1)
+            fill = (round(151 - 30 * t), round(151 - 31 * t),
+                    round(163 - 34 * t), 255)
+            if (y == 1 and x in (2, 45)) or (y == 2 and x in (1, 46)) \
+                    or (y >= 3 and x in (0, 47)):
+                color = dark
+            elif y == 1:
+                color = (round(170 - 27 * t), round(170 - 27 * t),
+                         round(182 - 27 * t), 255)
+            elif x == (2 if y == 2 else 1):
+                color = inner_left
+            elif x == (45 if y == 2 else 46):
+                color = inner_right
+            else:
+                color = fill
+            tab.putpixel((x, y), color)
     for name, rectangle in {'tab_left': (0, 0, 3, 14),
-                            'tab_center': (20, 0, 21, 14),
-                            'tab_right': (36, 0, 40, 14)}.items():
+                            'tab_center': (3, 0, 44, 14),
+                            'tab_right': (44, 0, 48, 14)}.items():
         stream = io.BytesIO()
         tab.crop(rectangle).save(stream, 'PNG')
         tiles[name] = base64.b64encode(stream.getvalue()).decode('ascii')

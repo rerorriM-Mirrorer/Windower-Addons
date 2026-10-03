@@ -50,6 +50,7 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
     Activity and settings
     //cbg activity on|off                       Follow automatic console output
     //cbg fade <hold_ms> [fade_ms]              Set native hold and frame fade
+    //cbg opensound on|off                      Play a cue on manual console open
     //cbg closesound on|off                     Play a cue on manual console close
     //cbg trace on|off                          Record visibility and timing changes
     //cbg diagnose                              Save one settings/layout snapshot
@@ -59,7 +60,7 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
 
 The default native font is Verdana 12 with color 255 250 250 250. The Input and Console labels use Verdana 8. **//cbg fade 1000 1000** gives automatic output a 1000 ms hold followed by a 1000 ms frame fade. On manual opening, the first rendered frame shows the compact output body; the next frame expands to full height with the Input area. Closing a manually opened console immediately removes the Input strip, divider, and tab, returns to the same compact output height, then fades over the saved 1000 ms duration. **//cbg activity on** also enables native console_log 1, which the output watcher needs. The watcher checks only the file's byte length, about eight times per second, and restarts the full hold whenever it sees growth. Activity off turns native logging off for this addon.
 
-The bundled close cue plays once when a manually open native console closes in the focused game window. It does not play for automatic output fading or for opening the console. Use **//cbg closesound off** to silence it, or replace **assets/closeconsole.wav** with another short PCM WAV. The addon detects the native open-to-closed transition; Windower does not identify which key closed it.
+The bundled open and close cues play once at each native console visibility transition in the focused game window. Automatic output and preview do not play sounds. Use **//cbg opensound off** or **//cbg closesound off** to silence either cue. Replace **assets/consoleopen.wav** or **assets/closeconsole.wav** with another short PCM WAV if desired. The addon detects native visibility changes; Windower does not identify which key opened or closed it. The supplied open recording is a working draft for testing.
 
 ## When something looks wrong
 
