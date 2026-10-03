@@ -28,6 +28,8 @@ function activity.new(addon_path, injected_clock)
     local watcher = {path = log_path(addon_path), clock = source, available = false,
         changes = 0, size = nil, last_checked = nil, last_output = nil, alpha = 0}
 
+    function watcher.now() return clock() end
+
     function watcher.suppress()
         watcher.last_output, watcher.alpha = nil, 0
     end

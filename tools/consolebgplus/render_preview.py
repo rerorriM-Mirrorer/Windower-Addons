@@ -54,12 +54,13 @@ def render(layout_path, output_path):
     # This local fallback shows alignment only; Windows/Windower supplies
     # the native Verdana console font and its actual metrics in game.
     console_font = font('DejaVuSans.ttf', 14)
-    lines = ['> ConsoleBG+ v0.1.5', '> Saved native console profile, text-only red input, and continuous glow.',
+    lines = ['> ConsoleBG+ v0.1.6', '> Compact activity frame, closing fade, and continuous glow.',
              '> cbg edit on', '> Drag the top edge and resize the lower-right corner.',
              '> cbg diagnose', '> screenshot jpg']
     for index, line in enumerate(lines):
         draw.text((50, 210 + index * 17), line, font=console_font, fill=(238, 238, 238, 255))
-    draw.text((50, 329), '$ type something with a j', font=console_font, fill=(238, 238, 238, 255))
+    if not data.get('output_only'):
+        draw.text((50, 329), '$ type something with a j', font=console_font, fill=(238, 238, 238, 255))
     for label in data['labels']:
         label_font = font('DejaVuSans-BoldOblique.ttf', max(8, round(label['size'] * 1.4)))
         overlay = Image.new('RGBA', canvas.size)

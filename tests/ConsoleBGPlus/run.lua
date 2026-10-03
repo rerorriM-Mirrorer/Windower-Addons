@@ -178,7 +178,9 @@ end
 
 dofile(addon_path .. 'ConsoleBGPlus.lua')
 assert(count() > 10 and count() <= 199)
-run('status'); assert(logs[#logs][2]:find('1856x348 (screen width)', 1, true))
+run('status'); assert(logs[#logs][2]:find('1856x344 (screen width)', 1, true)
+    and logs[#logs][2]:find('input on (15 + 0 padding)', 1, true)
+    and logs[#logs][2]:find('log activity on', 1, true))
 assert(positions[#positions].x == 82 and positions[#positions].y == 31)
 assert(text_objects.ConsoleBGPlus_label_title.font == 'Verdana')
 assert(not text_objects.ConsoleBGPlus_label_input.visible)
@@ -204,7 +206,11 @@ assert(visibility_calls == calls and geometry_calls == geometry,
 assert(#positions == native_calls, 'An unchanged frame must not rewrite console position')
 assert(style_calls == styles and measurement_calls == measurements,
     'Settled labels must not reset fonts or poll native measurements on idle frames')
-console_open = false; tick(); all_visible(false)
+console_open = false; tick()
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 344)
+tick(0.5)
+assert(text_objects.ConsoleBGPlus_label_title.alpha > 0 and text_objects.ConsoleBGPlus_label_title.alpha < 240)
+tick(0.6); all_visible(false)
 run('diagnose')
 local hidden_report = diagnostic_files[addon_path .. 'data/diagnostics.txt'].text
 assert(hidden_report:find('title_label=45x12 (measured)', 1, true)
@@ -219,6 +225,7 @@ run('gradient', '80', '230')
 assert(saved.pos.x == 16 and saved.pos.y == 24)
 assert(saved.extents.x == 960 and saved.extents.y + saved.input.padding == 320)
 assert(saved.gradient.top == 80 and saved.gradient.bottom == 230)
+run('input', 'off')
 local old_count = count()
 run('input', 'on', '26'); assert(count() == old_count + 3 and saved.input.enabled)
 run('preview', 'on'); assert(text_objects.ConsoleBGPlus_label_input.visible)
@@ -236,6 +243,10 @@ local r = rectangle()
 assert(not mouse(1, r.x + 30, r.y + 2))
 run('edit', 'on')
 assert(text_objects.ConsoleBGPlus_label_edit.visible)
+assert(text_objects.ConsoleBGPlus_label_edit.red == 255
+    and text_objects.ConsoleBGPlus_label_edit_exit.visible
+    and text_objects.ConsoleBGPlus_label_edit_exit.text == '//cbg edit off'
+    and text_objects.ConsoleBGPlus_label_edit_exit.y > text_objects.ConsoleBGPlus_label_edit.y)
 assert(not mouse(1, r.x + 30, r.y + 2, true))
 assert(not mouse(1, r.x + 100, r.y + 100))
 assert(not mouse(3, r.x + 30, r.y + 2))
@@ -405,7 +416,10 @@ run('reset')
 assert(saved.pos.x == 32 and saved.extents.x == 1070 and saved.extents.mode == 'screen' and saved.gradient.top == 100)
 assert(saved.gradient.bottom == 250 and saved.glow.alpha == 200 and saved.glow.height == 24)
 assert(saved.console.offset_x == 50 and saved.console.offset_y == 15 and saved.input.divider)
-assert(saved.activity.enabled == false and saved.activity.delay_ms == 1000
+assert(saved.activity.enabled == true and saved.input.enabled == true
+    and saved.input.height == 15 and saved.input.padding == 0
+    and saved.labels.offset_y == 2 and saved.labels.input_size == 8
+    and saved.activity.delay_ms == 1000
     and saved.activity.fade_ms == 1000 and saved.native.font == 'Verdana')
 run('alpha', '0')
 for _, object in pairs(objects) do
@@ -415,14 +429,15 @@ run('reset')
 
 -- Export actual layout geometry for the offline renderer.
 local layout = require('cbg_layout')
-local function export(path, viewport)
+local function export(path, viewport, output_only)
     if os.getenv('CBGPLUS_EXPORT_LAYOUT') ~= '1' then return end
     local title_width = windower.text.get_extents('ConsoleBGPlus_label_title')
     local input_width, input_height = windower.text.get_extents('ConsoleBGPlus_label_input')
     local pieces = layout.build(saved, viewport, title_width, input_width,
-        text_objects.ConsoleBGPlus_label_edit.visible, input_height)
+        text_objects.ConsoleBGPlus_label_edit.visible and not output_only, input_height, output_only)
     local file = assert(io.open(path, 'w'))
-    file:write(string.format('{"viewport":{"width":%d,"height":%d},"pieces":[', viewport.width, viewport.height))
+    file:write(string.format('{"viewport":{"width":%d,"height":%d},"output_only":%s,"pieces":[',
+        viewport.width, viewport.height, tostring(output_only == true)))
     for index, piece in ipairs(pieces) do
         if index > 1 then file:write(',') end
         file:write(string.format('{"texture":"%s","x":%d,"y":%d,"width":%d,"height":%d,"alpha":%d,"red":%d,"green":%d,"blue":%d,"repeat_x":%.6f,"repeat_y":%.6f}',
@@ -432,7 +447,7 @@ local function export(path, viewport)
     file:write('],"labels":[')
     local first = true
     for _, object in pairs(text_objects) do
-        if object.visible then
+        if object.visible and (not output_only or object.text == 'Console') then
             if not first then file:write(',') end
             file:write(string.format('{"text":"%s","x":%d,"y":%d,"size":%d,"red":%d,"green":%d,"blue":%d,"alpha":%d,"stroke":%d}',
                 object.text, object.x, object.y, object.size, object.red, object.green, object.blue,
@@ -442,9 +457,10 @@ local function export(path, viewport)
     end
     file:write(']}'); file:close()
 end
-run('position', '0', '0'); run('input', 'on', '14')
+run('position', '0', '0'); run('input', 'on', '15')
 console_open = true; tick(); settle()
 export('reference/layout.json', {width = 1920, height = 1080})
+export('reference/layout_output.json', {width = 1920, height = 1080}, true)
 run('size', '1070', '348')
 export('reference/layout_fixed.json', {width = 1920, height = 1080})
 run('glow', '0')
@@ -459,7 +475,10 @@ run('tabstyle', 'red'); run('divider', 'off'); settle()
 export('reference/layout_plain.json', {width = 1920, height = 1080})
 run('reset'); run('input', 'on')
 for _, viewport in ipairs({{width=120,height=40}, {width=80,height=30}, {width=1,height=1}, {width=640,height=240}, {width=3840,height=2160}}) do
-    local pieces = layout.build(saved, viewport, 40, 25, true)
+    local pieces, full_rect = layout.build(saved, viewport, 40, 25, true)
+    local _, compact_rect = layout.build(saved, viewport, 40, 25, false, 12, true)
+    assert(compact_rect.height == math.max(math.min(40, viewport.height),
+        full_rect.height - saved.input.height), 'Compact height must follow the clipped full frame')
     for _, piece in ipairs(pieces) do
         assert(piece.x >= 0 and piece.y >= 0)
         assert(piece.x + piece.width <= viewport.width and piece.y + piece.height <= viewport.height,
@@ -479,7 +498,7 @@ assert(queued[2] == 'console_font Verdana 12'
     and queued[3] == 'console_color 255 250 250 250'
     and queued[4] == 'console_fadedelay 1000'
     and queued[5] == 'console_displayactivity 1'
-    and queued[6] == 'console_log 0', 'Loading should establish the complete native profile')
+    and queued[6] == 'console_log 1', 'Loading should establish the complete native profile')
 for _ = 1, 60 do tick() end
 assert(#queued == 6, 'Idle frames must not rewrite the native profile')
 run('nativefont', 'Trebuchet', 'MS', '11')
@@ -499,8 +518,9 @@ assert(require('cbg_activity').new('C:\\Windower4\\Addons\\ConsoleBGPlus\\').pat
 windower.console.set_position = function(x, y) positions[#positions + 1] = {x = x, y = y} end
 saved, fake_log_size, console_open = nil, nil, false
 dofile(addon_path .. 'ConsoleBGPlus.lua')
-assert(queued[#queued] == 'console_log 0')
-run('input', 'on', '14')
+assert(queued[#queued] == 'console_log 1')
+run('activity', 'off')
+run('input', 'on', '15')
 local inactive_polls = log_polls
 for _ = 1, 30 do tick() end
 assert(log_polls == inactive_polls and not text_objects.ConsoleBGPlus_label_title.visible,
@@ -508,11 +528,16 @@ assert(log_polls == inactive_polls and not text_objects.ConsoleBGPlus_label_titl
 run('activity', 'on')
 assert(queued[#queued] == 'console_log 1')
 run('fade', '3000', '450')
+run('trace', 'on')
+trace = diagnostic_files[addon_path .. 'data/visibility.log']
 fake_log_size = 10000; tick(0.16)
 assert(not text_objects.ConsoleBGPlus_label_title.visible,
     'An existing log must start at EOF rather than replaying old output')
 fake_log_size = 10014; tick(0.16)
 assert(text_objects.ConsoleBGPlus_label_title.visible)
+local compact_height = rectangle().height
+assert(compact_height == saved.extents.y + saved.input.padding - saved.input.height,
+    'Automatic output should remove exactly the configured input strip height')
 assert(not text_objects.ConsoleBGPlus_label_input.visible,
     'Automatic output must not imply typing focus or show the input label')
 for _, object in pairs(objects) do
@@ -528,6 +553,14 @@ assert(objects[top_name].alpha > 0 and objects[top_name].alpha < original_alpha,
 assert(text_objects.ConsoleBGPlus_label_title.alpha > 0
     and text_objects.ConsoleBGPlus_label_title.alpha < original_title_alpha,
     'The title must fade with the border and fill')
+fake_log_size = 10020; tick(0.16)
+assert(objects[top_name].alpha == original_alpha and rectangle().height == compact_height,
+    'A second output burst must restore a full hold without resizing the compact frame')
+assert(trace.text:find('activity_changes=2', 1, true)
+    and trace.text:find('since_output_ms=0', 1, true)
+    and trace.text:find('clock_ms=', 1, true),
+    'Trace must expose subsecond timing and repeated growth without recording text')
+tick(3.25)
 tick(0.3)
 assert(not text_objects.ConsoleBGPlus_label_title.visible)
 fake_log_size = 25; tick(0.16)
@@ -538,9 +571,27 @@ assert(text_objects.ConsoleBGPlus_label_title.visible)
 console_open = true; tick(0.01)
 assert(text_objects.ConsoleBGPlus_label_input.visible and objects[top_name].alpha == original_alpha,
     'Manual opening always shows the input and full-strength frame')
+assert(rectangle().height == compact_height + saved.input.height)
 console_open = false; tick(0.01)
-assert(not text_objects.ConsoleBGPlus_label_title.visible,
-    'Closing the manual console must not keep the prior command frame open')
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == compact_height + saved.input.height,
+    'Closing must fade the full manual frame before hiding it')
+tick(0.22)
+assert(text_objects.ConsoleBGPlus_label_title.alpha > 0
+    and text_objects.ConsoleBGPlus_label_title.alpha < original_title_alpha)
+tick(0.3)
+assert(not text_objects.ConsoleBGPlus_label_title.visible)
+run('trace', 'off')
+console_open = true; tick()
+run('preview', 'on'); run('edit', 'on')
+console_open = false; tick()
+assert(not text_objects.ConsoleBGPlus_label_edit.visible
+    and not text_objects.ConsoleBGPlus_label_edit_exit.visible
+    and text_objects.ConsoleBGPlus_label_title.visible,
+    'Closing the console must finish edit and preview modes but still fade the frame')
+run('diagnose')
+assert(diagnostic_files[addon_path .. 'data/diagnostics.txt'].text:find('preview=false edit=false', 1, true))
+tick(0.5)
+assert(not text_objects.ConsoleBGPlus_label_title.visible)
 run('activity', 'off')
 assert(queued[#queued] == 'console_log 0')
 fake_log_size = 40; tick(0.16)

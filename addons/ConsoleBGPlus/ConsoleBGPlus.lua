@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.5'
+_addon.version = '0.1.6'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -17,12 +17,12 @@ local defaults = {
     gradient = {top = 100, bottom = 250},
     border = {alpha = 240, linked = false},
     glow = {alpha = 200, height = 24},
-    input = {enabled = false, height = 14, padding = 4, tab = 'left', divider = true},
-    labels = {font = 'Verdana', title_size = 8, input_size = 7,
-        input_text = 'Input', input_style = 'red', offset_y = -2},
+    input = {enabled = true, height = 15, padding = 0, tab = 'left', divider = true},
+    labels = {font = 'Verdana', title_size = 8, input_size = 8,
+        input_text = 'Input', input_style = 'red', offset_y = 2},
     console = {linked = true, offset_x = 50, offset_y = 15},
     native = {font = 'Verdana', size = 12, alpha = 255, red = 250, green = 250, blue = 250},
-    activity = {enabled = false, delay_ms = 1000, fade_ms = 1000,
+    activity = {enabled = true, delay_ms = 1000, fade_ms = 1000,
         native_delay_owned = false},
 }
 local settings = config.load(defaults)
@@ -34,8 +34,10 @@ local position_dirty = true
 local frame = 0
 local recorder = diagnostics.new(windower.addon_path, _addon.version)
 local watcher = activity.new(windower.addon_path)
-local auto_alpha, draw_alpha, input_shown, manual_was_open = 0, 255, false, false
+local auto_alpha, close_alpha, draw_alpha = 0, 0, 255
+local input_shown, manual_was_open, output_only, closing_since = false, false, false, nil
 local measurement_cache, measurement_order = {}, {}
+local refresh
 
 local function message(text, is_error)
     windower.add_to_chat(is_error and 123 or 207, '[ConsoleBG+] ' .. text)
@@ -102,8 +104,13 @@ end
 
 local function update_visibility()
     local manual = preview or editing or windower.console.visible()
-    apply_alpha(manual and 255 or auto_alpha)
-    visibility(manual or auto_alpha > 0, manual)
+    local compact = not manual and close_alpha == 0 and auto_alpha > 0
+    if compact ~= output_only then
+        output_only = compact
+        refresh()
+    end
+    apply_alpha(manual and 255 or math.max(auto_alpha, close_alpha))
+    visibility(manual or close_alpha > 0 or auto_alpha > 0, manual or close_alpha > 0)
 end
 
 local function new_label(key, text, size, red, green, blue, stroke)
@@ -128,7 +135,8 @@ end
 
 new_label('title', 'Console', 8, 235, 234, 245, 1)
 new_label('input', 'Input', 7, 233, 107, 124, 1)
-new_label('edit', 'Drag top edge / resize corner', 8, 235, 234, 245, 1)
+new_label('edit', 'Drag from top edge / Resize lower-right corner', 8, 255, 104, 125, 1)
+new_label('edit_exit', '//cbg edit off', 8, 255, 104, 125, 1)
 
 local function sync_console(rect, screen)
     if settings.console.linked ~= true then return end
@@ -190,13 +198,14 @@ local function style_labels()
     for _, label in pairs(labels) do label_metrics(label) end
 end
 
-local function refresh(screen)
+refresh = function(screen)
     screen = screen or viewport()
     style_labels()
     local title_width, title_height = labels.title.width, labels.title.height
     local input_width, input_height = labels.input.width, labels.input.height
     local pieces
-    pieces, actual_rectangle = layout.build(settings, screen, title_width, input_width, editing, input_height)
+    pieces, actual_rectangle = layout.build(settings, screen, title_width, input_width,
+        editing, input_height, output_only)
     for index, piece in ipairs(pieces) do
         local primitive = primitives[index]
         if not primitive then
@@ -245,11 +254,18 @@ local function refresh(screen)
     label_visibility(input, shown and input_shown and input.enabled)
     local edit = labels.edit
     local edit_width, edit_height = edit.width, edit.height
-    edit.enabled = editing and rect.width >= edit_width + 24 and rect.height >= edit_height + 30
+    local hint = labels.edit_exit
+    edit.enabled = editing and rect.width >= math.max(edit_width, hint.width) + 24
+        and rect.height >= edit_height + hint.height + 28
+    hint.enabled = edit.enabled
     windower.text.set_location(edit.name, math.max(rect.x + 12, rect.x + rect.width - edit_width - 16),
         rect.y + 14)
+    windower.text.set_location(hint.name, math.max(rect.x + 12, rect.x + rect.width - hint.width - 16),
+        rect.y + 14 + edit_height)
     tint_label(edit)
+    tint_label(hint)
     label_visibility(edit, shown and edit.enabled)
+    label_visibility(hint, shown and hint.enabled)
     sync_console(rect, screen)
     last_viewport = screen
 end
@@ -311,6 +327,13 @@ end
 
 local function context(console_visible)
     local measurements = {}
+    local now = watcher.now()
+    local age_ms = watcher.last_output and math.max(0, math.floor((now - watcher.last_output) * 1000 + 0.5))
+    local phase = 'idle'
+    if age_ms then
+        if age_ms <= settings.activity.delay_ms then phase = 'hold'
+        elseif age_ms < settings.activity.delay_ms + settings.activity.fade_ms then phase = 'fade' end
+    end
     for _, key in ipairs({'title', 'input'}) do
         local label = labels[key]
         local native_width, native_height = windower.text.get_extents(label.name)
@@ -321,9 +344,12 @@ local function context(console_visible)
         settings = settings, native_settings = windower.get_windower_settings() or {},
         rectangle = actual_rectangle, viewport = last_viewport, console_visible = console_visible,
         frame_visible = shown, preview = preview, edit = editing, frame = frame,
+        frame_alpha = draw_alpha, output_only = output_only,
         native_position = native_position, primitive_count = #primitives,
         activity = {path = watcher.path, available = watcher.available,
-            clock = watcher.clock, changes = watcher.changes, alpha = auto_alpha},
+            clock = watcher.clock, clock_ms = math.floor(now * 1000 + 0.5),
+            changes = watcher.changes, alpha = auto_alpha, phase = phase,
+            age_ms = age_ms, size = watcher.size},
         position_setter = windower.console.set_position and 'console.set_position'
             or (windower.send_command and 'console_position command' or 'unavailable'),
         label_measurements = measurements,
@@ -652,11 +678,27 @@ windower.register_event('addon command', command)
 windower.register_event('prerender', function()
     frame = frame + 1
     local console_visible = windower.console.visible()
-    if manual_was_open and not console_visible then watcher.suppress() end
+    if manual_was_open and not console_visible then
+        watcher.suppress()
+        local was_editing = editing
+        editing, preview = false, false
+        end_drag()
+        if was_editing then refresh() end
+        closing_since, close_alpha = watcher.now(), 255
+    elseif console_visible then
+        closing_since, close_alpha = nil, 0
+    end
     manual_was_open = console_visible
+    if closing_since then
+        local duration = math.max(0.05, settings.activity.fade_ms / 1000)
+        local progress = math.max(0, math.min(1, (watcher.now() - closing_since) / duration))
+        local eased = progress * progress * (3 - 2 * progress)
+        close_alpha = math.floor(255 * (1 - eased) + 0.5)
+        if progress >= 1 then closing_since = nil end
+    end
     auto_alpha = watcher.poll(settings.activity)
     local manual = preview or editing or console_visible
-    local wanted = manual or auto_alpha > 0
+    local wanted = manual or close_alpha > 0 or auto_alpha > 0
     if wanted then
         local screen = viewport()
         if screen.width ~= last_viewport.width or screen.height ~= last_viewport.height then

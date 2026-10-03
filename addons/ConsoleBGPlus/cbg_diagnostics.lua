@@ -13,16 +13,17 @@ end
 
 local function sample(context)
     local r, v = context.rectangle, context.viewport
-    return string.format('console_visible=%s frame_visible=%s preview=%s edit=%s auto_visible=%s activity_changes=%d frame=%d,%d,%d,%d viewport=%d,%d',
+    return string.format('console_visible=%s frame_visible=%s preview=%s edit=%s auto_visible=%s activity_changes=%d frame=%d,%d,%d,%d viewport=%d,%d output_only=%s frame_alpha=%d activity_phase=%s log_bytes=%s',
         tostring(context.console_visible), tostring(context.frame_visible), tostring(context.preview),
         tostring(context.edit), tostring(context.activity.alpha > 0), context.activity.changes,
-        r.x, r.y, r.width, r.height, v.width, v.height)
+        r.x, r.y, r.width, r.height, v.width, v.height, tostring(context.output_only),
+        context.frame_alpha, context.activity.phase, tostring(context.activity.size or 'unavailable'))
 end
 
 local function header(context, version)
     local lines = {'ConsoleBG+ v' .. version,
         'UTC: ' .. os.date('!%Y-%m-%dT%H:%M:%SZ'), sample(context),
-        'The frame size includes input.padding pixels of extra bottom space.',
+        'The full frame includes input.padding; output-only activity removes the saved input height.',
         'Native position below is the last position written by this addon, not a queried position.',
         'Native console font, input text, output buffer, fade delay, and fade opacity: no documented getters.',
         'Input styling follows manual console opening; log growth only controls the output frame.',
@@ -62,6 +63,8 @@ local function header(context, version)
     lines[#lines + 1] = 'activity_clock=' .. clean(context.activity.clock)
     lines[#lines + 1] = 'activity_changes=' .. clean(context.activity.changes)
     lines[#lines + 1] = 'activity_alpha=' .. clean(context.activity.alpha)
+    lines[#lines + 1] = 'activity_phase=' .. clean(context.activity.phase)
+    lines[#lines + 1] = 'activity_age_ms=' .. clean(context.activity.age_ms or 'none')
     for name, label in pairs(context.label_measurements) do
         lines[#lines + 1] = name .. '_label=' .. label.width .. 'x' .. label.height
             .. ' (' .. clean(label.source) .. ')'
@@ -105,8 +108,9 @@ function diagnostics.new(root, version)
         if not recorder.active then return end
         local state = sample(context)
         if state == previous then return end
-        local written, err = file:write(string.format('%s frame=%d %s\n',
-            os.date('!%Y-%m-%dT%H:%M:%SZ'), context.frame, state))
+        local written, err = file:write(string.format('%s clock_ms=%d frame=%d since_output_ms=%s %s\n',
+            os.date('!%Y-%m-%dT%H:%M:%SZ'), context.activity.clock_ms, context.frame,
+            tostring(context.activity.age_ms or 'none'), state))
         local flushed, flush_error
         if written then flushed, flush_error = file:flush() end
         if not written or not flushed then
@@ -114,8 +118,8 @@ function diagnostics.new(root, version)
             return nil, err or flush_error
         end
         previous, entries = state, entries + 1
-        -- Keep a forgotten trace bounded. Timestamps have one-second
-        -- precision; frame numbers provide ordering, not a fade-curve clock.
+        -- Keep a forgotten trace bounded. clock_ms uses the same clock as
+        -- the watcher, so adjacent samples reveal subsecond event spacing.
         if entries >= 512 then
             recorder.stop()
             return nil, 'Trace stopped after 512 state changes.'

@@ -9,7 +9,7 @@ local function bounded(value, fallback, minimum, maximum)
     return math.floor(math.max(minimum, math.min(maximum, number)) + 0.5)
 end
 
-function layout.build(settings, viewport, title_width, input_width, editing, input_text_height)
+function layout.build(settings, viewport, title_width, input_width, editing, input_text_height, output_only)
     local screen_width = bounded(viewport.width, 1920, 1, 32768)
     local screen_height = bounded(viewport.height, 1080, 1, 32768)
     local minimum_width = math.min(120, screen_width)
@@ -20,8 +20,10 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     if settings.extents.mode == 'screen' then requested_width = screen_width - x * 2 end
     local width = bounded(requested_width, 1070, minimum_width, screen_width - x)
     local padding = bounded(settings.input.padding, 4, 0, 32)
-    local height = bounded((tonumber(settings.extents.y) or 344) + padding, 348,
+    local full_height = bounded((tonumber(settings.extents.y) or 344) + padding, 344,
         minimum_height, screen_height - y)
+    local strip_height = settings.input.enabled == true and bounded(settings.input.height, 15, 6, 256) or 0
+    local height = output_only and math.max(minimum_height, full_height - strip_height) or full_height
     local fill_alpha = bounded(settings.bg.alpha, 255, 0, 255)
     local top_alpha = bounded(settings.gradient.top, 100, 0, 255)
     local bottom_alpha = bounded(settings.gradient.bottom, 250, 0, 255)
