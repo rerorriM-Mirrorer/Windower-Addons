@@ -5,7 +5,7 @@ local native_fields = {
     'profile_name', 'branch', 'ffxi_version', 'launcher_version', 'hook_version',
     'x_res', 'y_res', 'ui_x_res', 'ui_y_res', 'window_x_pos', 'window_y_pos',
 }
-local setting_groups = {'pos', 'extents', 'bg', 'gradient', 'border', 'glow', 'input', 'labels', 'console'}
+local setting_groups = {'pos', 'extents', 'bg', 'gradient', 'border', 'glow', 'input', 'labels', 'console', 'activity'}
 
 local function clean(value)
     return tostring(value):gsub('[\r\n\t]', ' ')
@@ -13,9 +13,10 @@ end
 
 local function sample(context)
     local r, v = context.rectangle, context.viewport
-    return string.format('console_visible=%s frame_visible=%s preview=%s edit=%s frame=%d,%d,%d,%d viewport=%d,%d',
+    return string.format('console_visible=%s frame_visible=%s preview=%s edit=%s auto_visible=%s activity_changes=%d frame=%d,%d,%d,%d viewport=%d,%d',
         tostring(context.console_visible), tostring(context.frame_visible), tostring(context.preview),
-        tostring(context.edit), r.x, r.y, r.width, r.height, v.width, v.height)
+        tostring(context.edit), tostring(context.activity.alpha > 0), context.activity.changes,
+        r.x, r.y, r.width, r.height, v.width, v.height)
 end
 
 local function header(context, version)
@@ -24,9 +25,10 @@ local function header(context, version)
         'The frame size includes input.padding pixels of extra bottom space.',
         'Native position below is the last position written by this addon, not a queried position.',
         'Native console font, input text, output buffer, fade delay, and fade opacity: no documented getters.',
-        'Input visibility currently follows console visibility; it does not establish typing focus.',
+        'Input styling follows manual console opening; log growth only controls the output frame.',
         'Layout uses retained positive label bounds; raw native bounds can be 0x0 while hidden.',
-        'No console input or output text is recorded.', '', '[Windower settings]'}
+        'Log watcher reads byte length only; no console input or output text is recorded.',
+        'Log availability depends on console_log 1 and timely writes.', '', '[Windower settings]'}
     for _, key in ipairs(native_fields) do
         if context.native_settings[key] ~= nil then
             lines[#lines + 1] = key .. '=' .. clean(context.native_settings[key])
@@ -55,6 +57,11 @@ local function header(context, version)
     lines[#lines + 1] = 'position_setter=' .. clean(context.position_setter)
     lines[#lines + 1] = 'divider_y=' .. clean(context.rectangle.divider_y or 'hidden')
     lines[#lines + 1] = 'divider_visible=' .. clean(context.rectangle.divider_visible or false)
+    lines[#lines + 1] = 'activity_log=' .. clean(context.activity.path or 'unresolved')
+    lines[#lines + 1] = 'activity_available=' .. clean(context.activity.available)
+    lines[#lines + 1] = 'activity_clock=' .. clean(context.activity.clock)
+    lines[#lines + 1] = 'activity_changes=' .. clean(context.activity.changes)
+    lines[#lines + 1] = 'activity_alpha=' .. clean(context.activity.alpha)
     for name, label in pairs(context.label_measurements) do
         lines[#lines + 1] = name .. '_label=' .. label.width .. 'x' .. label.height
             .. ' (' .. clean(label.source) .. ')'

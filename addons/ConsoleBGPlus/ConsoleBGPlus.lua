@@ -2,13 +2,14 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.3'
+_addon.version = '0.1.4'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
 local layout = require('cbg_layout')
 local skin = require('cbg_skin')
 local diagnostics = require('cbg_diagnostics')
+local activity = require('cbg_activity')
 local defaults = {
     bg = {alpha = 255, red = 255, green = 255, blue = 255},
     pos = {x = 32, y = 16},
@@ -20,6 +21,8 @@ local defaults = {
     labels = {font = 'Verdana', title_size = 8, input_size = 7,
         input_text = 'Input', input_style = 'red', offset_y = -2},
     console = {linked = true, offset_x = 50, offset_y = 15},
+    activity = {enabled = false, delay_ms = 3000, fade_ms = 450,
+        native_delay_owned = false},
 }
 local settings = config.load(defaults)
 local primitives, shown, preview, editing = {}, false, false, false
@@ -29,6 +32,8 @@ local drag, native_position, position_warning = nil, nil, false
 local position_dirty = true
 local frame = 0
 local recorder = diagnostics.new(windower.addon_path, _addon.version)
+local watcher = activity.new(windower.addon_path)
+local auto_alpha, draw_alpha, input_shown, manual_was_open = 0, 255, false, false
 local measurement_cache, measurement_order = {}, {}
 
 local function message(text, is_error)
@@ -60,14 +65,44 @@ local function label_visibility(label, visible)
     end
 end
 
-local function visibility(visible)
+local function opacity(value)
+    return math.floor(value * draw_alpha / 255 + 0.5)
+end
+
+local function tint_label(label)
+    windower.text.set_color(label.name, opacity(label.base_alpha),
+        label.red, label.green, label.blue)
+    windower.text.set_stroke_color(label.name, opacity(label.base_stroke), 15, 14, 28)
+end
+
+local function apply_alpha(value)
+    -- Eight-ish visible fade steps keep a large tiled frame inexpensive.
+    local quantized = math.min(255, math.floor(value / 32 + 0.5) * 32)
+    if quantized == draw_alpha then return end
+    draw_alpha = quantized
     for _, primitive in ipairs(primitives) do
-        windower.prim.set_visibility(primitive.name, visible)
+        windower.prim.set_color(primitive.name, opacity(primitive.alpha),
+            primitive.red, primitive.green, primitive.blue)
     end
-    for _, label in pairs(labels) do
-        label_visibility(label, visible and label.enabled)
+    for _, label in pairs(labels) do tint_label(label) end
+end
+
+local function visibility(visible, input_mode)
+    input_mode = visible and input_mode or false
+    if shown == visible and input_shown == input_mode then return end
+    for _, primitive in ipairs(primitives) do
+        windower.prim.set_visibility(primitive.name, visible and (input_mode or not primitive.input_only))
     end
-    shown = visible
+    for key, label in pairs(labels) do
+        label_visibility(label, visible and label.enabled and (input_mode or key ~= 'input'))
+    end
+    shown, input_shown = visible, input_mode
+end
+
+local function update_visibility()
+    local manual = preview or editing or windower.console.visible()
+    apply_alpha(manual and 255 or auto_alpha)
+    visibility(manual or auto_alpha > 0, manual)
 end
 
 local function new_label(key, text, size, red, green, blue, stroke)
@@ -86,7 +121,8 @@ local function new_label(key, text, size, red, green, blue, stroke)
     windower.text.set_stroke_width(name, stroke)
     windower.text.set_stroke_color(name, 220, 15, 14, 28)
     labels[key] = {name = name, enabled = false, visible = false,
-        font = 'Verdana', size = size, text = text, stroke = stroke}
+        font = 'Verdana', size = size, text = text, stroke = stroke,
+        red = red, green = green, blue = blue, base_alpha = 240, base_stroke = 220}
 end
 
 new_label('title', 'Console', 8, 235, 234, 245, 1)
@@ -169,6 +205,10 @@ local function refresh(screen)
             windower.prim.set_fit_to_texture(primitive.name, false)
             primitives[index] = primitive
         end
+        primitive.input_only = piece.texture:find('divider_', 1, true) == 1
+            or piece.texture:find('tab_', 1, true) == 1
+        primitive.alpha, primitive.red, primitive.green, primitive.blue =
+            piece.alpha, piece.red, piece.green, piece.blue
         if primitive.texture ~= piece.texture then
             windower.prim.set_texture(primitive.name, textures[piece.texture])
             primitive.texture = piece.texture
@@ -176,8 +216,8 @@ local function refresh(screen)
         windower.prim.set_position(primitive.name, piece.x, piece.y)
         windower.prim.set_size(primitive.name, piece.width, piece.height)
         windower.prim.set_repeat(primitive.name, piece.repeat_x, piece.repeat_y)
-        windower.prim.set_color(primitive.name, piece.alpha, piece.red, piece.green, piece.blue)
-        windower.prim.set_visibility(primitive.name, shown)
+        windower.prim.set_color(primitive.name, opacity(piece.alpha), piece.red, piece.green, piece.blue)
+        windower.prim.set_visibility(primitive.name, shown and (input_shown or not primitive.input_only))
     end
     for index = #primitives, #pieces + 1, -1 do
         windower.prim.delete(primitives[index].name)
@@ -186,8 +226,8 @@ local function refresh(screen)
     local title = labels.title
     local rect = actual_rectangle
     title.enabled = rect.title_slot ~= nil and screen.height >= title_height
-    windower.text.set_color(title.name, rect.title_alpha, 235, 234, 245)
-    windower.text.set_stroke_color(title.name, rect.title_alpha, 15, 14, 28)
+    title.base_alpha, title.base_stroke = rect.title_alpha, rect.title_alpha
+    tint_label(title)
     if rect.title_slot then
         windower.text.set_location(title.name, rect.title_slot.x, rect.title_slot.y)
     end
@@ -195,18 +235,19 @@ local function refresh(screen)
     local input = labels.input
     local tab = rect.input_tab
     input.enabled = tab ~= nil and input_width + 8 <= tab.width and input_height <= tab.height
-    windower.text.set_color(input.name, rect.input_alpha, input.red, input.green, input.blue)
-    windower.text.set_stroke_color(input.name, rect.input_alpha, 15, 14, 28)
+    input.base_alpha, input.base_stroke = rect.input_alpha, rect.input_alpha
+    tint_label(input)
     if tab then
         windower.text.set_location(input.name, tab.x + 4,
             math.max(0, tab.y + math.floor((tab.height - input_height) / 2) + settings.labels.offset_y))
     end
-    label_visibility(input, shown and input.enabled)
+    label_visibility(input, shown and input_shown and input.enabled)
     local edit = labels.edit
     local edit_width, edit_height = edit.width, edit.height
     edit.enabled = editing and rect.width >= edit_width + 24 and rect.height >= edit_height + 30
     windower.text.set_location(edit.name, math.max(rect.x + 12, rect.x + rect.width - edit_width - 16),
         rect.y + 14)
+    tint_label(edit)
     label_visibility(edit, shown and edit.enabled)
     sync_console(rect, screen)
     last_viewport = screen
@@ -280,6 +321,8 @@ local function context(console_visible)
         rectangle = actual_rectangle, viewport = last_viewport, console_visible = console_visible,
         frame_visible = shown, preview = preview, edit = editing, frame = frame,
         native_position = native_position, primitive_count = #primitives,
+        activity = {path = watcher.path, available = watcher.available,
+            clock = watcher.clock, changes = watcher.changes, alpha = auto_alpha},
         position_setter = windower.console.set_position and 'console.set_position'
             or (windower.send_command and 'console_position command' or 'unavailable'),
         label_measurements = measurements,
@@ -449,12 +492,34 @@ local function command(action, ...)
         position_dirty = true
         save()
         message('Console offset saved: ' .. value[1] .. ', ' .. value[2] .. '.')
+    elseif action == 'activity' then
+        local mode = args[1] and args[1]:lower()
+        if #args ~= 1 or (mode ~= 'on' and mode ~= 'off') then return usage('activity on|off') end
+        settings.activity.enabled = mode == 'on'
+        watcher.restart()
+        auto_alpha = 0
+        save()
+        update_visibility()
+        message('Log activity ' .. mode .. '. Windower console_log 1 is needed for automatic output.')
+    elseif action == 'fade' then
+        local delay = args[1] and integer(args[1], 0, 60000)
+        local duration = args[2] and integer(args[2], 50, 4000)
+        if #args < 1 or #args > 2 or not delay or (args[2] and not duration) then
+            return usage('fade <native hold ms 0-60000> [frame fade ms 50-4000]')
+        end
+        settings.activity.delay_ms = delay
+        if duration then settings.activity.fade_ms = duration end
+        settings.activity.native_delay_owned = windower.send_command ~= nil
+        if windower.send_command then windower.send_command('console_fadedelay ' .. delay) end
+        save()
+        message(windower.send_command and 'Native hold and frame fade timing saved.'
+            or 'Frame timing saved; native console command API unavailable.', not windower.send_command)
     elseif action == 'edit' then
         local mode = args[1] and args[1]:lower()
         if #args > 1 or (mode and mode ~= 'on' and mode ~= 'off') then return usage('edit [on|off]') end
         editing = mode and mode == 'on' or (not mode and not editing)
         refresh()
-        visibility(preview or editing or windower.console.visible())
+        update_visibility()
         message(editing and 'Edit mode on: drag the top edge; resize the lower-right corner. Release to save.'
             or 'Edit mode off.')
     elseif action == 'diagnose' then
@@ -480,27 +545,31 @@ local function command(action, ...)
             return usage('preview [on|off]')
         end
         if mode then preview = mode == 'on' else preview = not preview end
-        visibility(preview or editing or windower.console.visible())
+        update_visibility()
         message('Preview ' .. (preview and 'on' or 'off') .. '.')
     elseif action == 'reset' then
         if #args ~= 0 then return usage('reset') end
         for group, values in pairs(defaults) do
             for key, value in pairs(values) do settings[group][key] = value end
         end
+        watcher.restart()
+        auto_alpha = 0
         position_dirty = true
         save()
+        update_visibility()
         message('Default frame settings restored.')
     elseif action == 'status' then
         if #args ~= 0 then return usage('status') end
         local rect = actual_rectangle
-        message(string.format('v%s: drawn at %d,%d, %dx%d (%s width); gradient %d to %d; glow %d; input %s (%d + %d padding); console %s; edit %s; preview %s; trace %s.',
+        message(string.format('v%s: drawn at %d,%d, %dx%d (%s width); gradient %d to %d; glow %d; input %s (%d + %d padding); console %s; edit %s; preview %s; trace %s; log activity %s (%s).',
             _addon.version, rect.x, rect.y, rect.width, rect.height,
             settings.extents.mode,
             settings.gradient.top, settings.gradient.bottom,
             settings.glow.alpha,
             settings.input.enabled and 'on' or 'off', settings.input.height, settings.input.padding,
             settings.console.linked and 'linked' or 'free', editing and 'on' or 'off',
-            preview and 'on' or 'off', recorder.active and 'on' or 'off'))
+            preview and 'on' or 'off', recorder.active and 'on' or 'off',
+            settings.activity.enabled and 'on' or 'off', watcher.available and 'available' or 'unavailable'))
     elseif action == 'help' then
         if #args ~= 0 then return usage('help') end
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
@@ -512,21 +581,35 @@ local function command(action, ...)
         message('//cbg labelfont <font> | labelsize <title> <input> | labeloffset <-12 to 12>')
         message('//cbg diagnose | trace on|off. Files go to ConsoleBGPlus/data/.')
         message('//cbg preview [on|off] | status | reset. Changes save to data/settings.xml.')
+        message('//cbg activity on|off (with //console_log 1) | fade <hold ms> [fade ms]')
     else
         message('Unknown command. Use //cbg help.', true)
     end
 end
 
 refresh()
+if settings.activity.native_delay_owned and windower.send_command then
+    windower.send_command('console_fadedelay ' .. settings.activity.delay_ms)
+end
 local registration = config.register(settings, function()
     drag, position_dirty = nil, true
+    watcher.restart()
+    auto_alpha = 0
+    if settings.activity.native_delay_owned and windower.send_command then
+        windower.send_command('console_fadedelay ' .. settings.activity.delay_ms)
+    end
     refresh()
+    update_visibility()
 end)
 windower.register_event('addon command', command)
 windower.register_event('prerender', function()
     frame = frame + 1
     local console_visible = windower.console.visible()
-    local wanted = preview or editing or console_visible
+    if manual_was_open and not console_visible then watcher.suppress() end
+    manual_was_open = console_visible
+    auto_alpha = watcher.poll(settings.activity)
+    local manual = preview or editing or console_visible
+    local wanted = manual or auto_alpha > 0
     if wanted then
         local screen = viewport()
         if screen.width ~= last_viewport.width or screen.height ~= last_viewport.height then
@@ -536,7 +619,7 @@ windower.register_event('prerender', function()
             refresh(screen)
         end
     end
-    if wanted ~= shown then visibility(wanted) end
+    update_visibility()
     if wanted then measure_labels() end
     if recorder.active then
         local ok, err = recorder.observe(context(console_visible))

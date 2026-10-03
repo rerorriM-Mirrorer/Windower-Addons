@@ -1,6 +1,6 @@
 # ConsoleBG+
 
-An FFXI-style frame for the Windower 4 console, using XIVParty's violet stripes, silver rails, a transparency gradient, and native right-edge fade. Version **0.1.3** fixes delayed/hidden label measurements, makes red input lettering text-only, shortens the native plaque, moves the edit hint to the right, and carries the background and glow through the border strips.
+An FFXI-style frame for the Windower 4 console, using XIVParty's violet stripes, silver rails, a transparency gradient, and native right-edge fade. Version **0.1.4** adds optional automatic-output visibility and a tunable frame fade by checking the byte length of Windower's console log. It also retains the label sizing and border fixes from v0.1.3.
 
 ## Install or update
 
@@ -32,6 +32,27 @@ Resizing chooses a fixed width; `//cbg width screen` restores responsive width. 
 The input label fits before the default native console text inset; long labels or larger fonts can occupy more room. Default red lettering is bold, italic, outlined, and has **no plaque**. `//cbg tabstyle native` switches to dark lettering on a grey plaque whose height matches the measured text height. `//cbg divider off` hides the input divider without moving or hiding the label. The **Console** title and input label are separate elements.
 
 Windower can return `0 × 0` while a label is hidden and retain an old size immediately after changing its text or font. The addon keeps positive measurements, uses a bounded estimate for unseen text, and rechecks after visible render passes. Changing `$` back to `Input`, reopening the console, or changing fonts no longer requires another alignment command. A new font can settle over the first few visible frames.
+
+## Automatic output and frame fade
+
+The log watcher starts **off** for existing and new settings. To test it on one client, run these in FFXI chat:
+
+```text
+//console_log 1
+//cbg activity on
+//cbg fade 3000 450
+//cbg edit off
+//cbg preview off
+//console_echo ConsoleBG_activity_test
+```
+
+`activity on` saves the choice per character but does not change Windower's logging setting; `console_log 1` enables that native setting. `fade 3000 450` applies a 3000 ms native delay and stores a matching frame hold plus a 450 ms frame fade. Adjust both values until the frame follows the native output by eye. Native `console_fadedelay` specifies the wait **before** its fade; Windower does not report its live opacity or fade curve. If the native command setter is unavailable, the addon saves its own timing and reports that it could not change the native delay.
+
+On load, the watcher begins at the end of `Windower/console.log`, then checks its length at most about eight times per second. New bytes show the background without an `Input` label or divider, because `console.visible()` still reports false for automatic output on the tested Hook. After the configured hold it fades the background, rails, and title over the chosen duration. Manually opening the console always restores the full frame and input styling; closing it discards earlier activity. `activity off` stops checking the file. Existing saved Meiryo and layout adjustments carry over.
+
+The watcher never reads log contents. File writes may be buffered, so the frame may start late; `diagnose` reports whether the file was accessible, the timing clock, and how many size changes it observed. The path comes from Windower's addon directory; an unavailable file leaves manual visibility working normally. If several clients append to the same `console.log`, one client's output can wake another client's frame. Test one client before trying the four-client setup.
+
+`//cbg activity on` is a visibility experiment, not a replacement for native console input. There is no documented getter for its typed line or caret position, so a decorative blinking cursor would stay at a fixed location when typing moves. The output text *could* be copied from the log into a separate movable text panel, with native automatic display disabled via `console_displayactivity 0`, but that would be a second renderer with wrapping, scrollback, and text-format handling. This version reads size only and leaves command entry in Windower's own console.
 
 ## Position and alignment
 
@@ -70,6 +91,8 @@ Console movement uses `windower.console.set_position`, with the `console_positio
 | `//cbg glow 200 24` | Set glow strength (0-255) and height (4-128 pixels). `glow 0` disables it. |
 | `//cbg color 255 255 255 255` | Restore original colors and full fill strength. Values are alpha, red, green, blue. |
 | `//cbg preview on` / `//cbg preview off` | Keep the background visible for inspection or return to normal visibility. |
+| `//cbg activity on` / `//cbg activity off` | Watch console.log length for automatic output; requires native `console_log 1`. |
+| `//cbg fade 3000 450` | Set the native hold and frame hold to 3000 ms; fade the frame over 450 ms. |
 | `//cbg status` | Report actual geometry and current modes. |
 | `//cbg reset` / `//cbg help` | Restore defaults or show commands. |
 
@@ -77,7 +100,7 @@ Linked border alpha multiplies base border strength by fill alpha and the local 
 
 ## Diagnose console activity
 
-`//cbg diagnose` writes **`ConsoleBGPlus/data/diagnostics.txt`** with addon settings, known Windower display/version fields, available settings keys, retained label bounds and their measurement state, raw native bounds, actual geometry, and the last native position this addon wrote. A hidden native `0x0` is reported separately from the positive bounds used for layout.
+`//cbg diagnose` writes **`ConsoleBGPlus/data/diagnostics.txt`** with addon settings, known Windower display/version fields, log accessibility/activity clock/size-change count, retained label bounds and their measurement state, raw native bounds, actual geometry, and the last native position this addon wrote. A hidden native `0x0` is reported separately from the positive bounds used for layout.
 
 For automatic console display and fade behavior:
 
@@ -87,11 +110,11 @@ For automatic console display and fade behavior:
 
 The trace records visibility/layout changes to a file without printing to the console. It starts a fresh log when enabled, flushes after each change, stops at 512 changes, and closes on unload. UTC timestamps have one-second precision; frame numbers establish order, not exact fade duration. Neither input contents nor console output text is collected.
 
-Normal display follows `windower.console.visible()`. The supplied in-game trace and screenshot on Hook **4.7.9.3** show automatic console output while that API remains false, so the frame still follows manual opening rather than all automatic activity. `preview on` can keep it visible for inspection. Native `console_displayactivity` and `console_fadedelay` remain Windower settings; this release does not read their current values or reproduce a synchronized fade. Routing setters through `cbg` could retain settings that the addon applies, but matching arbitrary output still needs a separate activity signal and fade timing. No native input text or console output is collected.
+Normal display follows `windower.console.visible()` while the log watcher is off. The supplied in-game trace and screenshot on Hook **4.7.9.3** show automatic console output while that API remains false. The opt-in watcher adds a separate activity hint but cannot read native fade opacity, typed input, or the output buffer. It records no console input or output text.
 
 ## Validation and sources
 
-Checked with a Lua API mock that returns zero bounds while hidden and delays font/text measurements until rendering. Regression checks cover `$` → `Input` resizing without another command, Meiryo height changes, retained bounds after closing, red mode without a plaque, divider-only toggling, mouse ownership, linked movement/offsets, release-only saving, viewport bounds, legacy settings, diagnostic failures and cleanup, position-command fallback, and idle rendering. Texture joins, caps, and labels were inspected offline. Windows font metrics, native layering, and mouse behavior still need an in-game check.
+Checked with a Lua API mock that returns zero bounds while hidden and delays font/text measurements until rendering. Activity checks cover log growth while the console stays closed, no replay of old lines, fade and manual override, input hiding on automatic output, log truncation, opt-out, and reloading a paired native delay. Existing checks cover `$` → `Input` sizing, Meiryo metrics, divider/red/native modes, mouse ownership, release-only saves, viewport bounds, diagnostic failures and cleanup, and idle rendering. Texture joins, caps, and labels were inspected offline. The timing and file accessibility of live Windower log writes, Windows font metrics, native layering, and mouse behavior still need an in-game check.
 
 - [Original ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/addons/ConsoleBG), version 0.9.0.1.
 - [XIVParty textures by Tylas](https://github.com/Tylas11/XivParty/tree/master/assets/ffxi): `BgTop.png`, `BgMid.png`, and `BgBottom.png`. Attribution and terms are in `LICENSE.txt`.

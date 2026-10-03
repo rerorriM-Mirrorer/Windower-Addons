@@ -54,7 +54,7 @@ def render(layout_path, output_path):
     # Verdana remains the user's in-game console font. This local fallback
     # shows alignment only; Windows/Windower supplies the actual typeface.
     console_font = font('DejaVuSans.ttf', 14)
-    lines = ['> ConsoleBG+ v0.1.3', '> Stable label bounds, text-only red input, and continuous glow.',
+    lines = ['> ConsoleBG+ v0.1.4', '> Log-aware frame visibility, text-only red input, and continuous glow.',
              '> cbg edit on', '> Drag the top edge and resize the lower-right corner.',
              '> cbg diagnose', '> screenshot jpg']
     for index, line in enumerate(lines):

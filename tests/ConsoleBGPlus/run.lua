@@ -9,10 +9,18 @@ local save_calls, positions, console_writes = 0, {}, 0
 local diagnostic_files, fail_diagnostics = {}, false
 local render_frame, style_calls, measurement_calls = 0, 0, 0
 local render_latency = 2
+local test_seconds, fake_log_size, log_polls = 0, nil, 0
+package.preload.socket = function() return {gettime = function() return test_seconds end} end
 local real_open = io.open
 -- Keep diagnostic I/O deterministic, including open failures. PNG files
 -- still use the real filesystem and must contain valid image bytes.
 io.open = function(path, mode)
+    if path == './console.log' and mode == 'rb' then
+        log_polls = log_polls + 1
+        if not fake_log_size then return nil, 'no console log' end
+        return {seek = function(_, whence) assert(whence == 'end'); return fake_log_size end,
+            close = function() return true end}
+    end
     if path == addon_path .. 'data/diagnostics.txt' or path == addon_path .. 'data/visibility.log' then
         if fail_diagnostics then return nil, 'simulated write failure' end
         assert(mode == 'w')
@@ -142,7 +150,8 @@ local function all_visible(value)
     if not value then assert(not text_objects.ConsoleBGPlus_label_input.visible) end
 end
 local function run(...) callbacks['addon command'](...) end
-local function tick()
+local function tick(seconds)
+    test_seconds = test_seconds + (seconds or 1 / 30)
     callbacks.prerender()
     render_frame = render_frame + 1
     for _, object in pairs(text_objects) do
@@ -299,6 +308,7 @@ run('position', '16', '24')
 run('labeloffset', '-1')
 run('label', 'Input'); run('labelfont', 'Verdana'); run('labelsize', '8', '7')
 run('labeloffset', '-2'); run('tabstyle', 'red'); run('input', 'off'); run('preview', 'off')
+run('preview', 'on')
 run('border', 'link'); run('gradient', '0', '255')
 for _, object in pairs(objects) do
     if object.texture:find('_top_left.png', 1, true) then assert(object.alpha == 0) end
@@ -308,7 +318,7 @@ assert(text_objects.ConsoleBGPlus_label_title.alpha == 0)
 run('alpha', '0')
 for _, object in pairs(objects) do assert(object.alpha == 0) end
 assert(text_objects.ConsoleBGPlus_label_title.alpha == 0 and text_objects.ConsoleBGPlus_label_input.alpha == 0)
-run('alpha', '255'); run('gradient', '80', '230'); run('border', 'free')
+run('alpha', '255'); run('gradient', '80', '230'); run('border', 'free'); run('preview', 'off')
 
 -- Diagnostics capture explicit configuration and visibility, never console
 -- text. A trace must stay quiet on idle frames and close on stop/unload.
@@ -376,7 +386,7 @@ callbacks.unload(); assert(count() == 0 and next(text_objects) == nil)
 -- A v0.1.0 settings file retains the user's colors/position while new
 -- fields receive their defaults from Windower's config library.
 saved.extents.mode, saved.glow, saved.input.tab = nil, nil, nil
-saved.input.padding, saved.input.divider, saved.labels, saved.console, saved.border.linked = nil, nil, nil, nil, nil
+saved.input.padding, saved.input.divider, saved.labels, saved.console, saved.border.linked, saved.activity = nil, nil, nil, nil, nil, nil
 dofile(addon_path .. 'ConsoleBGPlus.lua')
 run('status'); assert(logs[#logs][2]:find('1888x320 (screen width)', 1, true))
 assert(logs[#logs][2]:find('gradient 80 to 230', 1, true))
@@ -385,6 +395,7 @@ run('reset')
 assert(saved.pos.x == 32 and saved.extents.x == 1070 and saved.extents.mode == 'screen' and saved.gradient.top == 100)
 assert(saved.gradient.bottom == 250 and saved.glow.alpha == 200 and saved.glow.height == 24)
 assert(saved.console.offset_x == 50 and saved.console.offset_y == 15 and saved.input.divider)
+assert(saved.activity.enabled == false and saved.activity.delay_ms == 3000)
 run('alpha', '0')
 for _, object in pairs(objects) do
     if object.texture:find('_mid_', 1, true) then assert(object.alpha == 0) end
@@ -458,5 +469,74 @@ assert(#queued == 1)
 run('trace', 'on')
 trace = diagnostic_files[addon_path .. 'data/visibility.log']
 callbacks.unload(); assert(trace.closed and count() == 0 and next(text_objects) == nil)
+
+-- Reproduce the user's Hook behavior: native text appears on a log append
+-- while console.visible() stays false. A watcher starts at EOF and checks
+-- byte counts, then fades without parsing text or claiming keyboard focus.
+assert(require('cbg_activity').new('C:\\Windower4\\Addons\\ConsoleBGPlus\\').path
+    == 'C:/Windower4/console.log', 'Resolve the live Windows addon path to its console log')
+windower.console.set_position = function(x, y) positions[#positions + 1] = {x = x, y = y} end
+saved, fake_log_size, console_open = nil, nil, false
+dofile(addon_path .. 'ConsoleBGPlus.lua')
+run('input', 'on', '14')
+local inactive_polls = log_polls
+for _ = 1, 30 do tick() end
+assert(log_polls == inactive_polls and not text_objects.ConsoleBGPlus_label_title.visible,
+    'Log watching must be opt-in, with no reads while disabled')
+run('activity', 'on')
+fake_log_size = 10000; tick(0.16)
+assert(not text_objects.ConsoleBGPlus_label_title.visible,
+    'An existing log must start at EOF rather than replaying old output')
+fake_log_size = 10014; tick(0.16)
+assert(text_objects.ConsoleBGPlus_label_title.visible)
+assert(not text_objects.ConsoleBGPlus_label_input.visible,
+    'Automatic output must not imply typing focus or show the input label')
+for _, object in pairs(objects) do
+    if object.texture:find('_divider_', 1, true) then assert(not object.visible) end
+end
+local top_name = 'ConsoleBGPlus_1'
+local original_alpha = objects[top_name].alpha
+local original_title_alpha = text_objects.ConsoleBGPlus_label_title.alpha
+tick(3.25)
+assert(text_objects.ConsoleBGPlus_label_title.visible)
+assert(objects[top_name].alpha > 0 and objects[top_name].alpha < original_alpha,
+    'Automatic output should gradually fade after the hold period')
+assert(text_objects.ConsoleBGPlus_label_title.alpha > 0
+    and text_objects.ConsoleBGPlus_label_title.alpha < original_title_alpha,
+    'The title must fade with the border and fill')
+tick(0.3)
+assert(not text_objects.ConsoleBGPlus_label_title.visible)
+fake_log_size = 25; tick(0.16)
+assert(not text_objects.ConsoleBGPlus_label_title.visible,
+    'Truncating or replacing the log must set a new baseline')
+fake_log_size = 30; tick(0.16)
+assert(text_objects.ConsoleBGPlus_label_title.visible)
+console_open = true; tick(0.01)
+assert(text_objects.ConsoleBGPlus_label_input.visible and objects[top_name].alpha == original_alpha,
+    'Manual opening always shows the input and full-strength frame')
+console_open = false; tick(0.01)
+assert(not text_objects.ConsoleBGPlus_label_title.visible,
+    'Closing the manual console must not keep the prior command frame open')
+run('activity', 'off')
+fake_log_size = 40; tick(0.16)
+assert(not text_objects.ConsoleBGPlus_label_title.visible)
+run('activity', 'on'); tick(0.16)
+assert(not text_objects.ConsoleBGPlus_label_title.visible,
+    'Re-enabling must baseline the current file, not play missed lines')
+run('fade', '2000', '600')
+assert(saved.activity.delay_ms == 2000 and saved.activity.fade_ms == 600)
+assert(queued[#queued] == 'console_fadedelay 2000')
+local queued_before_character_change = #queued
+config.callback()
+assert(#queued == queued_before_character_change + 1
+    and queued[#queued] == 'console_fadedelay 2000',
+    'A per-character setting change must reapply the owned native delay')
+run('diagnose')
+assert(diagnostic_files[addon_path .. 'data/diagnostics.txt'].text:find('activity_available=true', 1, true))
+callbacks.unload(); assert(count() == 0 and next(text_objects) == nil)
+dofile(addon_path .. 'ConsoleBGPlus.lua')
+assert(queued[#queued] == 'console_fadedelay 2000',
+    'A user-owned native delay should be restored after reload')
+callbacks.unload()
 io.open = real_open
-print('PASS: delayed/hidden label bounds, automatic tab resizing, text-only red style, optional divider, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
+print('PASS: delayed/hidden label bounds, automatic tab resizing, text-only red style, optional divider, log growth, no replay, fade/manual focus, rotation, reload, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
