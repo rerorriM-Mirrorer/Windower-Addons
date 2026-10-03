@@ -9,7 +9,7 @@ local function bounded(value, fallback, minimum, maximum)
     return math.floor(math.max(minimum, math.min(maximum, number)) + 0.5)
 end
 
-function layout.build(settings, viewport, title_width, input_width, editing, input_text_height, output_only)
+function layout.build(settings, viewport, title_width, input_width, editing, input_text_height, output_only, grip_state)
     local screen_width = bounded(viewport.width, 1920, 1, 32768)
     local screen_height = bounded(viewport.height, 1080, 1, 32768)
     local minimum_width = math.min(120, screen_width)
@@ -44,11 +44,12 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     rectangle.title_alpha, rectangle.input_alpha = bounded(rail_alpha(0), 240, 0, 255),
         bounded(rail_alpha(1), 240, 0, 255)
 
-    local function piece(texture, px, py, pw, ph, alpha, repeat_x, repeat_y)
+    local function piece(texture, px, py, pw, ph, alpha, repeat_x, repeat_y, tint_red, tint_green, tint_blue)
         if pw <= 0 or ph <= 0 then return end
         pieces[#pieces + 1] = {
             texture = texture, x = px, y = py, width = pw, height = ph,
-            alpha = bounded(alpha, 255, 0, 255), red = red, green = green, blue = blue,
+            alpha = bounded(alpha, 255, 0, 255), red = tint_red or red,
+            green = tint_green or green, blue = tint_blue or blue,
             repeat_x = repeat_x or 1, repeat_y = repeat_y or 1,
         }
     end
@@ -129,7 +130,7 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     piece('bottom_right', x + width - right_cap, bottom_y,
         right_cap, bottom_height, bottom_rail_alpha)
 
-    if settings.input.enabled == true then
+    if settings.input.enabled == true and not output_only then
         local inside_top = y + top_height
         local input_height = bounded(settings.input.height, 14, 6,
             math.max(6, height - top_height - bottom_height - 4))
@@ -163,9 +164,20 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     end
 
     if editing then
-        -- A pale grip marks the complete top drag edge while editing.
-        piece('drag_grip', x + 4, y + 8, width - 8, 6, 255, (width - 8) / 4, 1)
-        piece('resize_handle', x + width - 16, y + height - 16, 14, 14, 255)
+        -- Hover puts a soft wash behind white lines; dragging leaves only pink lines.
+        if grip_state == 'drag_hover' then
+            piece('drag_hover', x + 4, y + 5, width - 8, 12, 255,
+                (width - 8) / 4, 1, 255, 255, 255)
+        elseif grip_state == 'resize_hover' then
+            piece('resize_hover', x + width - 18, y + height - 18, 18, 18,
+                255, 1, 1, 255, 255, 255)
+        end
+        piece(grip_state == 'drag_pressed' and 'drag_pressed' or 'drag_grip',
+            x + 4, y + 8, width - 8, 6, 255, (width - 8) / 4, 1,
+            255, 255, 255)
+        piece(grip_state == 'resize_pressed' and 'resize_pressed' or 'resize_handle',
+            x + width - 16, y + height - 16, 14, 14, 255,
+            1, 1, 255, 255, 255)
     end
 
     return pieces, rectangle

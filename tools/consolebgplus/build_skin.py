@@ -9,7 +9,7 @@ import argparse
 import base64
 import io
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 
 def build(source: Path, destination: Path):
@@ -111,6 +111,38 @@ def build(source: Path, destination: Path):
     stream = io.BytesIO()
     grip.save(stream, 'PNG')
     tiles['drag_grip'] = base64.b64encode(stream.getvalue()).decode('ascii')
+
+    # FFXI menu selection: a faint pink wash on hover, then pale pink marks
+    # without the wash while the mouse button is held.
+    drag_hover = Image.new('RGBA', (4, 12))
+    for y, alpha in enumerate((0, 4, 12, 24, 38, 52, 52, 38, 24, 12, 4, 0)):
+        for x in range(4):
+            drag_hover.putpixel((x, y), (247, 139, 184, alpha))
+    stream = io.BytesIO()
+    drag_hover.save(stream, 'PNG')
+    tiles['drag_hover'] = base64.b64encode(stream.getvalue()).decode('ascii')
+
+    resize_mask = Image.new('L', (18, 18))
+    resize_mask.paste(handle.getchannel('A'), (2, 2))
+    blurred = resize_mask.filter(ImageFilter.GaussianBlur(2.2))
+    resize_hover = Image.new('RGBA', (18, 18))
+    for y in range(18):
+        for x in range(18):
+            wash = max(0, 24 - max(abs(x - 10), abs(y - 10)) * 3)
+            alpha = min(105, blurred.getpixel((x, y)) + wash)
+            resize_hover.putpixel((x, y), (247, 139, 184, alpha))
+    stream = io.BytesIO()
+    resize_hover.save(stream, 'PNG')
+    tiles['resize_hover'] = base64.b64encode(stream.getvalue()).decode('ascii')
+
+    for name, source in (('drag_pressed', grip), ('resize_pressed', handle)):
+        pressed = Image.new('RGBA', source.size)
+        for y in range(source.height):
+            for x in range(source.width):
+                pressed.putpixel((x, y), (244, 185, 207, source.getpixel((x, y))[3]))
+        stream = io.BytesIO()
+        pressed.save(stream, 'PNG')
+        tiles[name] = base64.b64encode(stream.getvalue()).decode('ascii')
 
     entries = '\n'.join("    %s = '%s'," % (name, value) for name, value in sorted(tiles.items()))
     module = """-- Generated texture bundle. Do not edit the base64 payloads by hand.

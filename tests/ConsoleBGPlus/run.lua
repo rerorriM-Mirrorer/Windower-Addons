@@ -216,7 +216,14 @@ assert(#positions == native_calls, 'An unchanged frame must not rewrite console 
 assert(style_calls == styles and measurement_calls == measurements,
     'Settled labels must not reset fonts or poll native measurements on idle frames')
 console_open = false; tick()
-assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 344)
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 329
+    and not text_objects.ConsoleBGPlus_label_input.visible,
+    'Manual close must immediately use the compact output frame')
+for _, object in pairs(objects) do
+    assert(not object.texture:find('_divider_', 1, true)
+        and not object.texture:find('_tab_', 1, true),
+        'The Input divider and plaque must leave the frame before its fade')
+end
 tick(0.5)
 assert(text_objects.ConsoleBGPlus_label_title.alpha > 0 and text_objects.ConsoleBGPlus_label_title.alpha < 240)
 tick(0.6); all_visible(false)
@@ -259,6 +266,25 @@ end
 assert(grip and grip.visible and grip.x == r.x + 4 and grip.y == r.y + 8
     and grip.width == r.width - 8 and grip.height == 6,
     'Edit-mode diagonal grip should span the full draggable top edge')
+local function piece_with(suffix)
+    for _, object in pairs(objects) do
+        if object.texture:find(suffix, 1, true) then return object end
+    end
+end
+assert(not piece_with('_drag_hover.png') and not piece_with('_resize_hover.png'))
+assert(not mouse(0, r.x + 30, r.y + 2))
+assert(piece_with('_drag_hover.png') and piece_with('_drag_grip.png')
+    and not piece_with('_drag_pressed.png'),
+    'Hovering the top edge adds a pink wash behind the white lines')
+assert(not mouse(0, r.x + 100, r.y + 100))
+assert(not piece_with('_drag_hover.png'), 'Leaving the edge removes its wash')
+assert(not mouse(0, r.x + r.width - 8, r.y + r.height - 8))
+assert(piece_with('_resize_hover.png') and piece_with('_resize_handle.png'))
+assert(mouse(1, r.x + r.width - 8, r.y + r.height - 8))
+assert(piece_with('_resize_pressed.png') and not piece_with('_resize_hover.png'),
+    'Pressing the corner replaces its hover wash with pale pink lines')
+assert(mouse(2, r.x + r.width - 8, r.y + r.height - 8))
+assert(piece_with('_resize_hover.png') and not piece_with('_resize_pressed.png'))
 assert(text_objects.ConsoleBGPlus_label_edit.red == 255
     and text_objects.ConsoleBGPlus_label_edit.visible
     and text_objects.ConsoleBGPlus_label_edit_exit == nil)
@@ -268,10 +294,13 @@ assert(not mouse(3, r.x + 30, r.y + 2))
 assert(not mouse(1, r.x - 1, r.y + 2))
 local saves_before_drag = save_calls
 assert(mouse(1, r.x + 30, r.y + 2))
+assert(piece_with('_drag_pressed.png') and not piece_with('_drag_hover.png'))
 assert(mouse(0, r.x + 110, r.y + 62))
+assert(piece_with('_drag_pressed.png'), 'Pressed lines persist during the drag')
 assert(save_calls == saves_before_drag, 'Dragging must not write XML on every mouse move')
 assert(positions[#positions].x == r.x + 130 and positions[#positions].y == r.y + 75)
 assert(mouse(2, -10, -10))
+assert(not piece_with('_drag_pressed.png') and not piece_with('_drag_hover.png'))
 assert(save_calls == saves_before_drag + 1 and saved.pos.x == r.x + 80 and saved.pos.y == r.y + 60)
 
 r = rectangle()
@@ -285,6 +314,7 @@ r = rectangle()
 assert(mouse(1, r.x + r.width - 8, r.y + r.height - 8))
 assert(mouse(0, 100000, 100000))
 assert(not mouse(2, 100000, 100000, true))
+assert(not piece_with('_resize_pressed.png') and not piece_with('_resize_hover.png'))
 assert(not mouse(0, 0, 0))
 r = rectangle()
 assert(r.x + r.width <= screen_width and r.y + r.height <= screen_height)
@@ -333,7 +363,8 @@ run('label', 'Input'); settle(); assert(plaque().width == 53,
 render_latency = 2
 -- Reopening and unrelated commands while hidden keep the last good bounds.
 run('preview', 'off'); console_open = false; tick()
-run('position', '17', '24'); assert(plaque().width == 53)
+run('position', '17', '24'); assert(not plaque(),
+    'Output-only frames must not retain the native Input plaque')
 run('preview', 'on'); settle(); assert(plaque().width == 53)
 run('tabstyle', 'red'); settle(); assert(not plaque(), 'Red mode should have no plaque primitives')
 local with_divider = count()
@@ -451,12 +482,13 @@ run('reset')
 
 -- Export actual layout geometry for the offline renderer.
 local layout = require('cbg_layout')
-local function export(path, viewport, output_only)
+local function export(path, viewport, output_only, grip_state)
     if os.getenv('CBGPLUS_EXPORT_LAYOUT') ~= '1' then return end
     local title_width = windower.text.get_extents('ConsoleBGPlus_label_title')
     local input_width, input_height = windower.text.get_extents('ConsoleBGPlus_label_input')
     local pieces = layout.build(saved, viewport, title_width, input_width,
-        text_objects.ConsoleBGPlus_label_edit.visible and not output_only, input_height, output_only)
+        text_objects.ConsoleBGPlus_label_edit.visible and not output_only,
+        input_height, output_only, grip_state)
     local file = assert(io.open(path, 'w'))
     file:write(string.format('{"viewport":{"width":%d,"height":%d},"output_only":%s,"pieces":[',
         viewport.width, viewport.height, tostring(output_only == true)))
@@ -489,6 +521,10 @@ run('glow', '0')
 export('reference/layout_no_glow.json', {width = 1920, height = 1080})
 run('edit', 'on')
 export('reference/layout_edit.json', {width = 1920, height = 1080})
+export('reference/layout_drag_hover.json', {width = 1920, height = 1080}, false, 'drag_hover')
+export('reference/layout_drag_pressed.json', {width = 1920, height = 1080}, false, 'drag_pressed')
+export('reference/layout_resize_hover.json', {width = 1920, height = 1080}, false, 'resize_hover')
+export('reference/layout_resize_pressed.json', {width = 1920, height = 1080}, false, 'resize_pressed')
 run('edit', 'off'); run('border', 'link')
 export('reference/layout_linked.json', {width = 1920, height = 1080})
 run('glow', '200', '24'); run('tabstyle', 'native'); settle()
@@ -607,8 +643,13 @@ console_open = false; tick(0.01)
 assert(#played_sounds == sound_count_before_output + 1
     and played_sounds[#played_sounds] == addon_path .. 'assets/closeconsole.wav',
     'Only a manual open-to-closed transition plays the bundled WAV')
-assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == compact_height + saved.input.height,
-    'Closing must fade the full manual frame before hiding it')
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == compact_height
+    and not text_objects.ConsoleBGPlus_label_input.visible,
+    'Closing must switch to compact output before fading')
+for _, object in pairs(objects) do
+    assert(not object.texture:find('_divider_', 1, true)
+        and not object.texture:find('_tab_', 1, true))
+end
 tick(0.22)
 assert(text_objects.ConsoleBGPlus_label_title.alpha > 0
     and text_objects.ConsoleBGPlus_label_title.alpha < original_title_alpha)

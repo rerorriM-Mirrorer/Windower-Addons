@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.9'
+_addon.version = '0.1.10'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -31,6 +31,7 @@ local primitives, shown, preview, editing = {}, false, false, false
 local last_viewport, actual_rectangle = nil, nil
 local labels = {}
 local drag, native_position, position_warning = nil, nil, false
+local hover_target = nil
 local position_dirty = true
 local frame = 0
 local recorder = diagnostics.new(windower.addon_path, _addon.version)
@@ -113,13 +114,13 @@ end
 
 local function update_visibility()
     local manual = preview or editing or windower.console.visible()
-    local compact = not manual and close_alpha == 0 and auto_alpha > 0
+    local compact = not manual and (close_alpha > 0 or auto_alpha > 0)
     if compact ~= output_only then
         output_only = compact
         refresh()
     end
     apply_alpha(manual and 255 or math.max(auto_alpha, close_alpha))
-    visibility(manual or close_alpha > 0 or auto_alpha > 0, manual or close_alpha > 0)
+    visibility(manual or close_alpha > 0 or auto_alpha > 0, manual)
 end
 
 local function new_label(key, text, size, red, green, blue, stroke)
@@ -213,7 +214,8 @@ refresh = function(screen)
     local input_width, input_height = labels.input.width, labels.input.height
     local pieces
     pieces, actual_rectangle = layout.build(settings, screen, title_width, input_width,
-        editing, input_height, output_only)
+        editing, input_height, output_only,
+        drag and (drag.kind .. '_pressed') or (hover_target and (hover_target .. '_hover')))
     for index, piece in ipairs(pieces) do
         local primitive = primitives[index]
         if not primitive then
@@ -601,6 +603,7 @@ local function command(action, ...)
         local mode = args[1] and args[1]:lower()
         if #args > 1 or (mode and mode ~= 'on' and mode ~= 'off') then return usage('edit [on|off]') end
         editing = mode and mode == 'on' or (not mode and not editing)
+        if not editing then hover_target = nil end
         refresh()
         update_visibility()
         message(editing and 'Edit mode on: drag the top edge; resize the lower-right corner. Release to save.'
@@ -676,7 +679,7 @@ end
 refresh()
 sync_native_profile()
 local registration = config.register(settings, function()
-    drag, position_dirty = nil, true
+    drag, hover_target, position_dirty = nil, nil, true
     watcher.restart()
     auto_alpha = 0
     refresh()
@@ -691,7 +694,7 @@ windower.register_event('prerender', function()
         play_close_sound()
         watcher.suppress()
         local was_editing = editing
-        editing, preview = false, false
+        editing, preview, hover_target = false, false, nil
         end_drag()
         if was_editing then refresh() end
         closing_since, close_alpha = watcher.now(), 255
@@ -725,22 +728,35 @@ windower.register_event('prerender', function()
         if err then message('Visibility trace: ' .. tostring(err), true) end
     end
 end)
+local function hit_grip(x, y)
+    local rect = actual_rectangle
+    if x < rect.x or y < rect.y or x >= rect.x + rect.width or y >= rect.y + rect.height then
+        return nil
+    end
+    if x >= rect.x + rect.width - 16 and y >= rect.y + rect.height - 16 then return 'resize' end
+    if y < rect.y + 18 then return 'drag' end
+end
+
 windower.register_event('mouse', function(kind, x, y, delta, blocked)
     -- A release claimed by another addon still ends our own drag.
     if kind == 2 and drag then
         end_drag()
+        hover_target = not blocked and editing and shown and hit_grip(x, y) or nil
+        refresh()
         return not blocked
     end
-    if blocked or not editing or not shown then return false end
+    if blocked or not editing or not shown then
+        if hover_target then hover_target = nil; refresh() end
+        return false
+    end
     if kind == 1 then
+        local target = hit_grip(x, y)
+        if not target then return false end
         local rect = actual_rectangle
-        if x < rect.x or y < rect.y or x >= rect.x + rect.width or y >= rect.y + rect.height then
-            return false
-        end
-        local resize = x >= rect.x + rect.width - 16 and y >= rect.y + rect.height - 16
-        if not resize and y >= rect.y + 18 then return false end
-        drag = {kind = resize and 'resize' or 'move', x = x, y = y,
+        drag = {kind = target == 'resize' and 'resize' or 'drag', x = x, y = y,
             rectangle = {x = rect.x, y = rect.y, width = rect.width, height = rect.height}, changed = false}
+        hover_target = nil
+        refresh()
         return true
     elseif kind == 0 and drag then
         local dx, dy = math.floor(x - drag.x + 0.5), math.floor(y - drag.y + 0.5)
@@ -767,6 +783,12 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
         drag.changed = true
         refresh(screen)
         return true
+    elseif kind == 0 then
+        local target = hit_grip(x, y)
+        if target ~= hover_target then
+            hover_target = target
+            refresh()
+        end
     end
     return false
 end)

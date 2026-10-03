@@ -1,8 +1,8 @@
 # ConsoleBG+ assets
 
-The 22 small PNG pieces embedded in `cbg_skin.lua` are unpacked here as `cbgplus_v4_*.png` on load. Existing matching files are reused; no image download or other addon is required.
+The 26 small PNG pieces embedded in `cbg_skin.lua` are unpacked here as `cbgplus_v4_*.png` on load. Existing matching files are reused; no image download or other addon is required.
 
-The frame uses slices of XIVParty's `BgTop.png`, `BgMid.png`, and `BgBottom.png`, retaining their native stripe spacing and 64-pixel right fade. Top and bottom slices retain only the three silver rows; continuous fill and glow render beneath them. The middle slice is rotated by two rows to preserve the original body stripe phase when filling from the outer top. Generated pieces add the bottom glow, fading title endcaps, a compact grey input tab used only in native style, and edit-only drag and resize grips. Attribution and redistribution terms are in `../LICENSE.txt`.
+The frame uses slices of XIVParty's `BgTop.png`, `BgMid.png`, and `BgBottom.png`, retaining their native stripe spacing and 64-pixel right fade. Top and bottom slices retain only the three silver rows; continuous fill and glow render beneath them. The middle slice is rotated by two rows to preserve the original body stripe phase when filling from the outer top. Generated pieces add the bottom glow, fading title endcaps, a compact grey input tab used only in native style, and edit-only drag and resize grips with hover and pressed variants. Attribution and redistribution terms are in `../LICENSE.txt`.
 
 `closeconsole.wav` is the user-supplied manual console close cue. Replace it with another PCM WAV to change the sound.
 

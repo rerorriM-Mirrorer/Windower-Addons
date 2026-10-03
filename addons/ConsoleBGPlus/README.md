@@ -10,7 +10,7 @@ Fresh settings start at **16,48** with equal left and right margins, a 344-pixel
 
 ## Move and resize
 
-Run **//cbg edit** to toggle edit mode. A band of pale diagonal lines marks the draggable top edge; drag anywhere along it to move the frame. The matching mark at the lower-right corner resizes it. Release the mouse to save. Run **//cbg edit** again when you finish. Closing the native console with Insert also ends edit and preview modes and fades the frame.
+Run **//cbg edit** to toggle edit mode. A band of pale diagonal lines marks the draggable top edge; drag anywhere along it to move the frame. The matching mark at the lower-right corner resizes it. Each grip gains a soft pink wash on hover; while pressed, the wash goes away and its lines turn pale pink. Release the mouse to save. Run **//cbg edit** again when you finish. Closing the native console with Insert also ends edit and preview modes.
 
 In screen-width mode, dragging left or right keeps matching side margins. Resizing sets a fixed width; **//cbg width screen** returns to screen-width mode. When console movement is linked, the native text follows the frame.
 
@@ -57,7 +57,7 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
     //cbg reset                                 Apply fresh defaults
     //cbg help                                  Show command groups in game
 
-The default native font is Verdana 12 with color 255 250 250 250. The Input and Console labels use Verdana 8. **//cbg fade 1000 1000** gives automatic output a 1000 ms hold followed by a 1000 ms frame fade; closing the console fades the full frame over the same 1000 ms duration. **//cbg activity on** also enables native console_log 1, which the output watcher needs. The watcher checks only the file's byte length, about eight times per second, and restarts the full hold whenever it sees growth. Activity off turns native logging off for this addon.
+The default native font is Verdana 12 with color 255 250 250 250. The Input and Console labels use Verdana 8. **//cbg fade 1000 1000** gives automatic output a 1000 ms hold followed by a 1000 ms frame fade. Closing a manually opened console immediately removes the Input strip, divider, and tab, shortens the frame by the saved Input height, then fades that output-only frame over the saved 1000 ms duration. **//cbg activity on** also enables native console_log 1, which the output watcher needs. The watcher checks only the file's byte length, about eight times per second, and restarts the full hold whenever it sees growth. Activity off turns native logging off for this addon.
 
 The bundled close cue plays once when a manually open native console closes in the focused game window. It does not play for automatic output fading or for opening the console. Use **//cbg closesound off** to silence it, or replace **assets/closeconsole.wav** with another short PCM WAV. The addon detects the native open-to-closed transition; Windower does not identify which key closed it.
 
