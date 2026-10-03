@@ -55,7 +55,7 @@ function skin.prepare(root)
     if windower.create_dir then windower.create_dir(directory) end
     local paths = {}
     for name, encoded in pairs(images) do
-        local path = directory .. 'cbgplus_v4_' .. name .. '.png'
+        local path = directory .. 'cbgplus_v5_' .. name .. '.png'
         local bytes = decode(encoded)
         local existing = io.open(path, 'rb')
         local unchanged = false

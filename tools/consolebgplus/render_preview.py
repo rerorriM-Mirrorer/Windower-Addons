@@ -36,7 +36,7 @@ def render(layout_path, output_path):
                 draw.rectangle((x, y, x + 31, y + 31), fill=(53, 53, 56, 255))
     for piece in data['pieces']:
         source = Image.open(root / 'addons/ConsoleBGPlus/assets' /
-                            ('cbgplus_v4_' + piece['texture'] + '.png')).convert('RGBA')
+                            ('cbgplus_v5_' + piece['texture'] + '.png')).convert('RGBA')
         tile_width = max(1, round(piece['width'] / piece['repeat_x']))
         tile_height = max(1, round(piece['height'] / piece['repeat_y']))
         source = source.resize((tile_width, tile_height), Image.Resampling.NEAREST)
