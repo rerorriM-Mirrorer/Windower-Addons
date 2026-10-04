@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.15'
+_addon.version = '0.1.16'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -233,9 +233,9 @@ refresh = function(screen)
     pieces, actual_rectangle = layout.build(settings, screen, title_width, input_width,
         editing, input_height, output_only,
         drag and (drag.kind .. '_pressed') or (hover_target and (hover_target .. '_hover')))
-    -- The body and moving bottom rail keep their original draw order.
-    -- The fixed top rail has its own primitives, so body band changes cannot
-    -- rebind or briefly hide it during compact/full transitions.
+    -- The output fill keeps its original primitives when Input appears;
+    -- the added opaque panel and lower rail are drawn after it. The fixed
+    -- top rail has its own primitives, so it cannot be rebound or hidden.
     local body, top, grips = {}, {}, {}
     for _, piece in ipairs(pieces) do
         if piece.texture:find('top_', 1, true) == 1
