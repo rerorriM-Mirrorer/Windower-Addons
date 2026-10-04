@@ -26,7 +26,7 @@
         SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ]]
 _addon.name = 'Equipviewer'
-_addon.version = '3.3.1'
+_addon.version = '3.3.2' -- draggable
 _addon.author = 'Tako, Rubenator'
 _addon.commands = { 'equipviewer', 'ev' }
 
@@ -104,6 +104,7 @@ local defaults = {
     hide_on_zone = true,
     hide_on_cutscene = true,
     left_justify = false,
+    draggable = true,
 }
 settings = config.load(defaults)
 config.save(settings)
@@ -111,6 +112,48 @@ if settings.game_path then
     icon_extractor.ffxi_path(settings.game_path)
 end
 local last_encumbrance_bitfield = 0
+
+-- Tracks movement of the draggable background. The background acts as the drag
+-- surface for the whole 4x4 EquipViewer grid; the remaining UI elements follow
+-- its position in real time.
+local drag_state = {
+    dirty = false,
+    start_x = nil,
+    start_y = nil,
+}
+
+local function ammo_text_position()
+    if settings.left_justify then
+        return settings.pos.x + settings.size*3, settings.pos.y + settings.size*0.58
+    end
+
+    return (windower.get_windower_settings().ui_x_res - (settings.pos.x + settings.size*4))*-1,
+        settings.pos.y + settings.size*0.58
+end
+
+local function sync_ui_to_position(x, y)
+    if not x or not y then return end
+
+    settings.pos.x = x
+    settings.pos.y = y
+
+    for _, slot in pairs(equipment_data) do
+        if slot.image then
+            position(slot)
+        end
+    end
+
+    for _, slot in pairs(encumbrance_data) do
+        if slot.image then
+            position(slot)
+        end
+    end
+
+    if ammo_count_text then
+        local ammo_x, ammo_y = ammo_text_position()
+        ammo_count_text:pos(ammo_x, ammo_y)
+    end
+end
 
 -- gets the currently equipped item data for the slot information provided
 local function get_equipped_item(slotName, slotId, bag, index)
@@ -186,7 +229,9 @@ local function setup_ui()
     refresh_ui_settings()
     destroy()
     
-    bg_image = images.new(bg_image_settings)
+    -- Pass the root settings object so Windower's images library can persist
+    -- drag-related changes when the mouse is released.
+    bg_image = images.new(bg_image_settings, settings)
     bg_image:show()
 
     for key, slot in pairs(equipment_data) do
@@ -207,6 +252,43 @@ local function setup_ui()
     ammo_count_text = texts.new(settings.left_justify and ammo_count_text_settings_left_justify or ammo_count_text_settings)
     display_ammo_count()
 end
+
+-- Keep every part of the display attached to the draggable background while it
+-- is moving. This avoids the background moving by itself while the icons lag
+-- behind until mouse release.
+windower.register_event('prerender', function()
+    if not bg_image or not settings.draggable then return end
+
+    local x, y = bg_image:pos()
+    if x ~= settings.pos.x or y ~= settings.pos.y then
+        if not drag_state.dirty then
+            drag_state.start_x = settings.pos.x
+            drag_state.start_y = settings.pos.y
+        end
+        drag_state.dirty = true
+        sync_ui_to_position(x, y)
+    end
+end)
+
+-- Windower's images library performs the actual drag. On release, make sure the
+-- final position is copied into EquipViewer's settings, save it, and confirm it
+-- in chat. We intentionally do not reject a blocked mouse event here because
+-- images.lua itself blocks the event while it owns the drag.
+windower.register_event('mouse', function(type, x, y, delta, blocked)
+    if type ~= 2 or not drag_state.dirty or not bg_image then return end
+
+    local pos_x, pos_y = bg_image:pos()
+    sync_ui_to_position(pos_x, pos_y)
+    config.save(settings)
+
+    if drag_state.start_x ~= settings.pos.x or drag_state.start_y ~= settings.pos.y then
+        log('Position saved to '..settings.pos.x..', '..settings.pos.y)
+    end
+
+    drag_state.dirty = false
+    drag_state.start_x = nil
+    drag_state.start_y = nil
+end)
 
 -- Called when the addon is first loaded.
 windower.register_event('load', function()
@@ -588,6 +670,33 @@ windower.register_event('addon command', function (...)
         setup_ui()
 
         log('Ammo text justification changed to '..tostring(settings.left_justify and 'Left' or 'Right'))
+    elseif cmd == 'lock' then
+        settings.draggable = false
+        config.save(settings)
+        if bg_image then bg_image:draggable(false) end
+        log('EquipViewer position locked.')
+    elseif cmd == 'unlock' then
+        settings.draggable = true
+        config.save(settings)
+        if bg_image then bg_image:draggable(true) end
+        log('EquipViewer position unlocked; drag anywhere on the grid/background to move it.')
+    elseif cmd == 'drag' or cmd == 'draggable' then
+        if #cmd_args >= 1 then
+            local arg = tostring(cmd_args[1]):lower()
+            if S{'1', 'on', 'true', 'yes'}:contains(arg) then
+                settings.draggable = true
+            elseif S{'0', 'off', 'false', 'no'}:contains(arg) then
+                settings.draggable = false
+            else
+                log('Usage: //ev draggable <on|off>')
+                return
+            end
+        else
+            settings.draggable = not settings.draggable
+        end
+        config.save(settings)
+        if bg_image then bg_image:draggable(settings.draggable) end
+        log('EquipViewer draggable: '..tostring(settings.draggable))
     elseif cmd == 'testenc' then
         display_encumbrance(0xffff)
     elseif cmd == 'debug' then
@@ -621,6 +730,9 @@ windower.register_event('addon command', function (...)
         log('ev hideonzone: toggles hiding while crossing zone line')
         log('ev hideoncutscene: toggles hiding when in cutscene/npc menu/etc')
         log('ev justify: toggles between ammo text left and right justify')
+        log('ev lock: prevents accidental dragging')
+        log('ev unlock: enables dragging and saved position')
+        log('ev draggable <on|off>: sets/toggles dragging')
     end
 end)
 
@@ -642,7 +754,7 @@ function refresh_ui_settings()
             width = settings.size * 4,
             height = settings.size * 4,
         },
-        draggable = false,
+        draggable = settings.draggable,
     }
     equipment_image_settings = {
         color = {

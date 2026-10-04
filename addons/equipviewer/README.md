@@ -1,16 +1,19 @@
 **Author:**  Tako, Rubenator<br>
-**Version:**  3.3.0<br>
-**Date:** April 13, 2021<br>
+**Version:**  3.3.2<br>
+**Date:** October 3, 2026<br>
 
 * Displays current equipment grid on screen. Also can show current Ammo count and current Encumbrance.
 
 ## Settings
+
+* The equipment grid is draggable by default. Drag anywhere on the grid/background; the new position is saved automatically when you release the mouse, and EquipViewer prints the saved coordinates in chat.
 
 * Most settings can be modified via commands, but you can edit the settings.xml directly for a few uncommon settings.
 
 **Abbreviation:** `//ev`
 
 ## Commands
+
 1. position <xpos> <ypos>: move display to position (from top left)
 2. size <pixels>: set pixel size of each item slot (defaults to 32 -- same as the size of the item icons)
 3. scale <factor>: scale multiplier for size of each item slot (1 is 32px) -- modifies same setting as size
@@ -22,7 +25,10 @@
 9. hideonzone: toggles hiding while crossing zone lines (default is on/true)
 10. hideoncutscene: toggles hiding when in cutscene/npc menu/etc (default is on/true)
 11. justify: toggles between ammo text being right or left justifed (default is right justified)
-12. help: displays explanations of each command
+12. lock: prevents accidental dragging
+13. unlock: enables dragging; dragged positions save automatically on mouse release
+14. draggable <on|off>: explicitly enable/disable dragging (with no argument, toggles it)
+15. help: displays explanations of each command
 
 Legacy Command:
 game_path <path>: sets path to FFXI folder where you want dats extracted from. Backslashes `\` must be escaped (like so: `\\`) or use forewardslash `/` instead. (legacy command as of `3.3.1` in which the game path is now pulled from the registry, but this command is still here in case you want to pull from dats that exist elsewhere)
@@ -40,5 +46,8 @@ game_path <path>: sets path to FFXI folder where you want dats extracted from. B
 //ev hideonzone
 //ev hideoncutscene
 //ev justify
+//ev unlock
+//ev lock
+//ev draggable on
 //ev help
 ```
