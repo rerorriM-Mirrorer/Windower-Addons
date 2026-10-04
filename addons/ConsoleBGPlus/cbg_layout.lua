@@ -162,10 +162,12 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
         rectangle.divider_visible = settings.input.divider ~= false
         rectangle.input_alpha = bounded(divider_alpha, 240, 0, 255)
         if rectangle.divider_visible then
-            piece('divider_left', x, divider_y, left_cap, 2, divider_alpha)
-            piece('divider_center', x + left_cap, divider_y, width - left_cap - right_cap, 2,
+            piece('divider_left', x, divider_y, left_cap, top_height, divider_alpha)
+            piece('divider_center', x + left_cap, divider_y, width - left_cap - right_cap,
+                top_height,
                 divider_alpha, (width - left_cap - right_cap) / 4, 1)
-            piece('divider_right', x + width - right_cap, divider_y, right_cap, 2, divider_alpha)
+            piece('divider_right', x + width - right_cap, divider_y,
+                right_cap, top_height, divider_alpha)
         end
         local tab_height = math.max(10, bounded(input_text_height, 10, 1, 60))
         if divider_y - inside_top >= tab_height then

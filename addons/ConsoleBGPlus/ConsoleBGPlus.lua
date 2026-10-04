@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.16'
+_addon.version = '0.1.17'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -18,7 +18,7 @@ local defaults = {
     border = {alpha = 240, linked = false},
     glow = {alpha = 200, height = 24},
     input = {enabled = true, height = 15, padding = 0, tab = 'left', divider = true},
-    labels = {font = 'Verdana', title_size = 8, input_size = 8,
+    labels = {font = 'Verdana', title_size = 8, input_size = 7,
         input_text = 'Input', input_style = 'native', offset_y = 2},
     console = {linked = true, offset_x = 50, offset_y = 15},
     native = {font = 'Verdana', size = 12, alpha = 255, red = 250, green = 250, blue = 250},
