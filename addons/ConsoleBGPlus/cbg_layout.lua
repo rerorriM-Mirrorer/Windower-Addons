@@ -27,8 +27,8 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     local compact_height = math.max(minimum_height, full_height - strip_height - 7)
     local height = output_only and compact_height or full_height
     local layered_input = settings.input.enabled == true and compact_height < full_height
-    -- Keep the output fill unchanged when the Input area opens. The added
-    -- panel covers the compact border's eight rows and continues below it.
+    -- Keep the output fill unchanged when the Input area opens. The compact
+    -- border is replaced by a separate Input panel starting at its top rail.
     local output_height = layered_input and compact_height or height
     local fill_alpha = bounded(settings.bg.alpha, 255, 0, 255)
     local top_alpha = bounded(settings.gradient.top, 100, 0, 255)
@@ -129,14 +129,19 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
             top_height, top_rail_alpha, (top_end - top_start) / 4, 1)
     end
     piece('top_right', x + width - right_cap, y, right_cap, top_height, top_rail_alpha)
+    local bottom_y = y + height - bottom_height
+    local input_height = settings.input.enabled == true and not output_only
+        and bounded(settings.input.height, 14, 6,
+            math.max(6, height - top_height - bottom_height - 4)) or nil
+    local divider_y = input_height and math.max(y + top_height, bottom_y - input_height) or nil
     if layered_input and not output_only then
-        local panel_y = y + output_height - bottom_height
+        local panel_y = divider_y
         local panel_height = y + height - panel_y
         local shade = 0.84
         local dark_red, dark_green, dark_blue = math.floor(red * shade + 0.5),
             math.floor(green * shade + 0.5), math.floor(blue * shade + 0.5)
-        -- The native chat Input area is a darker opaque layer. Start over
-        -- the compact bottom rail, keeping the output gradient above fixed.
+        -- The darker Input layer begins at its silver upper rail. Starting
+        -- seven rows earlier left a visible dark lip above that seam.
         piece('mid_left', x, panel_y, side_width, panel_height, fill_alpha,
             1, panel_height / 4, dark_red, dark_green, dark_blue)
         piece('mid_center', x + side_width, panel_y, width - side_width - right_cap,
@@ -145,7 +150,6 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
         piece('mid_right', x + width - right_cap, panel_y, right_cap,
             panel_height, fill_alpha, 1, panel_height / 4, dark_red, dark_green, dark_blue)
     end
-    local bottom_y = y + height - bottom_height
     piece('bottom_left', x, bottom_y, left_cap, bottom_height, bottom_rail_alpha)
     piece('bottom_center', x + left_cap, bottom_y, width - left_cap - right_cap,
         bottom_height, bottom_rail_alpha, (width - left_cap - right_cap) / 4, 1)
@@ -154,9 +158,6 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
 
     if settings.input.enabled == true and not output_only then
         local inside_top = y + top_height
-        local input_height = bounded(settings.input.height, 14, 6,
-            math.max(6, height - top_height - bottom_height - 4))
-        local divider_y = math.max(inside_top, bottom_y - input_height)
         local divider_alpha = rail_alpha((divider_y - y) / height)
         rectangle.divider_y = divider_y
         rectangle.divider_visible = settings.input.divider ~= false
