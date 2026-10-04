@@ -82,7 +82,12 @@ windower = {
     play_sound = function(path) played_sounds[#played_sounds + 1] = path end,
     register_event = function(name, fn) callbacks[name] = fn end,
 }
-function windower.prim.create(name) assert(not objects[name]); objects[name] = {} end
+local creation_order = 0
+function windower.prim.create(name)
+    assert(not objects[name])
+    creation_order = creation_order + 1
+    objects[name] = {draw_order = creation_order}
+end
 function windower.prim.delete(name) assert(objects[name]); objects[name] = nil end
 function windower.prim.set_visibility(name, visible)
     assert(type(visible) == 'boolean'); objects[name].visible = visible
@@ -192,6 +197,22 @@ local function rail(suffix)
         if object.texture:find('_' .. suffix .. '.png', 1, true) then return name, object end
     end
 end
+local function bottom_on_top()
+    local _, border = rail('bottom_center')
+    assert(border and border.visible and border.alpha > 0,
+        'The bottom rail must be visible')
+    local border_row = border.y + border.height - 2
+    for _, object in pairs(objects) do
+        if object ~= border and object.visible and object.texture
+            and (object.texture:find('_mid_', 1, true)
+                or object.texture:find('_glow_', 1, true))
+            and object.x <= border.x and object.x + object.width > border.x
+            and object.y <= border_row and object.y + object.height > border_row then
+            assert(object.draw_order < border.draw_order,
+                'The frame fill must not cover the bottom rail')
+        end
+    end
+end
 
 dofile(addon_path .. 'ConsoleBGPlus.lua')
 assert(count() > 10 and count() <= 199)
@@ -212,7 +233,7 @@ assert(objects[top_rail_name] == top_rail and top_rail.texture_sets == 1
     and top_rail.position_sets == 1,
     'The top rail should survive the initial compact switch without rebinding')
 local top_rail_visibility_sets = top_rail.visibility_sets
-local bottom_rail_name, bottom_rail = rail('bottom_left')
+bottom_on_top()
 run('diagnose')
 assert(diagnostic_files[addon_path .. 'data/diagnostics.txt'].text:find('startup_alpha=255', 1, true))
 console_open = true; tick(); all_visible(true)
@@ -220,8 +241,7 @@ settle()
 assert(objects[top_rail_name] == top_rail and top_rail.texture_sets == 1
     and top_rail.position_sets == 1 and top_rail.visibility_sets == top_rail_visibility_sets,
     'The top rail should remain fixed as the Input area appears')
-assert(objects[bottom_rail_name] == bottom_rail and bottom_rail.texture_sets == 1,
-    'The bottom rail should move with the frame without texture reloading')
+bottom_on_top()
 local title = text_objects.ConsoleBGPlus_label_title
 local title_left, title_right
 for _, object in pairs(objects) do
@@ -248,6 +268,7 @@ assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 
 assert(objects[top_rail_name] == top_rail
     and top_rail.visibility_sets == top_rail_visibility_sets,
     'The top rail should stay visible through the compact close transition')
+bottom_on_top()
 for _, object in pairs(objects) do
     assert(not object.texture:find('_divider_', 1, true)
         and not object.texture:find('_tab_', 1, true),
@@ -783,4 +804,4 @@ assert(rectangle().height == saved.extents.y + saved.input.padding,
     'An already open native console should begin with the full manual frame')
 callbacks.unload()
 io.open = real_open
-print('PASS: stable frame rails, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
+print('PASS: fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
