@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.13'
+_addon.version = '0.1.14'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -19,7 +19,7 @@ local defaults = {
     glow = {alpha = 200, height = 24},
     input = {enabled = true, height = 15, padding = 0, tab = 'left', divider = true},
     labels = {font = 'Verdana', title_size = 8, input_size = 8,
-        input_text = 'Input', input_style = 'red', offset_y = 2},
+        input_text = 'Input', input_style = 'native', offset_y = 2},
     console = {linked = true, offset_x = 50, offset_y = 15},
     native = {font = 'Verdana', size = 12, alpha = 255, red = 250, green = 250, blue = 250},
     activity = {enabled = true, delay_ms = 1000, fade_ms = 1000,
@@ -27,7 +27,8 @@ local defaults = {
     sound = {open = true, close = true},
 }
 local settings = config.load(defaults)
-local primitives, shown, preview, editing = {}, false, false, false
+local primitives, primitive_by_key, next_primitive_id = {}, {}, 0
+local shown, preview, editing = false, false, false
 local last_viewport, actual_rectangle = nil, nil
 local labels = {}
 local drag, native_position, position_warning = nil, nil, false
@@ -109,7 +110,11 @@ local function visibility(visible, input_mode)
     input_mode = visible and input_mode or false
     if shown == visible and input_shown == input_mode then return end
     for _, primitive in ipairs(primitives) do
-        windower.prim.set_visibility(primitive.name, visible and (input_mode or not primitive.input_only))
+        local wanted = visible and (input_mode or not primitive.input_only)
+        if wanted ~= primitive.visible then
+            windower.prim.set_visibility(primitive.name, wanted)
+            primitive.visible = wanted
+        end
     end
     for key, label in pairs(labels) do
         label_visibility(label, visible and label.enabled and (input_mode or key ~= 'input'))
@@ -224,33 +229,61 @@ refresh = function(screen)
     pieces, actual_rectangle = layout.build(settings, screen, title_width, input_width,
         editing, input_height, output_only,
         drag and (drag.kind .. '_pressed') or (hover_target and (hover_target .. '_hover')))
-    for index, piece in ipairs(pieces) do
-        local primitive = primitives[index]
+    -- Reuse each texture's matching primitive across compact/full layouts.
+    -- The top rail keeps its name and position while lower body bands change.
+    local active, ordered, counts = {}, {}, {}
+    for _, piece in ipairs(pieces) do
+        counts[piece.texture] = (counts[piece.texture] or 0) + 1
+        local key = piece.texture .. ':' .. counts[piece.texture]
+        local primitive = primitive_by_key[key]
         if not primitive then
-            primitive = {name = 'ConsoleBGPlus_' .. index}
+            next_primitive_id = next_primitive_id + 1
+            primitive = {name = 'ConsoleBGPlus_' .. next_primitive_id, visible = false}
             windower.prim.create(primitive.name)
             windower.prim.set_visibility(primitive.name, false)
             windower.prim.set_fit_to_texture(primitive.name, false)
-            primitives[index] = primitive
+            primitive_by_key[key] = primitive
         end
+        active[key], ordered[#ordered + 1] = true, primitive
         primitive.input_only = piece.texture:find('divider_', 1, true) == 1
             or piece.texture:find('tab_', 1, true) == 1
+        local color_changed = primitive.alpha ~= piece.alpha or primitive.red ~= piece.red
+            or primitive.green ~= piece.green or primitive.blue ~= piece.blue
         primitive.alpha, primitive.red, primitive.green, primitive.blue =
             piece.alpha, piece.red, piece.green, piece.blue
         if primitive.texture ~= piece.texture then
             windower.prim.set_texture(primitive.name, textures[piece.texture])
             primitive.texture = piece.texture
         end
-        windower.prim.set_position(primitive.name, piece.x, piece.y)
-        windower.prim.set_size(primitive.name, piece.width, piece.height)
-        windower.prim.set_repeat(primitive.name, piece.repeat_x, piece.repeat_y)
-        windower.prim.set_color(primitive.name, opacity(piece.alpha), piece.red, piece.green, piece.blue)
-        windower.prim.set_visibility(primitive.name, shown and (input_shown or not primitive.input_only))
+        if primitive.x ~= piece.x or primitive.y ~= piece.y then
+            windower.prim.set_position(primitive.name, piece.x, piece.y)
+            primitive.x, primitive.y = piece.x, piece.y
+        end
+        if primitive.width ~= piece.width or primitive.height ~= piece.height then
+            windower.prim.set_size(primitive.name, piece.width, piece.height)
+            primitive.width, primitive.height = piece.width, piece.height
+        end
+        if primitive.repeat_x ~= piece.repeat_x or primitive.repeat_y ~= piece.repeat_y then
+            windower.prim.set_repeat(primitive.name, piece.repeat_x, piece.repeat_y)
+            primitive.repeat_x, primitive.repeat_y = piece.repeat_x, piece.repeat_y
+        end
+        if color_changed then
+            windower.prim.set_color(primitive.name, opacity(piece.alpha),
+                piece.red, piece.green, piece.blue)
+        end
+        local wanted = shown and (input_shown or not primitive.input_only)
+        if wanted ~= primitive.visible then
+            windower.prim.set_visibility(primitive.name, wanted)
+            primitive.visible = wanted
+        end
     end
-    for index = #primitives, #pieces + 1, -1 do
-        windower.prim.delete(primitives[index].name)
-        primitives[index] = nil
+    for key, primitive in pairs(primitive_by_key) do
+        if not active[key] then
+            windower.prim.delete(primitive.name)
+            primitive_by_key[key] = nil
+        end
     end
+    primitives = ordered
     local title = labels.title
     local rect = actual_rectangle
     title.enabled = rect.title_slot ~= nil and screen.height >= title_height
@@ -517,7 +550,12 @@ local function command(action, ...)
         message('Input tab placed on the ' .. side .. '.')
     elseif action == 'tabstyle' then
         local style = args[1] and args[1]:lower()
-        if #args ~= 1 or (style ~= 'red' and style ~= 'native') then return usage('tabstyle red|native') end
+        if #args > 1 or (style and style ~= 'red' and style ~= 'native' and style ~= 'toggle') then
+            return usage('tabstyle [red|native|toggle]')
+        end
+        if not style or style == 'toggle' then
+            style = settings.labels.input_style == 'native' and 'red' or 'native'
+        end
         settings.labels.input_style = style
         save()
         message('Input label style saved: ' .. style .. '.')
@@ -674,7 +712,7 @@ local function command(action, ...)
         message('//cbg width screen|<pixels> | glow <alpha> [height]')
         message('//cbg gradient <top> <bottom> | alpha <0-255> | border <0-255>|link|free')
         message('//cbg color <alpha> <red> <green> <blue> | input on|off [height] | tab left|right')
-        message('//cbg inputpad <0-32> | divider on|off | tabstyle red|native | label <text>')
+        message('//cbg inputpad <0-32> | divider on|off | tabstyle [red|native|toggle] | label <text>')
         message('//cbg labelfont <font> | labelsize <title> <input> | labeloffset <-12 to 12>')
         message('//cbg diagnose | trace on|off. Files go to ConsoleBGPlus/data/.')
         message('//cbg preview [on|off] | status | reset. Changes save to data/settings.xml.')
@@ -822,7 +860,7 @@ windower.register_event('unload', function()
     drag = nil
     recorder.stop()
     for _, primitive in ipairs(primitives) do windower.prim.delete(primitive.name) end
-    primitives = {}
+    primitives, primitive_by_key = {}, {}
     for _, label in pairs(labels) do windower.text.delete(label.name) end
     labels = {}
     if config.unregister then config.unregister(settings, registration) end

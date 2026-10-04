@@ -86,6 +86,7 @@ function windower.prim.create(name) assert(not objects[name]); objects[name] = {
 function windower.prim.delete(name) assert(objects[name]); objects[name] = nil end
 function windower.prim.set_visibility(name, visible)
     assert(type(visible) == 'boolean'); objects[name].visible = visible
+    objects[name].visibility_sets = (objects[name].visibility_sets or 0) + 1
     visibility_calls = visibility_calls + 1
 end
 function windower.prim.set_fit_to_texture(name, fit) objects[name].fit = fit end
@@ -93,9 +94,12 @@ function windower.prim.set_texture(name, path)
     local file = assert(io.open(path, 'rb'))
     assert(file:read(8) == '\137PNG\r\n\26\n'); file:close()
     objects[name].texture = path
+    objects[name].texture_sets = (objects[name].texture_sets or 0) + 1
 end
 function windower.prim.set_position(name, x, y)
-    objects[name].x, objects[name].y = x, y; geometry_calls = geometry_calls + 1
+    objects[name].x, objects[name].y = x, y
+    objects[name].position_sets = (objects[name].position_sets or 0) + 1
+    geometry_calls = geometry_calls + 1
 end
 function windower.prim.set_size(name, width, height)
     assert(width > 0 and height > 0)
@@ -183,6 +187,11 @@ local function rectangle()
     return {x = top.x, y = top.y, width = right.x + right.width - top.x,
         height = bottom.y + bottom.height - top.y}
 end
+local function rail(suffix)
+    for name, object in pairs(objects) do
+        if object.texture:find('_' .. suffix .. '.png', 1, true) then return name, object end
+    end
+end
 
 dofile(addon_path .. 'ConsoleBGPlus.lua')
 assert(count() > 10 and count() <= 199)
@@ -194,14 +203,25 @@ assert(#played_sounds == 0, 'Loading should not play either manual cue')
 assert(text_objects.ConsoleBGPlus_label_title.font == 'Verdana')
 assert(not text_objects.ConsoleBGPlus_label_input.visible)
 all_visible(false)
+local top_rail_name, top_rail = rail('top_left')
 tick(0.01)
 assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 322
     and not text_objects.ConsoleBGPlus_label_input.visible and #played_sounds == 0,
     'Loading shows a silent compact output frame without relying on log activity')
+assert(objects[top_rail_name] == top_rail and top_rail.texture_sets == 1
+    and top_rail.position_sets == 1,
+    'The top rail should survive the initial compact switch without rebinding')
+local top_rail_visibility_sets = top_rail.visibility_sets
+local bottom_rail_name, bottom_rail = rail('bottom_left')
 run('diagnose')
 assert(diagnostic_files[addon_path .. 'data/diagnostics.txt'].text:find('startup_alpha=255', 1, true))
 console_open = true; tick(); all_visible(true)
 settle()
+assert(objects[top_rail_name] == top_rail and top_rail.texture_sets == 1
+    and top_rail.position_sets == 1 and top_rail.visibility_sets == top_rail_visibility_sets,
+    'The top rail should remain fixed as the Input area appears')
+assert(objects[bottom_rail_name] == bottom_rail and bottom_rail.texture_sets == 1,
+    'The bottom rail should move with the frame without texture reloading')
 local title = text_objects.ConsoleBGPlus_label_title
 local title_left, title_right
 for _, object in pairs(objects) do
@@ -225,6 +245,9 @@ console_open = false; tick()
 assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 322
     and not text_objects.ConsoleBGPlus_label_input.visible,
     'Manual close must immediately use the compact output frame')
+assert(objects[top_rail_name] == top_rail
+    and top_rail.visibility_sets == top_rail_visibility_sets,
+    'The top rail should stay visible through the compact close transition')
 for _, object in pairs(objects) do
     assert(not object.texture:find('_divider_', 1, true)
         and not object.texture:find('_tab_', 1, true),
@@ -249,7 +272,7 @@ assert(saved.extents.x == 960 and saved.extents.y + saved.input.padding == 320)
 assert(saved.gradient.top == 80 and saved.gradient.bottom == 230)
 run('input', 'off')
 local old_count = count()
-run('input', 'on', '26'); assert(count() == old_count + 3 and saved.input.enabled)
+run('input', 'on', '26'); assert(count() == old_count + 6 and saved.input.enabled)
 run('preview', 'on'); assert(text_objects.ConsoleBGPlus_label_input.visible)
 run('tab', 'right')
 local right_tab_x = text_objects.ConsoleBGPlus_label_input.x
@@ -362,6 +385,12 @@ end
 run('label', 'Input'); settle()
 assert(plaque().width == 53 and plaque().height == 24,
     'The native plaque should fit rendered Meiryo text without extra vertical padding')
+run('tabstyle'); assert(saved.labels.input_style == 'red' and not plaque(),
+    'A bare tabstyle command toggles from native to red')
+run('tabstyle'); assert(saved.labels.input_style == 'native' and plaque(),
+    'A second bare command toggles back to native')
+run('tabstyle', 'toggle'); assert(saved.labels.input_style == 'red' and not plaque())
+run('tabstyle', 'toggle'); assert(saved.labels.input_style == 'native' and plaque())
 run('label', '$'); settle(); assert(plaque().width == 17)
 render_latency = 7
 run('label', 'Input'); settle(); assert(plaque().width == 53,
@@ -478,6 +507,7 @@ assert(saved.console.offset_x == 50 and saved.console.offset_y == 15 and saved.i
 assert(saved.activity.enabled == true and saved.input.enabled == true
     and saved.input.height == 15 and saved.input.padding == 0
     and saved.labels.offset_y == 2 and saved.labels.input_size == 8
+    and saved.labels.input_style == 'native'
     and saved.activity.delay_ms == 1000
     and saved.activity.fade_ms == 1000 and saved.native.font == 'Verdana'
     and saved.sound.open == true and saved.sound.close == true)
@@ -753,4 +783,4 @@ assert(rectangle().height == saved.extents.y + saved.input.padding,
     'An already open native console should begin with the full manual frame')
 callbacks.unload()
 io.open = real_open
-print('PASS: startup hold/fade and manual takeover, native profile/load/reload, delayed/hidden label bounds, automatic tab resizing, text-only red style, optional divider, log growth, no replay, fade/manual focus, rotation, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
+print('PASS: stable frame rails, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')

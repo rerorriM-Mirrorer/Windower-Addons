@@ -6,7 +6,7 @@ An FFXI-style frame for the Windower 4 console, with XIVParty's violet stripes, 
 
 Extract the ConsoleBGPlus folder into Windower/addons. When updating, replace the addon files and **keep your data folder**; the ZIP contains no settings file. In FFXI chat, run **//lua load ConsoleBGPlus** for a first install or **//lua reload ConsoleBGPlus** after updating. Unload the original ConsoleBG addon if it is running.
 
-Fresh settings start at **16,48** with equal left and right margins, a 344-pixel full height, Verdana 12 native console text, and a 15-pixel Input strip. Automatic output shows a 322-pixel frame without the Input area: the 15-pixel strip plus 7 extra pixels are removed. Existing saved positions, input heights, colors, and activity choices stay as they are. **//cbg reset** applies the new defaults if you want to start over.
+Fresh settings start at **16,48** with equal left and right margins, a 344-pixel full height, Verdana 12 native console text, a 15-pixel Input strip, and the native grey Input tab. Automatic output shows a 322-pixel frame without the Input area: the 15-pixel strip plus 7 extra pixels are removed. Existing saved positions, tab style, input heights, colors, and activity choices stay as they are. **//cbg reset** applies the new defaults if you want to start over.
 
 ## Move and resize
 
@@ -17,6 +17,8 @@ In screen-width mode, dragging left or right keeps matching side margins. Resizi
 ## Commands
 
 Type these in FFXI chat. Angle brackets mark required arguments, square brackets mark optional arguments, and a vertical bar separates choices. Command forms and descriptions are aligned below for quick reference.
+
+**//cbg tabstyle** and **//cbg tabstyle toggle** both switch between the native grey plaque and red lettering.
 
     Layout
     //cbg edit [on|off]                         Toggle or set mouse edit mode
@@ -31,7 +33,7 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
     //cbg inputpad <0-32>                       Add extra space below the input line
     //cbg divider on|off                        Show or hide the input divider
     //cbg tab left|right                        Choose Input label side
-    //cbg tabstyle red|native                   Red lettering or grey plaque
+    //cbg tabstyle [red|native|toggle]          Toggle or set Input tab style
     //cbg label <text>                          Change the Input label (1-16 bytes)
     //cbg labelfont <font name>                 Change frame label font
     //cbg labelsize <title> <input>             Set label sizes (6-16)
