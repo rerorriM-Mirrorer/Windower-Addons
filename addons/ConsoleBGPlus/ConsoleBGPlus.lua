@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.18'
+_addon.version = '0.1.19'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -486,8 +486,10 @@ local function sync_native_profile()
     windower.send_command(string.format('console_color %d %d %d %d',
         color('alpha'), color('red'), color('green'), color('blue')))
     windower.send_command('console_fadedelay ' .. settings.activity.delay_ms)
-    windower.send_command('console_displayactivity 1')
-    windower.send_command('console_log ' .. (settings.activity.enabled and '1' or '0'))
+    -- Native auto display and file logging are independent. Keep the log
+    -- available for diagnostics even on characters that hide output popups.
+    windower.send_command('console_displayactivity ' .. (settings.activity.enabled and '1' or '0'))
+    windower.send_command('console_log 1')
     settings.activity.native_delay_owned = true
     return true
 end
@@ -662,11 +664,12 @@ local function command(action, ...)
         watcher.restart()
         auto_alpha = 0
         if windower.send_command then
-            windower.send_command('console_log ' .. (settings.activity.enabled and '1' or '0'))
+            windower.send_command('console_displayactivity ' .. (settings.activity.enabled and '1' or '0'))
+            windower.send_command('console_log 1')
         end
         save()
         update_visibility()
-        message('Log activity ' .. mode .. '. Native console logging follows this setting.')
+        message('Automatic output ' .. mode .. '. Native console logging stays on.')
     elseif action == 'fade' then
         local delay = args[1] and integer(args[1], 0, 60000)
         local duration = args[2] and integer(args[2], 50, 4000)
@@ -757,7 +760,7 @@ local function command(action, ...)
         message('//cbg labelfont <font> | labelsize <title> <input> | labeloffset <-12 to 12>')
         message('//cbg diagnose | trace on|off. Files go to ConsoleBGPlus/data/.')
         message('//cbg preview [on|off] | status | reset. Changes save to data/settings.xml.')
-        message('//cbg activity on|off | fade <hold ms> [fade ms]')
+        message('//cbg activity on|off (auto display; logging stays on) | fade <hold ms> [fade ms]')
         message('//cbg opensound on|off | closesound on|off. Focused manual console cues.')
     else
         message('Unknown command. Use //cbg help.', true)
