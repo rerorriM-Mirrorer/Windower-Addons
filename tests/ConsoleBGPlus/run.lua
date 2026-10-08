@@ -640,6 +640,16 @@ assert(queued[#queued - 4] == 'console_font "Trebuchet MS" 18'
     and text_objects.ConsoleBGPlus_label_title.font == 'Trebuchet MS',
     'Saved native and label font must be restored on load')
 run('reset')
+local query_saves, query_commands = save_calls, #queued
+for _, action in ipairs({'pos', 'size', 'offset', 'nativefont', 'labelfont', 'labelsize', 'fade', 'font'}) do
+    local previous_messages = #logs
+    run(action)
+    assert(#logs == previous_messages + 1 and not logs[#logs][2]:find('Usage:', 1, true))
+end
+assert(save_calls == query_saves and #queued == query_commands, 'Queries must not change settings/native state')
+run('width', '900')
+run('width')
+assert(saved.extents.mode == 'screen', 'Bare width restores equal screen margins')
 run('nativefont', 'Trebuchet', 'MS', '11')
 assert(saved.native.font == 'Trebuchet MS' and saved.native.size == 11
     and queued[#queued - 4] == 'console_font "Trebuchet MS" 11')

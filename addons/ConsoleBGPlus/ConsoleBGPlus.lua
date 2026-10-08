@@ -553,11 +553,36 @@ local function font_command(args)
     message('Linked font saved: ' .. font .. ' ' .. size .. '. Check alignment with //cbg preview; offset/input can fine-tune it.')
 end
 
+-- Readouts never save or send native commands, so checking a calibration
+-- is safe during testing. Bare width is intentionally a screen-width setter.
+local function report_setting(action)
+    local value
+    if action == 'position' then
+        value = string.format('Position: %d,%d.', settings.pos.x, settings.pos.y)
+    elseif action == 'size' then
+        value = string.format('Size: drawn %dx%d; saved full height %d; width %s (fixed value %d).',
+            actual_rectangle.width, actual_rectangle.height,
+            settings.extents.y + settings.input.padding, settings.extents.mode, settings.extents.x)
+    elseif action == 'offset' then
+        value = string.format('Console offset: %d,%d.', settings.console.offset_x, settings.console.offset_y)
+    elseif action == 'nativefont' then
+        value = string.format('Native font: %s %d.', settings.native.font, settings.native.size)
+    elseif action == 'labelfont' then value = 'Label font: ' .. settings.labels.font .. '.'
+    elseif action == 'labelsize' then
+        value = string.format('Label sizes: %d/%d.', settings.labels.title_size, settings.labels.input_size)
+    elseif action == 'fade' then
+        value = string.format('Fade: hold %d ms; background fade %d ms.', settings.activity.delay_ms, settings.activity.fade_ms)
+    else return false end
+    message(value)
+    return true
+end
+
 local aliases = {p = 'position', s = 'size', c = 'color', pos = 'position'}
 local function command(action, ...)
     action = (action or 'help'):lower()
     action = aliases[action] or action
     local args = {...}
+    if #args == 0 and report_setting(action) then return end
     end_drag()
     if action == 'position' then
         local value = numbers(args, 2, 0, 32768)
@@ -575,12 +600,13 @@ local function command(action, ...)
         save()
         message('Size saved: ' .. value[1] .. ' x ' .. value[2] .. '.')
     elseif action == 'width' then
-        if #args ~= 1 then return usage('width screen|<pixels>') end
+        if #args == 0 then args[1] = 'screen' end
+        if #args ~= 1 then return usage('width [screen|<pixels>]') end
         if args[1]:lower() == 'screen' then
             settings.extents.mode = 'screen'
         else
             local width = integer(args[1], 120, 32768)
-            if not width then return usage('width screen|<pixels> (minimum 120)') end
+            if not width then return usage('width [screen|<pixels>] (minimum 120)') end
             settings.extents.x, settings.extents.mode = width, 'fixed'
         end
         save()
@@ -803,13 +829,14 @@ local function command(action, ...)
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] | console on|off | offset <x> <y>')
         message('//cbg font [<font> <size>] (linked) | nativefont <font> <size> | nativecolor <alpha> <red> <green> <blue>')
-        message('//cbg width screen|<pixels> | glow <alpha> [height]')
+        message('//cbg width [screen|<pixels>] | glow <alpha> [height]')
         message('//cbg gradient <top> <bottom> | alpha <0-255> | border <0-255>|link|free')
         message('//cbg color <alpha> <red> <green> <blue> | input on|off [height] | tab left|right')
         message('//cbg inputpad <0-32> | divider on|off | tabstyle [red|native|toggle] | label <text>')
         message('//cbg labelfont <font> | labelsize <title> <input> | labeloffset <-12 to 12>')
         message('//cbg diagnose | trace on|off. Files go to ConsoleBGPlus/data/.')
         message('//cbg preview [on|off] | status | reset. Changes save to data/settings.xml.')
+        message('Bare pos/size/offset/font/nativefont/labelfont/labelsize/fade report current values.')
         message('//cbg activity [on|off] | nativeactivity [on|off] (logging stays on) | fade <hold ms> [fade ms]')
         message('//cbg opensound on|off | closesound on|off. Focused manual console cues.')
     else

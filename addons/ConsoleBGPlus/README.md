@@ -18,15 +18,17 @@ In screen-width mode, dragging left or right keeps matching side margins. Resizi
 
 Type these in FFXI chat. Angle brackets mark required arguments, square brackets mark optional arguments, and a vertical bar separates choices. Command forms and descriptions are aligned below for quick reference.
 
+**//cbg pos**, **size**, **offset**, **nativefont**, **labelfont**, **labelsize**, **font**, and **fade** report current values when given no arguments. **//cbg width** restores screen-width mode, just like width screen.
+
 **//cbg tabstyle** and **//cbg tabstyle toggle** both switch between the native grey plaque and red lettering.
 
     Layout
     //cbg edit [on|off]                         Toggle or set mouse edit mode
-    //cbg position <x> <y>                      Move the frame to pixel coordinates
-    //cbg size <width> <height>                 Set the outer size and fixed width
-    //cbg width screen|<pixels>                Use equal side margins or fixed width
+    //cbg position [<x> <y>]                      Move the frame to pixel coordinates
+    //cbg size [<width> <height>]                 Set the outer size and fixed width
+    //cbg width [screen|<pixels>]                Use equal side margins or fixed width
     //cbg console on|off                        Link or unlink native text movement
-    //cbg offset <x> <y>                        Position native text relative to frame
+    //cbg offset [<x> <y>]                        Position native text relative to frame
 
     Input and labels
     //cbg input on|off [height]                 Show Input strip; fresh height is 15
@@ -35,11 +37,11 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
     //cbg tab left|right                        Choose Input label side
     //cbg tabstyle [red|native|toggle]          Toggle or set Input tab style
     //cbg label <text>                          Change the Input label (1-16 bytes)
-    //cbg labelfont <font name>                 Change frame label font
-    //cbg labelsize <title> <input>             Set label sizes (6-16)
+    //cbg labelfont [<font name>]                 Change frame label font
+    //cbg labelsize [<title> <input>]             Set label sizes (6-16)
     //cbg labeloffset <-12 to 12>              Move Input label vertically
     //cbg font [<font name> <size>]             Linked font/size; no args reports it
-    //cbg nativefont <font name> <size>         Set native console font (size 6-24)
+    //cbg nativefont [<font name> <size>]         Set native console font (size 6-24)
     //cbg nativecolor <a> <r> <g> <b>           Set native console color (0-255)
 
     Appearance
@@ -51,9 +53,9 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
     //cbg preview [on|off]                      Keep the full frame visible to inspect
 
     Activity and settings
-    //cbg activity on|off                       Toggle automatic frame; keep logging
+    //cbg activity [on|off]                       Toggle automatic frame; keep logging
     //cbg nativeactivity [on|off]               Toggle native automatic text
-    //cbg fade <hold_ms> [fade_ms]              Set native hold and frame fade
+    //cbg fade [<hold_ms> [fade_ms]]              Set native hold and frame fade
     //cbg opensound on|off                      Play a cue on manual console open
     //cbg closesound on|off                     Play a cue on manual console close
     //cbg trace on|off                          Record visibility and timing changes
