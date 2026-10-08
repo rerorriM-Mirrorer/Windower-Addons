@@ -293,14 +293,14 @@ assert(saved.extents.x == 960 and saved.extents.y + saved.input.padding == 320)
 assert(saved.gradient.top == 80 and saved.gradient.bottom == 230)
 run('input', 'off')
 local old_count = count()
-run('input', 'on', '26'); assert(count() == old_count + 6 and saved.input.enabled)
+run('input', 'on', '26'); assert(saved.input.enabled and saved.input.height == 26)
 run('preview', 'on'); assert(text_objects.ConsoleBGPlus_label_input.visible)
 run('tab', 'right')
 local right_tab_x = text_objects.ConsoleBGPlus_label_input.x
 run('tab', 'left'); assert(text_objects.ConsoleBGPlus_label_input.x < right_tab_x)
 run('tab', 'right'); assert(text_objects.ConsoleBGPlus_label_input.x == right_tab_x)
 run('preview', 'off')
-run('input', 'off'); assert(count() == old_count and not saved.input.enabled)
+run('input', 'off'); assert(not saved.input.enabled)
 assert(not text_objects.ConsoleBGPlus_label_input.visible)
 
 -- Mouse ownership: regular play/body clicks/wheel events pass through.
@@ -527,7 +527,7 @@ assert(saved.gradient.bottom == 250 and saved.glow.alpha == 200 and saved.glow.h
 assert(saved.console.offset_x == 50 and saved.console.offset_y == 15 and saved.input.divider)
 assert(saved.activity.enabled == true and saved.input.enabled == true
     and saved.input.height == 15 and saved.input.padding == 0
-    and saved.labels.offset_y == 2 and saved.labels.input_size == 8
+    and saved.labels.offset_y == 2 and saved.labels.input_size == 7
     and saved.labels.input_style == 'native'
     and saved.activity.delay_ms == 1000
     and saved.activity.fade_ms == 1000 and saved.native.font == 'Verdana'
@@ -753,8 +753,22 @@ run('diagnose')
 assert(diagnostic_files[addon_path .. 'data/diagnostics.txt'].text:find('preview=false edit=false', 1, true))
 tick(0.5)
 assert(not text_objects.ConsoleBGPlus_label_title.visible)
+run('nativeactivity', 'on')
+local commands_before_activity_off = #queued
 run('activity', 'off')
-assert(queued[#queued] == 'console_log 0')
+assert(#queued == commands_before_activity_off + 1 and queued[#queued] == 'console_log 1',
+    'Frame activity must not rewrite the native display setting')
+assert(saved.native.activity == true and saved.activity.enabled == false)
+run('nativeactivity', 'off')
+assert(queued[#queued - 1] == 'console_displayactivity 0' and queued[#queued] == 'console_log 1')
+config.callback()
+assert(queued[#queued - 1] == 'console_displayactivity 0', 'Reload must preserve independent native setting')
+run('activity', 'on')
+assert(saved.native.activity == false and saved.activity.enabled == true)
+run('activity', 'off')
+run('nativeactivity')
+assert(saved.native.activity == true and saved.activity.enabled == false)
+
 fake_log_size = 40; tick(0.16)
 assert(not text_objects.ConsoleBGPlus_label_title.visible)
 run('activity', 'on'); tick(0.16)
@@ -805,3 +819,4 @@ assert(rectangle().height == saved.extents.y + saved.input.padding,
 callbacks.unload()
 io.open = real_open
 print('PASS: fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
+

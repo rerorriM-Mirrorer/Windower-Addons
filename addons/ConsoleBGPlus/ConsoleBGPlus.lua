@@ -1,8 +1,8 @@
 -- ConsoleBG+ is derived from ConsoleBG by StarHawk, Copyright 2015 Windower.
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
-_addon.author = 'StarHawk; ConsoleBG+ contributors'
-_addon.version = '0.1.19'
+_addon.author = 'StarHawk; Awake'
+_addon.version = '0.1.20'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -21,7 +21,7 @@ local defaults = {
     labels = {font = 'Verdana', title_size = 8, input_size = 7,
         input_text = 'Input', input_style = 'native', offset_y = 2},
     console = {linked = true, offset_x = 50, offset_y = 15},
-    native = {font = 'Verdana', size = 12, alpha = 255, red = 250, green = 250, blue = 250},
+    native = {activity = true, font = 'Verdana', size = 12, alpha = 255, red = 250, green = 250, blue = 250},
     activity = {enabled = true, delay_ms = 1000, fade_ms = 1000,
         native_delay_owned = false},
     sound = {open = true, close = true},
@@ -488,10 +488,36 @@ local function sync_native_profile()
     windower.send_command('console_fadedelay ' .. settings.activity.delay_ms)
     -- Native auto display and file logging are independent. Keep the log
     -- available for diagnostics even on characters that hide output popups.
-    windower.send_command('console_displayactivity ' .. (settings.activity.enabled and '1' or '0'))
+    windower.send_command('console_displayactivity ' .. (settings.native.activity and '1' or '0'))
     windower.send_command('console_log 1')
     settings.activity.native_delay_owned = true
     return true
+end
+
+-- Keep these two signals independent: file growth may come from another
+-- client, while native automatic text belongs to the current client.
+local function activity_command(action, args)
+    local native = action == 'nativeactivity'
+    local group, key = native and settings.native or settings.activity,
+        native and 'activity' or 'enabled'
+    local mode = args[1] and args[1]:lower()
+    if #args > 1 or (mode and mode ~= 'on' and mode ~= 'off') then
+        return usage(action .. ' [on|off]')
+    end
+    group[key] = mode and mode == 'on' or (not mode and not group[key])
+    if native then
+        if windower.send_command then
+            windower.send_command('console_displayactivity ' .. (group[key] and '1' or '0'))
+        end
+    else
+        watcher.restart()
+        auto_alpha = 0
+    end
+    if windower.send_command then windower.send_command('console_log 1') end
+    save()
+    update_visibility()
+    message((native and 'Native automatic text ' or 'Frame log activity ')
+        .. (group[key] and 'on' or 'off') .. '. Console logging stays on.')
 end
 
 local aliases = {p = 'position', s = 'size', c = 'color', pos = 'position'}
@@ -657,19 +683,8 @@ local function command(action, ...)
         sync_native_profile()
         save()
         message('Native console text color saved.')
-    elseif action == 'activity' then
-        local mode = args[1] and args[1]:lower()
-        if #args ~= 1 or (mode ~= 'on' and mode ~= 'off') then return usage('activity on|off') end
-        settings.activity.enabled = mode == 'on'
-        watcher.restart()
-        auto_alpha = 0
-        if windower.send_command then
-            windower.send_command('console_displayactivity ' .. (settings.activity.enabled and '1' or '0'))
-            windower.send_command('console_log 1')
-        end
-        save()
-        update_visibility()
-        message('Automatic output ' .. mode .. '. Native console logging stays on.')
+    elseif action == 'activity' or action == 'nativeactivity' then
+        activity_command(action, args)
     elseif action == 'fade' then
         local delay = args[1] and integer(args[1], 0, 60000)
         local duration = args[2] and integer(args[2], 50, 4000)
@@ -739,7 +754,7 @@ local function command(action, ...)
     elseif action == 'status' then
         if #args ~= 0 then return usage('status') end
         local rect = actual_rectangle
-        message(string.format('v%s: drawn at %d,%d, %dx%d (%s width); gradient %d to %d; glow %d; input %s (%d + %d padding); console %s; edit %s; preview %s; trace %s; log activity %s (%s).',
+        message(string.format('v%s: drawn at %d,%d, %dx%d (%s width); gradient %d to %d; glow %d; input %s (%d + %d padding); console %s; edit %s; preview %s; trace %s; log activity %s (%s); native activity %s; logging on.',
             _addon.version, rect.x, rect.y, rect.width, rect.height,
             settings.extents.mode,
             settings.gradient.top, settings.gradient.bottom,
@@ -747,7 +762,7 @@ local function command(action, ...)
             settings.input.enabled and 'on' or 'off', settings.input.height, settings.input.padding,
             settings.console.linked and 'linked' or 'free', editing and 'on' or 'off',
             preview and 'on' or 'off', recorder.active and 'on' or 'off',
-            settings.activity.enabled and 'on' or 'off', watcher.available and 'available' or 'unavailable'))
+            settings.activity.enabled and 'on' or 'off', watcher.available and 'available' or 'unavailable', settings.native.activity and 'on' or 'off'))
     elseif action == 'help' then
         if #args ~= 0 then return usage('help') end
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
@@ -760,7 +775,7 @@ local function command(action, ...)
         message('//cbg labelfont <font> | labelsize <title> <input> | labeloffset <-12 to 12>')
         message('//cbg diagnose | trace on|off. Files go to ConsoleBGPlus/data/.')
         message('//cbg preview [on|off] | status | reset. Changes save to data/settings.xml.')
-        message('//cbg activity on|off (auto display; logging stays on) | fade <hold ms> [fade ms]')
+        message('//cbg activity [on|off] | nativeactivity [on|off] (logging stays on) | fade <hold ms> [fade ms]')
         message('//cbg opensound on|off | closesound on|off. Focused manual console cues.')
     else
         message('Unknown command. Use //cbg help.', true)
@@ -911,3 +926,4 @@ windower.register_event('unload', function()
     labels = {}
     if config.unregister then config.unregister(settings, registration) end
 end)
+
