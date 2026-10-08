@@ -1,6 +1,6 @@
-**Author:**  Tako, Rubenator<br>
-**Version:**  3.3.2<br>
-**Date:** October 3, 2026<br>
+**Author:** Tako, Rubenator; fork changes by A<br>
+**Version:** 3.3.3-dev.1 (testing)<br>
+**Date:** October 8, 2026<br>
 
 * Displays current equipment grid on screen. Also can show current Ammo count and current Encumbrance.
 
@@ -11,6 +11,38 @@
 * Most settings can be modified via commands, but you can edit the settings.xml directly for a few uncommon settings.
 
 **Abbreviation:** `//ev`
+
+## Visibility
+
+The default remains always visible. Autohide is opt-in and reveals the grid after
+equipment changes or encumbrance changes. It stays open for 4 seconds after the
+last change, fading in over 0.12 seconds and out over 0.30 seconds. Routine ammo
+consumption updates the count without repeatedly revealing the grid.
+
+| Command | Behavior |
+| --- | --- |
+| `//ev show` | Save always-visible mode. Existing zone/cutscene hiding still applies. |
+| `//ev hide` | Save hidden mode; equipment packets, status changes, and zoning cannot override it. |
+| `//ev autohide [on\|off]` | Enable/disable auto mode; no argument toggles it. `//ev auto` is an alias. Off returns to always-visible mode. |
+| `//ev delay [seconds]` | Set auto hold time from 0.1 to 60 seconds, or report it without an argument. |
+| `//ev fade [in-seconds out-seconds]` | Set both fade durations from 0 to 5 seconds, or report them without arguments. Zero means instant. |
+| `//ev hover [on\|off]` | Toggle optional mouse reveal in auto mode. Off by default. |
+| `//ev status` | Report version, mode, current visibility/opacity, delay, hover, scale, and position. |
+
+Hover means moving the pointer over the grid's saved rectangular location, even
+when the grid is hidden. It does not intercept clicks while hidden. Manual hide
+takes precedence over hover. Use `//ev autohide on` to resume auto behavior after
+`show` or `hide`.
+
+In auto mode, loading or changing size/scale briefly reveals the grid. Manual
+hidden mode stays hidden during these changes. A held drag keeps auto mode open;
+release saves the position and starts a fresh hold period. Fully hidden grids
+cannot start a drag. Fades multiply your configured background/icon/text/stroke
+opacity rather than replacing it.
+
+The mode and timing settings persist under `<visibility>` in `data/settings.xml`.
+Existing configurations receive the always-visible default. There is no controller
+or combat dependency; this first batch uses equipment activity as its trigger.
 
 ## Commands
 
@@ -51,3 +83,21 @@ game_path <path>: sets path to FFXI folder where you want dats extracted from. B
 //ev draggable on
 //ev help
 ```
+
+## Changelog
+
+### 3.3.3-dev.1 — October 8, 2026 — awaiting live testing
+
+- Added persistent show/hide and opt-in gear-change autohide, delay/fade controls,
+  optional hover reveal, and status output.
+- Centralized visibility for the background, icons, encumbrance, ammo, and text
+  stroke; hidden equipment/ammo data keeps updating.
+- Preserved scale, opacity, alignment, and position-saving behavior. A held drag
+  prevents auto expiry; final coordinates save even for a drag between frames.
+- Added shared development documents and a cumulative root `TESTING.md`.
+
+### 3.3.2 — October 3, 2026 — user reported dragging working well
+
+- Added whole-grid dragging with live icon/encumbrance/ammo movement, XML position
+  saving, chat confirmation, and lock/unlock/draggable controls.
+- Retained upstream 3.3.1 equipment handling and scale/appearance settings.
