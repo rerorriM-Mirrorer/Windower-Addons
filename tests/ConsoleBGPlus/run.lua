@@ -618,6 +618,28 @@ assert(queued[2] == 'console_font Verdana 12'
     and queued[6] == 'console_log 1', 'Loading should establish the complete native profile')
 for _ = 1, 60 do tick() end
 assert(#queued == 6, 'Idle frames must not rewrite the native profile')
+run('reset')
+local output_body_height = saved.extents.y - saved.input.height
+run('font', 'Trebuchet', 'MS', '18')
+assert(saved.native.font == 'Trebuchet MS' and saved.native.size == 18
+    and saved.labels.font == 'Trebuchet MS' and saved.labels.title_size == 12
+    and saved.labels.input_size == 11 and saved.input.height == 23
+    and saved.console.offset_y == 23 and saved.extents.y - saved.input.height == output_body_height)
+local font_save_count = save_calls
+run('font')
+assert(save_calls == font_save_count and logs[#logs][2]:find('Trebuchet MS 18', 1, true))
+run('font', 'Trebuchet', 'MS', '18')
+assert(saved.input.height == 23 and saved.console.offset_y == 23,
+    'Repeated identical font command must preserve calibration')
+local invalid_font_save_count = save_calls
+run('font', 'Verdana;console_log', '12')
+assert(save_calls == invalid_font_save_count and saved.native.size == 18)
+callbacks.unload()
+dofile(addon_path .. 'ConsoleBGPlus.lua')
+assert(queued[#queued - 4] == 'console_font "Trebuchet MS" 18'
+    and text_objects.ConsoleBGPlus_label_title.font == 'Trebuchet MS',
+    'Saved native and label font must be restored on load')
+run('reset')
 run('nativefont', 'Trebuchet', 'MS', '11')
 assert(saved.native.font == 'Trebuchet MS' and saved.native.size == 11
     and queued[#queued - 4] == 'console_font "Trebuchet MS" 11')

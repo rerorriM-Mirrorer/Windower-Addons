@@ -38,6 +38,7 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
     //cbg labelfont <font name>                 Change frame label font
     //cbg labelsize <title> <input>             Set label sizes (6-16)
     //cbg labeloffset <-12 to 12>              Move Input label vertically
+    //cbg font [<font name> <size>]             Linked font/size; no args reports it
     //cbg nativefont <font name> <size>         Set native console font (size 6-24)
     //cbg nativecolor <a> <r> <g> <b>           Set native console color (0-255)
 
@@ -66,6 +67,12 @@ The default native font is Verdana 12 with color 255 250 250 250. The Console la
 Clients launched from the same Windower installation watch the same console.log. Its growth does not identify a source client: another client's messages can trigger any enabled frame watcher. To keep native messages on an alt without the background, use **//cbg activity off** and **//cbg nativeactivity on**. The addon does not change another client's settings. The watcher checks file length about eight times per second and starts at the current end of the file when re-enabled.
 
 The bundled open and close cues play once at each native console visibility transition in the focused game window. Automatic output and preview do not play sounds. Use **//cbg opensound off** or **//cbg closesound off** to silence either cue. Replace **assets/consoleopen.wav** or **assets/closeconsole.wav** with another short PCM WAV if desired. The addon detects native visibility changes; Windower does not identify which key opened or closed it. The supplied open recording is a working draft for testing.
+
+## Linked font calibration
+
+**//cbg font Trebuchet MS 18** sets both native console text and frame labels. Changing size scales the existing label sizes, Input strip height, label vertical offset, and native console vertical offset. The full frame grows or shrinks with the strip, preserving the compact output body's height. Horizontal position, bottom padding, and saved fade settings are kept. Font sizes are 6-24; labels are limited to 6-16. **//cbg font** reports current values. Repeating the same font/size keeps your calibration.
+
+Verdana 12 is an initial default, not a forced font. Load/reload reapplies the saved font. **//cbg nativefont** changes native text alone; labelfont and labelsize remain available for individual adjustments. Native text has no documented font/extent getter, so a different typeface may still need **//cbg offset**, **//cbg labeloffset**, or **//cbg input on <height>** after inspecting it with preview. Changing console_font outside the addon is not detected and is overwritten by the saved font on reload.
 
 ## When something looks wrong
 

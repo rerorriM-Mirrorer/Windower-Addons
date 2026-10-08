@@ -520,6 +520,39 @@ local function activity_command(action, args)
         .. (group[key] and 'on' or 'off') .. '. Console logging stays on.')
 end
 
+-- Scale the user's existing calibration, so custom offsets survive a
+-- size change and repeating the same command never compounds a scale.
+-- Label bounds settle through measure_labels; native text has no getter,
+-- so the strip and console baseline remain an approximation to test live.
+local function font_command(args)
+    if #args == 0 then
+        return message(string.format('Font: %s %d; labels %s %d/%d; input height %d; console offset %d,%d.',
+            settings.native.font, settings.native.size, settings.labels.font,
+            settings.labels.title_size, settings.labels.input_size, settings.input.height,
+            settings.console.offset_x, settings.console.offset_y))
+    end
+    local size = args[#args] and integer(args[#args], 6, 24)
+    local font = table.concat(args, ' ', 1, #args - 1)
+    if not size or not safe_native_font(font) then return usage('font <font name> <size 6-24>') end
+    local ratio = size / (integer(settings.native.size, 6, 24) or defaults.native.size)
+    local function scale(value, minimum, maximum)
+        return math.max(minimum, math.min(maximum, math.floor(value * ratio + 0.5)))
+    end
+    local old_height = settings.input.height
+    settings.input.height = scale(old_height, 6, 256)
+    -- Match the full frame to the changed strip; the output body stays put.
+    settings.extents.y = math.max(40, settings.extents.y + settings.input.height - old_height)
+    settings.labels.title_size = scale(settings.labels.title_size, 6, 16)
+    settings.labels.input_size = scale(settings.labels.input_size, 6, 16)
+    settings.labels.offset_y = scale(settings.labels.offset_y, -12, 12)
+    settings.console.offset_y = scale(settings.console.offset_y, -32768, 32768)
+    settings.labels.font, settings.native.font, settings.native.size = font, font, size
+    position_dirty = true
+    sync_native_profile()
+    save()
+    message('Linked font saved: ' .. font .. ' ' .. size .. '. Check alignment with //cbg preview; offset/input can fine-tune it.')
+end
+
 local aliases = {p = 'position', s = 'size', c = 'color', pos = 'position'}
 local function command(action, ...)
     action = (action or 'help'):lower()
@@ -665,6 +698,8 @@ local function command(action, ...)
         position_dirty = true
         save()
         message('Console offset saved: ' .. value[1] .. ', ' .. value[2] .. '.')
+    elseif action == 'font' then
+        font_command(args)
     elseif action == 'nativefont' then
         local size = args[#args] and integer(args[#args], 6, 24)
         local font = table.concat(args, ' ', 1, #args - 1)
@@ -767,7 +802,7 @@ local function command(action, ...)
         if #args ~= 0 then return usage('help') end
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] | console on|off | offset <x> <y>')
-        message('//cbg nativefont <font> <size> | nativecolor <alpha> <red> <green> <blue>')
+        message('//cbg font [<font> <size>] (linked) | nativefont <font> <size> | nativecolor <alpha> <red> <green> <blue>')
         message('//cbg width screen|<pixels> | glow <alpha> [height]')
         message('//cbg gradient <top> <bottom> | alpha <0-255> | border <0-255>|link|free')
         message('//cbg color <alpha> <red> <green> <blue> | input on|off [height] | tab left|right')
