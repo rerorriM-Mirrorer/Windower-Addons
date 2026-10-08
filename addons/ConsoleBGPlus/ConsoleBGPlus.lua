@@ -22,7 +22,7 @@ local defaults = {
         input_text = 'Input', input_style = 'native', offset_y = 2},
     console = {linked = true, offset_x = 50, offset_y = 15},
     native = {activity = true, font = 'Verdana', size = 12, alpha = 255, red = 250, green = 250, blue = 250},
-    activity = {enabled = true, delay_ms = 1000, fade_ms = 1000,
+    activity = {enabled = true, delay_ms = 1000, fade_ms = 450,
         native_delay_owned = false},
     sound = {open = true, close = true},
 }

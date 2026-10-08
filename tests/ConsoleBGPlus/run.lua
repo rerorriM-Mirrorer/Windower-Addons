@@ -274,7 +274,7 @@ for _, object in pairs(objects) do
         and not object.texture:find('_tab_', 1, true),
         'The Input divider and plaque must leave the frame before its fade')
 end
-tick(0.5)
+tick(0.2)
 assert(text_objects.ConsoleBGPlus_label_title.alpha > 0 and text_objects.ConsoleBGPlus_label_title.alpha < 240)
 tick(0.6); all_visible(false)
 run('diagnose')
@@ -530,7 +530,7 @@ assert(saved.activity.enabled == true and saved.input.enabled == true
     and saved.labels.offset_y == 2 and saved.labels.input_size == 7
     and saved.labels.input_style == 'native'
     and saved.activity.delay_ms == 1000
-    and saved.activity.fade_ms == 1000 and saved.native.font == 'Verdana'
+    and saved.activity.fade_ms == 450 and saved.native.font == 'Verdana'
     and saved.sound.open == true and saved.sound.close == true)
 run('alpha', '0')
 for _, object in pairs(objects) do
@@ -666,13 +666,13 @@ assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 
     and objects.ConsoleBGPlus_1.alpha > 0,
     'Startup frame should hold even when console logging is disabled')
 local startup_full_alpha = objects.ConsoleBGPlus_1.alpha
-tick(1.0)
+tick(0.7)
 assert(text_objects.ConsoleBGPlus_label_title.visible
     and objects.ConsoleBGPlus_1.alpha > 0 and objects.ConsoleBGPlus_1.alpha < startup_full_alpha,
     'Startup frame should fade after its saved 1000 ms hold')
 tick(0.6)
 assert(not text_objects.ConsoleBGPlus_label_title.visible,
-    'Startup frame should hide after the saved 1000 ms fade')
+    'Startup frame should hide after the saved 450 ms fade')
 for _ = 1, 30 do tick() end
 assert(log_polls == inactive_polls and not text_objects.ConsoleBGPlus_label_title.visible,
     'Startup pulse must not poll the log when activity is off')

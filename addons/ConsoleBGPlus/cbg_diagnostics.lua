@@ -30,6 +30,8 @@ local function header(context, version)
         'Input styling follows manual console opening; log growth only controls the output frame.',
         'Layout uses retained positive label bounds; raw native bounds can be 0x0 while hidden.',
         'Log watcher reads byte length only; no console input or output text is recorded.',
+        'Shared console.log growth may come from another client; source client is unknown.',
+        'native.activity controls native text; activity.enabled controls the frame watcher.',
         'Log availability depends on console_log 1 and timely writes.', '', '[Windower settings]'}
     for _, key in ipairs(native_fields) do
         if context.native_settings[key] ~= nil then
@@ -144,3 +146,4 @@ function diagnostics.new(root, version)
 end
 
 return diagnostics
+
