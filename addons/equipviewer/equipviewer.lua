@@ -26,8 +26,8 @@
         SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ]]
 _addon.name = 'Equipviewer'
-_addon.version = '3.3.2' -- draggable
-_addon.author = 'Tako, Rubenator'
+_addon.version = '3.3.3-dev.1'
+_addon.author = 'Tako, Rubenator, A'
 _addon.commands = { 'equipviewer', 'ev' }
 
 require('luau')
@@ -38,6 +38,7 @@ local texts = require('texts')
 local functions = require('functions')
 local packets = require('packets')
 local icon_extractor = require('icon_extractor')
+local Visibility = require('visibility')
 
 local equipment_data = {
     [0] =  {slot_name = 'main',       slot_id = 0,  display_pos = 0,  item_id = 0, image = nil},
@@ -105,6 +106,13 @@ local defaults = {
     hide_on_cutscene = true,
     left_justify = false,
     draggable = true,
+    visibility = {
+        mode = 'show', -- Preserve the live-tested default; auto is opt-in.
+        delay = 4,
+        fade_in = 0.12,
+        fade_out = 0.30,
+        hover = false,
+    },
 }
 settings = config.load(defaults)
 config.save(settings)
@@ -112,6 +120,73 @@ if settings.game_path then
     icon_extractor.ffxi_path(settings.game_path)
 end
 local last_encumbrance_bitfield = 0
+
+local visibility = Visibility.new(os.clock(), settings.visibility.mode)
+local ui_state = {
+    logged_in = windower.ffxi.get_info().logged_in,
+    zoning = false,
+    in_cutscene = false,
+    dragging = false,
+    mouse_x = nil,
+    mouse_y = nil,
+}
+local rendered_alpha, rendered_wanted
+
+local function suppressed()
+    return not ui_state.logged_in
+        or (ui_state.zoning and settings.hide_on_zone)
+        or (ui_state.in_cutscene and settings.hide_on_cutscene)
+end
+
+local function display_visible()
+    return visibility.alpha > 0 and not suppressed()
+end
+
+local function reveal_ui()
+    if settings.visibility.mode == 'auto' then
+        visibility:reveal(os.clock(), settings.visibility.delay)
+    end
+end
+
+local function pointer_over_grid()
+    local x, y = ui_state.mouse_x, ui_state.mouse_y
+    return x ~= nil and y ~= nil and x >= settings.pos.x and y >= settings.pos.y
+        and x < settings.pos.x + settings.size * 4 and y < settings.pos.y + settings.size * 4
+end
+
+-- A: one renderer owns visibility and opacity for every element. Data still
+-- updates while hidden; redraw only on a fade step or an actual UI change.
+local function refresh_visibility(force)
+    local alpha, wanted = visibility:step(os.clock(), settings.visibility, suppressed(),
+        ui_state.dragging, pointer_over_grid())
+    if not force and alpha == rendered_alpha and wanted == rendered_wanted then return end
+    rendered_alpha, rendered_wanted = alpha, wanted
+    local visible = alpha > 0 and not suppressed()
+    if bg_image then
+        bg_image:alpha(math.floor(settings.bg.alpha * alpha))
+        bg_image:visible(visible)
+        bg_image:draggable(settings.draggable and wanted and visible)
+    end
+    for _, slot in pairs(equipment_data) do
+        if slot.image then
+            slot.image:alpha(math.floor(settings.icon.alpha * alpha))
+            slot.image:visible(visible and slot.item_id ~= 0 and slot.item_id ~= 65535)
+        end
+    end
+    for key, slot in pairs(encumbrance_data) do
+        if slot.image then
+            slot.image:alpha(math.floor(settings.icon.alpha * 0.8 * alpha))
+            slot.image:visible(visible and settings.show_encumbrance
+                and bit.band(last_encumbrance_bitfield, bit.lshift(1, key)) ~= 0)
+        end
+    end
+    if ammo_count_text then
+        ammo_count_text:alpha(math.floor(settings.ammo_text.alpha * alpha))
+        ammo_count_text:stroke_alpha(math.floor(settings.ammo_text.stroke.alpha * alpha))
+        local count = equipment_data[3].count
+        ammo_count_text:visible(not not (visible and settings.show_ammo_count and count and count > 1))
+    end
+end
 
 -- Tracks movement of the draggable background. The background acts as the drag
 -- surface for the whole 4x4 EquipViewer grid; the remaining UI elements follow
@@ -191,6 +266,7 @@ local function update_equipment_slot(source, slot, bag, index, item, count)
         slot_data.count = count or slot_data.count or 0
     end
     if slot_data.image and item ~= nil then
+        if slot_data.item_id ~= item then reveal_ui() end
         if item == 0 or item == 65535 then -- empty slot
             slot_data.image:hide()
             slot_data.image:clear()
@@ -206,14 +282,14 @@ local function update_equipment_slot(source, slot, bag, index, item, count)
             end
             if windower.file_exists(icon_path) then
                 slot_data.image:path(icon_path)
-                slot_data.image:alpha(settings.icon.alpha)
-                slot_data.image:show()
+                slot_data.image:visible(display_visible())
             end
         end
         if slot_data.slot_name == 'ammo' then
             display_ammo_count(slot_data.count)
         end
         slot_data.image:update()
+        refresh_visibility(true)
     end
 end
 
@@ -232,7 +308,6 @@ local function setup_ui()
     -- Pass the root settings object so Windower's images library can persist
     -- drag-related changes when the mouse is released.
     bg_image = images.new(bg_image_settings, settings)
-    bg_image:show()
 
     for key, slot in pairs(equipment_data) do
         slot.item_id = 0
@@ -251,12 +326,20 @@ local function setup_ui()
 
     ammo_count_text = texts.new(settings.left_justify and ammo_count_text_settings_left_justify or ammo_count_text_settings)
     display_ammo_count()
+    local player = windower.ffxi.get_player()
+    ui_state.in_cutscene = player and player.status == 4 or false
+    ui_state.dragging = false
+    drag_state.dirty = false
+    drag_state.start_x, drag_state.start_y = nil, nil
+    reveal_ui()
+    refresh_visibility(true)
 end
 
 -- Keep every part of the display attached to the draggable background while it
 -- is moving. This avoids the background moving by itself while the icons lag
 -- behind until mouse release.
 windower.register_event('prerender', function()
+    refresh_visibility(false)
     if not bg_image or not settings.draggable then return end
 
     local x, y = bg_image:pos()
@@ -266,7 +349,19 @@ windower.register_event('prerender', function()
             drag_state.start_y = settings.pos.y
         end
         drag_state.dirty = true
+        ui_state.dragging = true
         sync_ui_to_position(x, y)
+    end
+end)
+
+windower.register_event('mouse', function(event_type, x, y)
+    ui_state.mouse_x, ui_state.mouse_y = x, y
+    if event_type == 1 and bg_image and bg_image:draggable() and bg_image:hover(x, y) then
+        ui_state.dragging = true
+        reveal_ui()
+    elseif event_type == 2 and ui_state.dragging then
+        ui_state.dragging = false
+        reveal_ui()
     end
 end)
 
@@ -275,13 +370,18 @@ end)
 -- in chat. We intentionally do not reject a blocked mouse event here because
 -- images.lua itself blocks the event while it owns the drag.
 windower.register_event('mouse', function(type, x, y, delta, blocked)
-    if type ~= 2 or not drag_state.dirty or not bg_image then return end
+    if type ~= 2 or not bg_image then return end
 
     local pos_x, pos_y = bg_image:pos()
+    -- A short drag may begin and end between prerender callbacks. Compare the
+    -- actual background position on release so its final coordinates still save.
+    if not drag_state.dirty and pos_x == settings.pos.x and pos_y == settings.pos.y then return end
+    local start_x = drag_state.start_x or settings.pos.x
+    local start_y = drag_state.start_y or settings.pos.y
     sync_ui_to_position(pos_x, pos_y)
     config.save(settings)
 
-    if drag_state.start_x ~= settings.pos.x or drag_state.start_y ~= settings.pos.y then
+    if start_x ~= settings.pos.x or start_y ~= settings.pos.y then
         log('Position saved to '..settings.pos.x..', '..settings.pos.y)
     end
 
@@ -304,12 +404,18 @@ end)
 
 -- Called whenever character logs out.
 windower.register_event('logout', function()
+    ui_state.logged_in = false
+    ui_state.dragging = false
+    visibility = Visibility.new(os.clock(), 'hide')
     clear_all_equipment_slots()
     destroy()
 end)
 
 -- Called whenever character logs in.
 windower.register_event('login', function()
+    ui_state.logged_in = true
+    ui_state.zoning = false
+    visibility = Visibility.new(os.clock(), settings.visibility.mode)
     setup_ui()
     update_equipment_slots('login')
 end)
@@ -321,6 +427,7 @@ windower.register_event('incoming chunk', function(id, original, modified, injec
         local index = packet['Inventory Index']
         local slot = packet['Equipment Slot']
         local bag = packet['Inventory Bag']
+        if equipment_data[slot].bag_id ~= bag or equipment_data[slot].index ~= index then reveal_ui() end
         equipment_data[slot].bag_id = bag
         equipment_data[slot].index = index
         update_equipment_slot:schedule(0, '0x050', slot, bag, index)
@@ -353,11 +460,12 @@ windower.register_event('incoming chunk', function(id, original, modified, injec
         local packet = packets.parse('incoming', original)
         display_encumbrance(packet['Encumbrance Flags'])
     elseif id == 0x0A then -- Finish Zone
-        show()
+        ui_state.zoning = false
+        refresh_visibility(true)
     elseif id == 0x0B then -- Zone
-        if settings.hide_on_zone then
-            hide()
-        end
+        ui_state.zoning = true
+        ui_state.dragging = false
+        refresh_visibility(true)
     end
 end)
 
@@ -371,6 +479,8 @@ end)
 
 -- Destroys all created ui objects
 function destroy()
+    rendered_alpha, rendered_wanted = nil, nil
+    ui_state.dragging = false
     if bg_image then
         bg_image:destroy()
         bg_image = nil
@@ -393,40 +503,6 @@ function destroy()
     end
 end
 
--- Shows appropriate ui objects
-function show()
-    if bg_image then
-        bg_image:show()
-    end
-    for key, slot_data in pairs(equipment_data) do
-        if slot_data.item_id ~= 0 and slot_data.image then
-            slot_data.image:show()
-        end
-    end
-    display_encumbrance()
-    display_ammo_count()
-end
-
--- Hides all ui objects
-function hide()
-    if bg_image then
-        bg_image:hide()
-    end
-    for key, slot_data in pairs(equipment_data) do
-        if slot_data.image then
-            slot_data.image:hide()
-        end
-    end
-    for key, slot_data in pairs(encumbrance_data) do
-        if slot_data.image then
-            slot_data.image:hide()
-        end
-    end
-    if ammo_count_text then
-        ammo_count_text:hide()
-    end
-end
-
 -- Moves ui object to correct spot based on 'display_pos' field
 function position(slot)
     local pos_x = settings.pos.x + ((slot.display_pos % 4) * settings.size)
@@ -437,13 +513,15 @@ end
 -- Clears all equipment slot data and hides ui object
 function clear_slot(slot)
     local slot_data = equipment_data[slot]
-    slot_data.image:hide()
-    slot_data.image:clear()
+    if slot_data.image then
+        slot_data.image:hide()
+        slot_data.image:clear()
+    end
     slot_data.item_id = 0
     slot_data.bag_id = nil
     slot_data.index = nil
     slot_data.count = nil
-    slot_data.image:update()
+    if slot_data.image then slot_data.image:update() end
 
     display_ammo_count()
 end
@@ -459,16 +537,18 @@ end
 -- flags based on provided bitfield number
 function display_encumbrance(bitfield)
     bitfield = bitfield or last_encumbrance_bitfield
+    if bitfield ~= last_encumbrance_bitfield then reveal_ui() end
     last_encumbrance_bitfield = bitfield
     for key, slot in pairs(encumbrance_data) do
         if slot.image then
-            if not settings.show_encumbrance or bit.band(bitfield, bit.lshift(1,key)) == 0 then
+            if not display_visible() or not settings.show_encumbrance or bit.band(bitfield, bit.lshift(1,key)) == 0 then
                 slot.image:hide()
             else
                 slot.image:show()
             end
         end
     end
+    refresh_visibility(true)
 end
 
 -- Displays appropriatly and possibly updates ammo count and ui object
@@ -476,21 +556,20 @@ function display_ammo_count(count)
     if not ammo_count_text then return end
     count = count or equipment_data[3] and equipment_data[3].count -- 3 == Ammo
     equipment_data[3].count = count
-    if not settings.show_ammo_count or  not count or count <= 1 then
+    -- Keep the text current even when visibility suppresses its drawing.
+    ammo_count_text:text(count and tostring(count) or '')
+    if not display_visible() or not settings.show_ammo_count or not count or count <= 1 then
         ammo_count_text:hide()
     else
-        ammo_count_text:text(count and tostring(count) or '')
         ammo_count_text:show()
     end
+    refresh_visibility(true)
 end
 
 -- Called when player status changes.
 windower.register_event('status change', function(new_status_id)
-    if new_status_id == 4 and settings.hide_on_cutscene then --Cutscene/Menu
-        hide()
-    else
-        show()
-    end
+    ui_state.in_cutscene = new_status_id == 4
+    refresh_visibility(true)
 end)
 
 -- Called when our addon is unloaded.
@@ -498,12 +577,87 @@ windower.register_event('unload', function()
     destroy()
 end)
 
+local function set_visibility_mode(mode)
+    settings.visibility.mode = mode
+    ui_state.dragging = false
+    reveal_ui()
+    config.save(settings)
+    refresh_visibility(true)
+    log('Visibility mode: '..mode)
+end
+
+local function toggle_argument(argument, current)
+    if argument == nil then return not current end
+    argument = tostring(argument):lower()
+    if S{'1', 'on', 'true', 'yes'}:contains(argument) then return true end
+    if S{'0', 'off', 'false', 'no'}:contains(argument) then return false end
+    return nil
+end
+
+local function bounded_number(argument, minimum, maximum)
+    local value = tonumber(argument)
+    if value and value == value and value >= minimum and value <= maximum then return value end
+end
+
+-- A: visibility commands are immediate. They do not need the legacy command
+-- path's settings reload and half-second delay before changing the display.
+local function handle_visibility_command(cmd, args)
+    if cmd == 'show' or cmd == 'hide' then
+        set_visibility_mode(cmd)
+    elseif cmd == 'auto' or cmd == 'autohide' then
+        local enabled = toggle_argument(args[1], settings.visibility.mode == 'auto')
+        if enabled == nil then
+            log('Usage: //ev autohide [on|off]')
+        else
+            set_visibility_mode(enabled and 'auto' or 'show')
+        end
+    elseif cmd == 'hover' then
+        local enabled = toggle_argument(args[1], settings.visibility.hover)
+        if enabled == nil then
+            log('Usage: //ev hover [on|off]')
+        else
+            settings.visibility.hover = enabled
+            config.save(settings)
+            refresh_visibility(true)
+            log('Hover reveal: '..tostring(enabled))
+        end
+    elseif cmd == 'delay' then
+        if args[1] then
+            local seconds = bounded_number(args[1], 0.1, 60)
+            if not seconds then log('Usage: //ev delay <seconds: 0.1-60>'); return true end
+            settings.visibility.delay = seconds
+            config.save(settings)
+            reveal_ui()
+        end
+        log('Autohide delay: '..settings.visibility.delay..' seconds')
+    elseif cmd == 'fade' then
+        if args[1] then
+            local fade_in = bounded_number(args[1], 0, 5)
+            local fade_out = bounded_number(args[2], 0, 5)
+            if not fade_in or not fade_out then
+                log('Usage: //ev fade <in seconds: 0-5> <out seconds: 0-5>'); return true
+            end
+            settings.visibility.fade_in, settings.visibility.fade_out = fade_in, fade_out
+            config.save(settings)
+        end
+        log('Fade in: '..settings.visibility.fade_in..'s | Fade out: '..settings.visibility.fade_out..'s')
+    elseif cmd == 'status' then
+        log(('EquipViewer %s | Mode=%s | Visible=%s | Alpha=%d%% | Delay=%ss | Hover=%s | Scale=%s | Pos=%s,%s'):format(
+            _addon.version, settings.visibility.mode, tostring(display_visible()), math.floor(visibility.alpha * 100),
+            settings.visibility.delay, tostring(settings.visibility.hover), settings.size / 32, settings.pos.x, settings.pos.y))
+    else
+        return false
+    end
+    return true
+end
+
 -- Called when the addon receives a command.
 windower.register_event('addon command', function (...)
-    config.reload(settings)
-    coroutine.sleep(0.5)
     local cmd  = (...) and (...):lower() or ''
     local cmd_args = {select(2, ...)}
+    if handle_visibility_command(cmd, cmd_args) then return end
+    config.reload(settings)
+    coroutine.sleep(0.5)
     if cmd == "gamepath" or cmd == "game_path" then
         if #cmd_args == 0 then
             error("Must provide path.")
@@ -673,12 +827,13 @@ windower.register_event('addon command', function (...)
     elseif cmd == 'lock' then
         settings.draggable = false
         config.save(settings)
-        if bg_image then bg_image:draggable(false) end
+        ui_state.dragging = false
+        refresh_visibility(true)
         log('EquipViewer position locked.')
     elseif cmd == 'unlock' then
         settings.draggable = true
         config.save(settings)
-        if bg_image then bg_image:draggable(true) end
+        refresh_visibility(true)
         log('EquipViewer position unlocked; drag anywhere on the grid/background to move it.')
     elseif cmd == 'drag' or cmd == 'draggable' then
         if #cmd_args >= 1 then
@@ -695,7 +850,8 @@ windower.register_event('addon command', function (...)
             settings.draggable = not settings.draggable
         end
         config.save(settings)
-        if bg_image then bg_image:draggable(settings.draggable) end
+        if not settings.draggable then ui_state.dragging = false end
+        refresh_visibility(true)
         log('EquipViewer draggable: '..tostring(settings.draggable))
     elseif cmd == 'testenc' then
         display_encumbrance(0xffff)
@@ -719,6 +875,12 @@ windower.register_event('addon command', function (...)
         end
     else
         log('HELP:')
+        log('ev show / hide: persistently show or hide the grid')
+        log('ev autohide [on|off]: toggle gear-change autohide (auto is an alias)')
+        log('ev delay <seconds>: seconds to stay visible in auto mode (0.1-60)')
+        log('ev fade <in seconds> <out seconds>: fade durations (0-5, 0 is instant)')
+        log('ev hover [on|off]: optional mouse reveal in auto mode')
+        log('ev status: report visibility, scale, and position')
         log('ev position <xpos> <ypos>: move to position (from top left)')
         log('ev size <pixels>: set pixel size of each item slot')
         log('ev scale <factor>: scale multiplier for each item slot (from 32px)')
