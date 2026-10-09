@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _addon.name = 'DistancePlus'
 _addon.author = 'Sammeh'
-_addon.version = '1.5.3'
+_addon.version = '1.5.4'
 _addon.command = 'dp'
 
 -- 1.3.0.2 Fixed up nil's per recommendation on submission to Windower 
@@ -50,6 +50,7 @@ _addon.command = 'dp'
 --         visual centering offset; retain <=15 as a disabled experiment.
 -- 1.5.2  Optional saved job auto-mode toggle and position reset commands.
 -- 1.5.3  Keep text within the current UI resolution, including after dragging.
+-- 1.5.4  Optional event/cutscene auto-hide matching EnemyBar2 status 4.
 
 require('tables')
 
@@ -151,6 +152,7 @@ defaults.ui = {
     -- Manual mode selection survives reloads, even when job-based selection
     -- is enabled temporarily. Turning AutoJob off restores this preference.
     autojob = false,
+    hideevents = true, -- Match EnemyBar2's cutscene/event state (status 4).
     mode = 'Default',
     decimals = 1,
     theme = 'ffxi',
@@ -234,6 +236,20 @@ local text_objects = {
     abilities = abilities,
     height = height,
 }
+
+-- EnemyBar2 hides its bars while FFXI reports status 4 (cutscenes/events).
+-- Track the event state regardless of the setting so toggling hideevents back
+-- on during an event works immediately. Do not touch saved appearance/layout.
+local in_event = false
+local function event_hide_active()
+    return settings.ui.hideevents and in_event
+end
+
+local function hide_event_text()
+    for _, obj in pairs(text_objects) do
+        if obj:visible() then obj:hide() end
+    end
+end
 
 local target_aliases = {
     all = 'all',
@@ -554,7 +570,7 @@ function displayabilities(distance,master_pet_distance,s,t)
       end
     end
     abilities.value = list
-    abilities:visible(showabilities)
+    abilities:visible(showabilities and not event_hide_active())
 end
 
 -- Original Sammeh job->mode mapping remains intact. We only invoke it when
@@ -607,6 +623,13 @@ local mob_cache = {
 local MOB_CACHE_TTL = 0.033  -- ~30 Hz refresh (every 2 frames at 60 FPS)
 
 windower.register_event('prerender', function()
+    -- Prevent ALL four displays from being repainted during an event.
+    -- The status-change callback hides immediately; this guard also covers
+    -- independent visibility updates (e.g. toggling the ability list).
+    if event_hide_active() then
+        hide_event_text()
+        return
+    end
     guard_screen_positions()
     local now = os.clock()
     
@@ -841,6 +864,7 @@ windower.register_event('addon command', function(command, ...)
     if command == 'help' or command == '?' then
         add_chat(8, 'Commands: mode | style | display. Changes save immediately.')
         add_chat(8, '//dp gun|bow|xbow|magic|ninjutsu|default  |  //dp autojob [on|off|toggle]')
+        add_chat(8, '//dp hideevents [on|off|toggle]  (hide during cutscenes/events)')
         add_chat(8, '//dp bg on|off  |  //dp bg alpha <0-255>  |  //dp bg color <r> <g> <b>')
         add_chat(8, '//dp stroke <0-10>|off  |  //dp stroke color <r> <g> <b>  |  //dp stroke alpha <0-255>')
         add_chat(8, '//dp font <name>  |  //dp size <n>  |  //dp bold on|off')
@@ -865,7 +889,8 @@ windower.register_event('addon command', function(command, ...)
             settings.ui.bands_enabled and 'on' or 'off', tostring(settings.ui.near_cutoff or 22),
             tostring(settings.ui.far_cutoff or 30), tostring(settings.ui.far_cutoff or 30),
             tostring(settings.ui.close_cutoff or 22), tostring(settings.ui.close_emphasis or 'off')))
-        add_chat(8, ('JA=%s | Height=%s'):format(tostring(showabilities), tostring(showheight)))
+        add_chat(8, ('JA=%s | Height=%s | HideEvents=%s'):format(
+            tostring(showabilities), tostring(showheight), settings.ui.hideevents and 'on' or 'off'))
 
     elseif command == 'gun' then
         choose_manual_mode('Gun')
@@ -892,6 +917,20 @@ windower.register_event('addon command', function(command, ...)
         MaxDistance = 25
         sync_close_emphasis(nil)
         add_chat(207, 'Mode: Default. FFXI distance bands are '..(settings.ui.bands_enabled and 'on.' or 'off.'))
+
+    elseif command == 'hideevents' then
+        local enabled = parse_on_off(args[1], settings.ui.hideevents)
+        if enabled == nil or #args > 1 then
+            add_chat(123, 'Usage: //dp hideevents [on|off|toggle]')
+        else
+            settings.ui.hideevents = enabled
+            save_settings()
+            if event_hide_active() then hide_event_text() end
+            -- Disabling event hiding lets normal prerender restore only the
+            -- text that would otherwise be visible (not all four blindly).
+            mob_cache.last_update = 0
+            add_chat(207, 'HideEvents='..(enabled and 'on.' or 'off.'))
+        end
 
     elseif command == 'autojob' then
         -- With no argument this is a toggle, like //dp ja and //dp height.
@@ -1178,7 +1217,7 @@ windower.register_event('addon command', function(command, ...)
             add_chat(123, 'Usage: //dp ja [on|off|toggle]')
         else
             showabilities = value
-            abilities:visible(showabilities)
+            abilities:visible(showabilities and not event_hide_active())
             if showabilities then displayabilities() end
             add_chat(207, 'ability list = '..(showabilities and 'on.' or 'off.'))
         end
@@ -1198,6 +1237,15 @@ windower.register_event('addon command', function(command, ...)
     end
 end)
 
+
+-- Match EnemyBar2's event/cutscene condition: status 4 means in-event.
+-- Clear the stale-target throttle on exit so the normal draw logic restores
+-- the appropriate elements promptly on the next frame.
+windower.register_event('status change', function(new_status_id)
+    in_event = new_status_id == 4
+    if event_hide_active() then hide_event_text() end
+    if not in_event then mob_cache.last_update = 0 end
+end)
 
 windower.register_event('job change', function()
     coroutine.sleep(2) -- sleeping because jobchange too fast doesn't show new abilities
