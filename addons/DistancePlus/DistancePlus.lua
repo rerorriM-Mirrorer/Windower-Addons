@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _addon.name = 'DistancePlus'
 _addon.author = 'Sammeh'
-_addon.version = '1.5.2'
+_addon.version = '1.5.3'
 _addon.command = 'dp'
 
 -- 1.3.0.2 Fixed up nil's per recommendation on submission to Windower 
@@ -49,6 +49,7 @@ _addon.command = 'dp'
 -- 1.5.1  Tune FFXI defaults: size 11, stroke 1, <=22 size emphasis with
 --         visual centering offset; retain <=15 as a disabled experiment.
 -- 1.5.2  Optional saved job auto-mode toggle and position reset commands.
+-- 1.5.3  Keep text within the current UI resolution, including after dragging.
 
 require('tables')
 
@@ -299,6 +300,91 @@ local function paint(obj, role)
     obj:color(c.red, c.green, c.blue)
 end
 
+-- ============================================================================
+-- VIEWPORT CLAMPING
+-- Texts with flags.right use coordinates measured from the RIGHT screen edge.
+-- We clamp their *visible rectangle*, not just the anchor point. Positions are
+-- adjusted only if necessary; ordinary placements remain exactly as saved.
+-- ============================================================================
+local screen_margin = 4
+local close_render_offset = 0  -- temporary +2px near-range centering, not saved
+
+local function clamp_number(value, minimum, maximum)
+    if maximum < minimum then return minimum end
+    return math.max(minimum, math.min(maximum, value))
+end
+
+local function screen_dimensions()
+    local ws = windower.get_windower_settings()
+    local w = ws and tonumber(ws.ui_x_res)
+    local h = ws and tonumber(ws.ui_y_res)
+    if not w or not h or w <= 0 or h <= 0 then return nil end
+    return w, h
+end
+
+local function clamp_text_to_screen(name, obj, screen_w, screen_h)
+    if not screen_w then
+        screen_w, screen_h = screen_dimensions()
+    end
+    if not screen_w then return false end
+
+    local x, y = obj:pos()
+    local width, height = obj:extents()
+    width = math.max(0, tonumber(width) or 0)
+    height = math.max(0, tonumber(height) or 0)
+    local margin = math.min(screen_margin, screen_w / 2, screen_h / 2)
+    local right = obj:right_justified()
+    local offset = name == 'main' and close_render_offset or 0
+
+    -- The right-justified text grows LEFT from its anchor. A near-range
+    -- visual offset moves that anchor right without changing saved coordinates.
+    local absolute_x = x + (right and screen_w or 0)
+    local left_limit = right and (margin + width - offset) or (margin - offset)
+    local right_limit = right and (screen_w - margin - offset)
+        or (screen_w - margin - width - offset)
+    if left_limit > right_limit then
+        -- If the text itself is wider than the screen, favor showing its
+        -- right end (right-justified) or left end (normal justification).
+        absolute_x = right and right_limit or left_limit
+    else
+        absolute_x = clamp_number(absolute_x, left_limit, right_limit)
+    end
+
+    local top_limit = margin
+    local bottom_limit = screen_h - margin - height
+    local clamped_y = clamp_number(y, top_limit, bottom_limit)
+    local clamped_x = absolute_x - (right and screen_w or 0)
+
+    if x ~= clamped_x or y ~= clamped_y then
+        obj:pos(clamped_x, clamped_y)
+        return true
+    end
+    return false
+end
+
+-- Check periodically because text extents can change (different distances,
+-- ability-list length, or font size), and immediately on resolution changes.
+local last_screen_w, last_screen_h, last_screen_check = nil, nil, 0
+local function guard_screen_positions(force)
+    local w, h = screen_dimensions()
+    if not w then return end
+    local resized = w ~= last_screen_w or h ~= last_screen_h
+    local now = os.clock()
+    if not force and not resized and now - last_screen_check < 0.20 then return end
+    last_screen_w, last_screen_h, last_screen_check = w, h, now
+
+    local changed = false
+    for name, obj in pairs(text_objects) do
+        changed = clamp_text_to_screen(name, obj, w, h) or changed
+    end
+    if changed then
+        config.save(settings)
+        if resized then
+            add_chat(207, ('adjusted off-screen text for %dx%d UI.'):format(w, h))
+        end
+    end
+end
+
 -- Close-range emphasis is applied directly to the Windower primitive so the
 -- saved base size/stroke in settings never gets overwritten by the temporary
 -- emphasis state. This also avoids position/extents churn being persisted.
@@ -322,10 +408,16 @@ local function sync_close_emphasis(distance_actual)
         display_stroke = base_stroke + stroke_delta
     end
 
+    -- A resolution change changes the screen-relative right anchor even if
+    -- the saved (negative) x-coordinate stays identical.
+    local ws = windower.get_windower_settings()
+    close_render_offset = active and mode == 'size'
+        and (tonumber(settings.ui.close_offset_x) or 2) or 0
     local base_x, base_y = distance:pos()
     local signature = table.concat({
         tostring(active), mode, tostring(display_size), tostring(display_stroke),
-        tostring(base_x), tostring(base_y)
+        tostring(base_x), tostring(base_y), tostring(ws.ui_x_res),
+        tostring(ws.ui_y_res), tostring(close_render_offset)
     }, '|')
 
     if signature ~= close_style_signature then
@@ -335,11 +427,8 @@ local function sync_close_emphasis(distance_actual)
         -- Main distance is right-justified. Growing the font expands leftward,
         -- so nudge the rendered primitive right while emphasized to keep the
         -- number visually centered. This does not alter the saved position.
-        local ws = windower.get_windower_settings()
         local rendered_x = base_x + (settings.main.flags.right and ws.ui_x_res or 0)
-        if active and mode == 'size' then
-            rendered_x = rendered_x + (tonumber(settings.ui.close_offset_x) or 2)
-        end
+        rendered_x = rendered_x + close_render_offset
         windower.text.set_location(distance._name, rendered_x, base_y)
 
         close_style_signature = signature
@@ -377,7 +466,13 @@ end
 local drag_pending = nil
 for name, obj in pairs(text_objects) do
     obj:register_event('drag', function(_, x, y)
-        drag_pending = {name = name, x = math.floor(x + 0.5), y = math.floor(y + 0.5)}
+        -- texts.lua moves the object first; pull it back inside the viewport
+        -- before the library automatically saves its new position on release.
+        clamp_text_to_screen(name, obj)
+        local real_x, real_y = obj:pos()
+        drag_pending = {
+            name = name, x = math.floor(real_x + 0.5), y = math.floor(real_y + 0.5)
+        }
     end)
 end
 
@@ -512,6 +607,7 @@ local mob_cache = {
 local MOB_CACHE_TTL = 0.033  -- ~30 Hz refresh (every 2 frames at 60 FPS)
 
 windower.register_event('prerender', function()
+    guard_screen_positions()
     local now = os.clock()
     
     -- ============================================================================
@@ -958,6 +1054,7 @@ windower.register_event('addon command', function(command, ...)
                 for_targets(requested, function(obj, name)
                     local home = default_positions[name]
                     obj:pos(home.x, home.y)
+                    clamp_text_to_screen(name, obj)
                 end)
                 -- Reset the render-only size-emphasis offset calculation too.
                 close_style_signature = nil
@@ -969,8 +1066,13 @@ windower.register_event('addon command', function(command, ...)
             if not x or not y or target == 'all' then
                 add_chat(123, 'Usage: //dp pos <x> <y> [main|pet|abilities|height] | //dp pos reset [target]')
             else
-                for_targets(target, function(obj) obj:pos(x, y) end)
-                save_settings(('%s position saved (%d, %d).'):format(target, x, y))
+                for_targets(target, function(obj, name)
+                    obj:pos(x, y)
+                    clamp_text_to_screen(name, obj)
+                end)
+                local visible_x, visible_y = text_objects[target]:pos()
+                save_settings(('%s position saved (%d, %d).'):format(
+                    target, visible_x, visible_y))
             end
         end
 
