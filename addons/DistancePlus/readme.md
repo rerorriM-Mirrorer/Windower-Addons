@@ -2,7 +2,7 @@
 
 Enhances Windower's distance display with range-aware coloring, pet distance, ability-range hints, draggable persistent positions, and configurable styling.
 
-## FFXI-style defaults (v1.5.3)
+## FFXI-style defaults (v1.5.4)
 
 Fresh installs now use the `ffxi` theme by default:
 
@@ -69,6 +69,27 @@ Most style commands accept an optional final target: `main`, `pet`, `abilities`,
 `//dp closeemphasis size` is the new default and enlarges the displayed number by `1`. `stroke` remains available to add `0.5` to the rendered outline. These are display-only changes and do not overwrite the saved base font size or stroke width.
 
 For compatibility with v1.4.1, `//dp cutoff <distance>` remains available as an alias for changing the near-band cutoff, and `//dp cutoff off` disables the bands.
+
+## Cutscene and event visibility (v1.5.4)
+
+DistancePlus now follows EnemyBar2's status-change cutscene handling:
+when Windower reports player status `4` (event/cutscene), all four text
+elements hide immediately. While the event continues, the render loop will
+not show them again. When the status changes back, normal target-based
+visibility resumes. No positions, visual settings, or distance calculations
+are modified.
+
+This behavior is enabled by default and saved per character. To toggle it:
+
+```text
+//dp hideevents on
+//dp hideevents off
+//dp hideevents           # toggle
+//dp status               # reports HideEvents=on/off
+```
+
+This matches EnemyBar2's **status-4** behavior; zoning/loading transitions that
+do not emit that status need separate in-game verification.
 
 ## Manual modes and optional job detection (v1.5.2)
 
