@@ -28,8 +28,9 @@
 
 _addon.name = 'invtracker'
 _addon.author = 'sylandro'
-_addon.version = '1.0.0'
+_addon.version = '1.0.1-a.20261009.1' -- Awake: safe movement and autohide
 _addon.language = 'English'
+_addon.commands = {'invtracker','inv'}
 
 config = require('config')
 images = require('images')
@@ -60,8 +61,16 @@ local hideKey = SCROLL_LOCK_KEY
 local is_hidden_by_cutscene = false
 local is_hidden_by_key = false
 
+-- Awake: presentation state only; inventory sorting and block indexing are untouched.
+local moving = false
+local drag = {active=false, x=0, y=0, original_x=0, original_y=0}
+local vis = {opacity=1, target=1, from=1, start=0, duration=1, until_time=0, manual='auto', step=-1}
+local function now() return os.clock() end
+local function message(s) windower.add_to_chat(207, '[InvTracker] '..s) end
+
 defaults = {}
 defaults.HideKey = SCROLL_LOCK_KEY
+defaults.autoHide = {enabled=false, hold=4, fadeIn=0.13, fadeOut=0.32}
 defaults.slotImage = {}
 defaults.slotImage.sort = true
 defaults.slotImage.spacing = 4
@@ -242,6 +251,166 @@ local refresh_inventory = false
 local refresh_linkshell = false
 local last_treasure_count = 0
 
+-- Translate existing primitives as one group. NEVER re-run slot index layout to drag.
+local function shift_grid(dx,dy)
+    if dx == 0 and dy == 0 then return end
+    for _, block in ipairs(slot_images) do
+        for _, slot in ipairs(block) do
+            if slot.background then
+                local x,y = slot.background:pos()
+                slot.background:pos(x+dx,y+dy)
+            end
+            if slot.box then
+                local x,y = slot.box:pos()
+                slot.box:pos(x+dx,y+dy)
+            end
+        end
+    end
+    xBase, yBase = xBase + dx, yBase + dy
+    settings.slotImage.pos.x, settings.slotImage.pos.y = xBase, yBase
+end
+
+local function apply_opacity(value)
+    vis.opacity = math.max(0,math.min(1,value))
+    local visible = vis.opacity > 0
+    for _,block in ipairs(slot_images) do
+        for _,slot in ipairs(block) do
+            if slot.background then
+                slot.background:alpha(math.floor((slot.bg_alpha or 255)*vis.opacity+0.5))
+                if visible then slot.background:show() else slot.background:hide() end
+            end
+            if slot.box then
+                slot.box:alpha(math.floor((slot.box_alpha or 255)*vis.opacity+0.5))
+                if visible then slot.box:show() else slot.box:hide() end
+            end
+        end
+    end
+end
+
+function refresh_visibility(immediate)
+    local target = 1
+    if is_hidden_by_key or is_hidden_by_cutscene or not inventory_loaded then
+        target = 0
+    elseif moving or vis.manual == 'show' then
+        target = 1
+    elseif vis.manual == 'hide' then
+        target = 0
+    elseif settings.autoHide.enabled and now() >= vis.until_time then
+        target = 0
+    end
+    if immediate then
+        vis.target, vis.from = target, target
+        apply_opacity(target)
+    elseif target ~= vis.target then
+        vis.from, vis.target, vis.start = vis.opacity, target, now()
+        vis.duration = math.max(0.01, tonumber(target == 1 and settings.autoHide.fadeIn or settings.autoHide.fadeOut) or 0.25)
+        if target == 1 and vis.opacity == 0 then apply_opacity(0.001) end
+    end
+end
+
+function activity()
+    if moving or not inventory_loaded or not settings.autoHide.enabled then return end
+    vis.manual = 'auto'
+    vis.until_time = now() + math.max(0.5,tonumber(settings.autoHide.hold) or 4)
+    refresh_visibility()
+end
+
+windower.register_event('prerender',function()
+    if settings.autoHide.enabled and vis.manual == 'auto' then refresh_visibility() end
+    if math.abs(vis.opacity-vis.target) < 0.001 then return end
+    local progress = math.max(0,math.min(1,(now()-vis.start)/vis.duration))
+    local alpha = vis.from+(vis.target-vis.from)*progress
+    local step = math.floor(alpha*24+0.5)
+    if step ~= vis.step or progress == 1 then
+        vis.step = step
+        apply_opacity(progress == 1 and vis.target or alpha)
+    end
+end)
+
+-- Move mode consumes mouse input so the camera does not turn while dragging.
+windower.register_event('mouse',function(kind,x,y,delta,blocked)
+    if not moving then return end
+    if blocked and not drag.active then return end
+    if kind == 1 and not drag.active then
+        drag.active, drag.x, drag.y = true,x,y
+        return true
+    elseif kind == 0 and drag.active then
+        shift_grid(x-drag.x,y-drag.y)
+        drag.x,drag.y = x,y
+        return true
+    elseif kind == 2 and drag.active then
+        shift_grid(x-drag.x,y-drag.y)
+        moving,drag.active = false,false
+        config.save(settings)
+        message(('Position saved: %d, %d'):format(xBase,yBase))
+        refresh_visibility()
+        return true
+    end
+end)
+
+windower.register_event('addon command',function(command,...)
+    local args = {...}
+    local cmd = (command or 'status'):lower()
+    if cmd == 'move' then
+        if not inventory_loaded then message('Log in first.') return end
+        drag.original_x,drag.original_y = xBase,yBase
+        moving,drag.active = true,false
+        refresh_visibility(true)
+        message('Click-drag anywhere; release to save. //inv cancel to revert.')
+    elseif cmd == 'cancel' then
+        if not moving then message('Not moving.') return end
+        drag.active,moving = false,false
+        shift_grid(drag.original_x-xBase,drag.original_y-yBase)
+        refresh_visibility()
+        message('Move cancelled.')
+    elseif cmd == 'pos' or cmd == 'position' then
+        local x,y = tonumber(args[1]),tonumber(args[2])
+        if args[1] == 'reset' then x,y = defaults.slotImage.pos.x,defaults.slotImage.pos.y end
+        if not x or not y then
+            message(('Position %d, %d. Use //inv pos X Y or //inv pos reset.'):format(xBase,yBase))
+            return
+        end
+        moving,drag.active = false,false
+        shift_grid(math.floor(x)-xBase,math.floor(y)-yBase)
+        config.save(settings)
+        refresh_visibility()
+        message(('Position saved: %d, %d'):format(xBase,yBase))
+    elseif cmd == 'autohide' then
+        local arg = args[1] and tostring(args[1]):lower() or ''
+        if arg == 'on' or arg == 'off' then
+            settings.autoHide.enabled = (arg == 'on')
+            vis.manual = 'auto'
+            vis.until_time = now() + (tonumber(settings.autoHide.hold) or 4)
+            config.save(settings)
+            refresh_visibility()
+        end
+        message('Autohide '..(settings.autoHide.enabled and 'ON' or 'OFF'))
+    elseif cmd == 'hold' then
+        local value = tonumber(args[1])
+        if value then
+            settings.autoHide.hold = math.max(0.5, math.min(30,value))
+            config.save(settings)
+        end
+        message('Hold '..tostring(settings.autoHide.hold)..' seconds')
+    elseif cmd == 'show' then
+        vis.manual = 'show'
+        refresh_visibility()
+        message('Pinned visible.')
+    elseif cmd == 'hide' then
+        vis.manual = 'hide'
+        refresh_visibility()
+        message('Hidden; inventory changes can reveal it again.')
+    elseif cmd == 'help' or cmd == 'status' then
+        message(('Position %d,%d | autohide %s | hold %ss | mode %s'):format(
+            xBase,yBase, settings.autoHide.enabled and 'on' or 'off',settings.autoHide.hold,vis.manual))
+        if cmd == 'help' then
+            message('move / cancel / pos X Y / pos reset / autohide on|off / hold SECONDS / show / hide / status')
+        end
+    else
+        message('Unknown command. Use //inv help.')
+    end
+end)
+
 config.register(settings, function(settings)
     hideKey = settings.HideKey
     xBase = settings.slotImage.pos.x
@@ -266,11 +435,11 @@ windower.register_event('logout', function(...)
 end)
 
 windower.register_event('add item', function(_bag,_index,id,...)
-    if (id ~= GIL_ITEM_ID and id ~= NO_ITEM_ID) then refresh_items = true end
+    if (id ~= GIL_ITEM_ID and id ~= NO_ITEM_ID) then refresh_items = true; activity() end
 end)
 
 windower.register_event('remove item', function(_bag,_index,id,...)
-    if (id ~= GIL_ITEM_ID and id ~= NO_ITEM_ID) then refresh_items = true end
+    if (id ~= GIL_ITEM_ID and id ~= NO_ITEM_ID) then refresh_items = true; activity() end
 end)
 
 windower.register_event('linkshell change', function(new,old)
@@ -287,8 +456,10 @@ windower.register_event('incoming chunk',function(id,org,_modi,_is_injected,_is_
         update()
     elseif (id == TREASURE_FIND_ITEM_PACKET) then
         update_treasure_only()
+        activity()
     elseif (id == TREASURE_LOT_ITEM_PACKET) then
         update_treasure_only()
+        activity()
     elseif (id == INVENTORY_SIZE_PACKET) then
         update_if_different_size(org)
     end
@@ -297,8 +468,10 @@ end)
 windower.register_event('outgoing chunk',function(id,org,_modi,_is_injected,_is_blocked)
     if (id == EQUIPMENT_CHANGED_PACKET or id == EQUIPSET_CHANGED_PACKET) then
         refresh_all = true
+        activity()
     elseif (id == BAZAAR_PRICE_PACKET) then
         refresh_inventory = true
+        activity()
     elseif (id == EQUIP_LINKSHELL_PACKET) then
         refresh_linkshell = true
     end
@@ -327,7 +500,8 @@ function initialize()
     refresh_all = false
     refresh_items = false
     refresh_inventory = false
-    if not is_hidden_by_key and not is_hidden_by_cutscene then show() end
+    vis.until_time = now() + (tonumber(settings.autoHide.hold) or 4)
+    refresh_visibility(true)
 end
 
 function update_all()
@@ -599,11 +773,14 @@ function print_slot_background(slot_color, max_columns, last_index)
     local s = settings.slotImage
     if slot_image.background == nil then
         slot_image.background = images.new(s.background)
-        slot_image.background:pos(current_x,current_y)
-    end
+        end
+    -- Refresh position every time, not only when the image was first created.
+    slot_image.background:pos(current_x,current_y)
     slot_image.background:width(s.background.size.width)
     slot_image.background:height(s.background.size.height)
-    slot_image.background:alpha(slot_color.alpha)
+    slot_image.bg_alpha = slot_color.alpha
+    slot_image.background:alpha(math.floor(slot_color.alpha*vis.opacity+0.5))
+    if vis.opacity == 0 then slot_image.background:hide() end
     slot_image.background:color(slot_color.red,slot_color.green,slot_color.blue)
 end
 
@@ -612,12 +789,14 @@ function print_slot_box(slot_color, max_columns, last_index)
     local s = settings.slotImage
     if slot_image.box == nil then
         slot_image.box = images.new(s.box)
-        slot_image.box:pos(current_x,current_y)
-    end
+        end
+    slot_image.box:pos(current_x,current_y)
     slot_image.box:width(s.box.size.width)
     slot_image.box:height(s.box.size.height)
     slot_image.box:color(slot_color.red,slot_color.green,slot_color.blue)
-    slot_image.box:alpha(slot_color.alpha)
+    slot_image.box_alpha = slot_color.alpha
+    slot_image.box:alpha(math.floor(slot_color.alpha*vis.opacity+0.5))
+    if vis.opacity == 0 then slot_image.box:hide() end
 end
 
 function update_coordinates()
@@ -669,21 +848,13 @@ function is_cutscene(status_id)
 end
 
 function toggle_display_if_cutscene(is_cutscene_playing)
-    if (is_cutscene_playing) and (not is_hidden_by_key) then
-        is_hidden_by_cutscene = true
-        hide()
-    elseif (not is_cutscene_playing) and (not is_hidden_by_key) then
-        is_hidden_by_cutscene = false
-        show()
-    end
+    is_hidden_by_cutscene = is_cutscene_playing
+    refresh_visibility()
 end
 
 function toggle_display_if_hide_key_is_pressed(key_pressed, key_down)
-    if (key_pressed == hideKey) and (key_down) and (is_hidden_by_key) and (not is_hidden_by_cutscene) then
-        is_hidden_by_key = false
-        show()
-    elseif (key_pressed == hideKey) and (key_down) and (not is_hidden_by_key) and (not is_hidden_by_cutscene) then
-        is_hidden_by_key = true
-        hide()
+    if key_pressed == hideKey and key_down then
+        is_hidden_by_key = not is_hidden_by_key
+        refresh_visibility()
     end
 end
