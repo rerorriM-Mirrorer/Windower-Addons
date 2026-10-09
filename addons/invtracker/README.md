@@ -20,11 +20,12 @@ This is a test build; it has **not** been live-tested in FFXI. The existing
 inventory grouping and item tracking have not been intentionally changed.
 
 - `//inv move` — click and drag **anywhere on the screen**. Every slot follows
-  one shared movement delta. Releasing the left mouse button saves the position.
+  one shared movement delta. Releasing the left mouse button saves the position and restarts the
+  visibility hold timer.
 - `//inv cancel` — leave move mode without saving a drag.
 - `//inv pos X Y` — set the traditional, resolution-relative coordinates.
 - `//inv pos reset` — restore the original offset (`-365 -50`).
-- `//inv autohide on` / `//inv autohide off` — opt in/out of reveal on inventory
+- `//inv autohide` — toggle on/off; `//inv autohide on` / `//inv autohide off` set the state explicitly. Opt in/out of reveal on inventory
   or equipment activity; default is **off**.
 - `//inv hold 4` — set seconds to remain fully visible following activity
   (range 0.5–30; default 4).
@@ -45,3 +46,18 @@ try `//inv move`, confirm the grid shape remains unchanged while dragging,
 reload to verify its saved location, and finally try
 `//inv autohide on` with an item added/removed. Check both short/fat and
 low-resolution UI layouts and that a cutscene does not reveal the tracker.
+
+### Test build .2 corrections (2026-10-09)
+
+- Every background/border primitive has independent images.lua settings
+  (position, alpha and color). Sharing settings made drag collapse multiple
+  slots at the same coordinates and interfered with status redraws.
+- Native per-slot dragging is disabled: only `//inv move` controls movement.
+- Redrawing inventory status restores image visibility when the HUD is shown.
+  Underlying inventory packet/update logic is unchanged.
+- Bare `//inv autohide` toggles on/off; explicit on/off remain supported.
+- Moving the HUD starts a fresh auto-hide hold period on release.
+
+Regression checks: drag and release (HUD should remain visible), add/remove an
+inventory item both with autohide on and off (slot colors/count change),
+reload (position persists), and run the bare autohide command twice.
