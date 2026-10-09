@@ -28,7 +28,7 @@
 
 _addon.name = 'invtracker'
 _addon.author = 'sylandro'
-_addon.version = '1.0.1-a.20261009.1' -- Awake: safe movement and autohide
+_addon.version = '1.0.1-a.20261009.2' -- Awake: stable independent image primitives and autohide
 _addon.language = 'English'
 _addon.commands = {'invtracker','inv'}
 
@@ -251,6 +251,34 @@ local refresh_inventory = false
 local refresh_linkshell = false
 local last_treasure_count = 0
 
+-- Awake: Windower images.new(table) RETAINS the supplied settings table.
+-- Its pos()/alpha()/color() methods write back to that table. Passing the
+-- shared s.box/s.background prototype made every slot report the coordinates
+-- of the last drawn slot. On drag, all primitives stacked at one location;
+-- shared color/alpha state could also interfere with inventory redraws.
+-- Allocate one independent settings tree per primitive, with native single-
+-- image dragging off. //inv move is the only supported drag mechanism.
+local function independent_image_settings(prototype)
+    return {
+        pos = {x = 0, y = 0},
+        visible = true,
+        draggable = false,
+        size = {
+            width = prototype.size.width,
+            height = prototype.size.height,
+        },
+        color = {alpha = 255, red = 255, green = 255, blue = 255},
+        texture = {
+            path = prototype.texture.path,
+            fit = prototype.texture.fit,
+        },
+        repeatable = {
+            x = prototype.repeatable.x,
+            y = prototype.repeatable.y,
+        },
+    }
+end
+
 -- Translate existing primitives as one group. NEVER re-run slot index layout to drag.
 local function shift_grid(dx,dy)
     if dx == 0 and dy == 0 then return end
@@ -341,6 +369,7 @@ windower.register_event('mouse',function(kind,x,y,delta,blocked)
     elseif kind == 2 and drag.active then
         shift_grid(x-drag.x,y-drag.y)
         moving,drag.active = false,false
+        vis.until_time = now() + (tonumber(settings.autoHide.hold) or 4)
         config.save(settings)
         message(('Position saved: %d, %d'):format(xBase,yBase))
         refresh_visibility()
@@ -354,13 +383,16 @@ windower.register_event('addon command',function(command,...)
     if cmd == 'move' then
         if not inventory_loaded then message('Log in first.') return end
         drag.original_x,drag.original_y = xBase,yBase
+        vis.manual = 'auto'
         moving,drag.active = true,false
+        vis.until_time = now() + (tonumber(settings.autoHide.hold) or 4)
         refresh_visibility(true)
         message('Click-drag anywhere; release to save. //inv cancel to revert.')
     elseif cmd == 'cancel' then
         if not moving then message('Not moving.') return end
         drag.active,moving = false,false
         shift_grid(drag.original_x-xBase,drag.original_y-yBase)
+        vis.until_time = now() + (tonumber(settings.autoHide.hold) or 4)
         refresh_visibility()
         message('Move cancelled.')
     elseif cmd == 'pos' or cmd == 'position' then
@@ -372,13 +404,15 @@ windower.register_event('addon command',function(command,...)
         end
         moving,drag.active = false,false
         shift_grid(math.floor(x)-xBase,math.floor(y)-yBase)
+        vis.manual = 'auto'
+        vis.until_time = now() + (tonumber(settings.autoHide.hold) or 4)
         config.save(settings)
         refresh_visibility()
         message(('Position saved: %d, %d'):format(xBase,yBase))
     elseif cmd == 'autohide' then
         local arg = args[1] and tostring(args[1]):lower() or ''
-        if arg == 'on' or arg == 'off' then
-            settings.autoHide.enabled = (arg == 'on')
+        if arg == '' or arg == 'on' or arg == 'off' then
+            settings.autoHide.enabled = (arg == '') and (not settings.autoHide.enabled) or (arg == 'on')
             vis.manual = 'auto'
             vis.until_time = now() + (tonumber(settings.autoHide.hold) or 4)
             config.save(settings)
@@ -404,7 +438,7 @@ windower.register_event('addon command',function(command,...)
         message(('Position %d,%d | autohide %s | hold %ss | mode %s'):format(
             xBase,yBase, settings.autoHide.enabled and 'on' or 'off',settings.autoHide.hold,vis.manual))
         if cmd == 'help' then
-            message('move / cancel / pos X Y / pos reset / autohide on|off / hold SECONDS / show / hide / status')
+            message('move / cancel / pos X Y / pos reset / autohide [on|off] / hold SECONDS / show / hide / status')
         end
     else
         message('Unknown command. Use //inv help.')
@@ -776,15 +810,15 @@ function print_slot_background(slot_color, max_columns, last_index)
     local slot_image = slot_images[current_block][current_slot]
     local s = settings.slotImage
     if slot_image.background == nil then
-        slot_image.background = images.new(s.background)
-        end
+        slot_image.background = images.new(independent_image_settings(s.background))
+    end
     -- Refresh position every time, not only when the image was first created.
     slot_image.background:pos(current_x,current_y)
     slot_image.background:width(s.background.size.width)
     slot_image.background:height(s.background.size.height)
     slot_image.bg_alpha = slot_color.alpha
     slot_image.background:alpha(math.floor(slot_color.alpha*vis.opacity+0.5))
-    if vis.opacity == 0 then slot_image.background:hide() end
+    if vis.opacity > 0 then slot_image.background:show() else slot_image.background:hide() end
     slot_image.background:color(slot_color.red,slot_color.green,slot_color.blue)
 end
 
@@ -792,15 +826,15 @@ function print_slot_box(slot_color, max_columns, last_index)
     local slot_image = slot_images[current_block][current_slot]
     local s = settings.slotImage
     if slot_image.box == nil then
-        slot_image.box = images.new(s.box)
-        end
+        slot_image.box = images.new(independent_image_settings(s.box))
+    end
     slot_image.box:pos(current_x,current_y)
     slot_image.box:width(s.box.size.width)
     slot_image.box:height(s.box.size.height)
     slot_image.box:color(slot_color.red,slot_color.green,slot_color.blue)
     slot_image.box_alpha = slot_color.alpha
     slot_image.box:alpha(math.floor(slot_color.alpha*vis.opacity+0.5))
-    if vis.opacity == 0 then slot_image.box:hide() end
+    if vis.opacity > 0 then slot_image.box:show() else slot_image.box:hide() end
 end
 
 function update_coordinates()
