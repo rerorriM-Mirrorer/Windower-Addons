@@ -2,7 +2,7 @@
 
 Enhances Windower's distance display with range-aware coloring, pet distance, ability-range hints, draggable persistent positions, and configurable styling.
 
-## FFXI-style defaults (v1.5.2)
+## FFXI-style defaults (v1.5.3)
 
 Fresh installs now use the `ffxi` theme by default:
 
@@ -21,7 +21,7 @@ The distance-band presentation applies in **Default** mode. Bow/XBow/Gun/Magic/N
 
 ## Position and styling
 
-DistancePlus text elements are draggable and positions save automatically on mouse release. A resolution change can leave elements off-screen; use the reset commands to recover them.
+DistancePlus text elements are draggable and positions save automatically on mouse release. **v1.5.3 automatically clamps their visible rectangles inside the UI resolution**, including after resolution changes, drags, and manual position commands. It handles right-justified coordinates and the +2 px near-range centering offset. Only positions that actually need adjusting are changed and saved; it prints a confirmation if it rescues off-screen text after a resolution change. If an element is larger than the entire screen, the visible side is prioritized. You can still use the reset commands to return to the original layout.
 
 Common commands:
 
