@@ -399,7 +399,7 @@ windower.register_event('addon command',function(command,...)
     elseif cmd == 'hide' then
         vis.manual = 'hide'
         refresh_visibility()
-        message('Hidden; inventory changes can reveal it again.')
+        message(settings.autoHide.enabled and 'Hidden until next inventory change or //inv show.' or 'Hidden until //inv show.')
     elseif cmd == 'help' or cmd == 'status' then
         message(('Position %d,%d | autohide %s | hold %ss | mode %s'):format(
             xBase,yBase, settings.autoHide.enabled and 'on' or 'off',settings.autoHide.hold,vis.manual))
@@ -637,6 +637,8 @@ function update_treasure_bag(config,bag)
         if (treasure_count ~= last_treasure_count) then
             initialize_block()
             for k, _v in ipairs(slot_images[current_block]) do
+                slot_images[current_block][k].bg_alpha = 0
+                slot_images[current_block][k].box_alpha = 0
                 slot_images[current_block][k].background:alpha(0)
                 slot_images[current_block][k].box:alpha(0)
             end
@@ -665,6 +667,8 @@ function update_temp_bag(config, bag)
             end
         end
         for k, _v in ipairs(slot_images[current_block]) do
+            slot_images[current_block][k].bg_alpha = 0
+            slot_images[current_block][k].box_alpha = 0
             slot_images[current_block][k].background:alpha(0)
             slot_images[current_block][k].box:alpha(0)
         end
