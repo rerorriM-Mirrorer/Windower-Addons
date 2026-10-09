@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _addon.name = 'DistancePlus'
 _addon.author = 'Sammeh'
-_addon.version = '1.5.0'
+_addon.version = '1.5.2'
 _addon.command = 'dp'
 
 -- 1.3.0.2 Fixed up nil's per recommendation on submission to Windower 
@@ -46,6 +46,9 @@ _addon.command = 'dp'
 -- 1.4.1  numeric cutoff coloring for Default mode (near/far roles).
 -- 1.5.0  FFXI-first defaults, three distance bands, and optional close-range
 --         emphasis for Default mode.
+-- 1.5.1  Tune FFXI defaults: size 11, stroke 1, <=22 size emphasis with
+--         visual centering offset; retain <=15 as a disabled experiment.
+-- 1.5.2  Optional saved job auto-mode toggle and position reset commands.
 
 require('tables')
 
@@ -59,8 +62,8 @@ defaults.main.pos = {}
 defaults.main.pos.x = -178
 defaults.main.pos.y = 21
 defaults.main.text = {}
-defaults.main.text.font = 'Arial'
-defaults.main.text.size = 14
+defaults.main.text.font = 'Verdana'
+defaults.main.text.size = 11
 defaults.main.flags = {}
 defaults.main.flags.right = true
 
@@ -69,8 +72,8 @@ defaults.pettxt.pos = {}
 defaults.pettxt.pos.x = -178
 defaults.pettxt.pos.y = 45
 defaults.pettxt.text = {}
-defaults.pettxt.text.font = 'Arial'
-defaults.pettxt.text.size = 14
+defaults.pettxt.text.font = 'Verdana'
+defaults.pettxt.text.size = 11
 defaults.pettxt.flags = {}
 defaults.pettxt.flags.right = true
 
@@ -80,7 +83,7 @@ defaults.abilitytxt.pos = {}
 defaults.abilitytxt.pos.x = -80
 defaults.abilitytxt.pos.y = 45
 defaults.abilitytxt.text = {}
-defaults.abilitytxt.text.font = 'Arial'
+defaults.abilitytxt.text.font = 'Verdana'
 defaults.abilitytxt.text.size = 10
 defaults.abilitytxt.flags = {}
 defaults.abilitytxt.flags.right = true
@@ -90,8 +93,8 @@ defaults.heighttxt.pos = {}
 defaults.heighttxt.pos.x = -238
 defaults.heighttxt.pos.y = 21
 defaults.heighttxt.text = {}
-defaults.heighttxt.text.font = 'Arial'
-defaults.heighttxt.text.size = 14
+defaults.heighttxt.text.font = 'Verdana'
+defaults.heighttxt.text.size = 11
 defaults.heighttxt.flags = {}
 defaults.heighttxt.flags.right = true
 
@@ -116,7 +119,7 @@ local function complete_text_defaults(t)
     if t.text.green == nil then t.text.green = 255 end
     if t.text.blue == nil then t.text.blue = 255 end
     t.text.stroke = t.text.stroke or {}
-    if t.text.stroke.width == nil then t.text.stroke.width = 1.5 end
+    if t.text.stroke.width == nil then t.text.stroke.width = 1 end
     if t.text.stroke.alpha == nil then t.text.stroke.alpha = 255 end
     if t.text.stroke.red == nil then t.text.stroke.red = 20 end
     if t.text.stroke.green == nil then t.text.stroke.green = 10 end
@@ -134,16 +137,32 @@ complete_text_defaults(defaults.pettxt)
 complete_text_defaults(defaults.abilitytxt)
 complete_text_defaults(defaults.heighttxt)
 
+-- Capture the original safe coordinates before config.load() creates mutable
+-- per-character Settings objects. Resolution changes cannot affect these.
+local default_positions = {
+    main = {x = defaults.main.pos.x, y = defaults.main.pos.y},
+    pet = {x = defaults.pettxt.pos.x, y = defaults.pettxt.pos.y},
+    abilities = {x = defaults.abilitytxt.pos.x, y = defaults.abilitytxt.pos.y},
+    height = {x = defaults.heighttxt.pos.x, y = defaults.heighttxt.pos.y},
+}
+
 defaults.ui = {
-    decimals = 2,
+    -- Manual mode selection survives reloads, even when job-based selection
+    -- is enabled temporarily. Turning AutoJob off restores this preference.
+    autojob = false,
+    mode = 'Default',
+    decimals = 1,
     theme = 'ffxi',
     bands_enabled = true,
     near_cutoff = 22,
     far_cutoff = 30,
-    close_cutoff = 15,
-    close_emphasis = 'stroke',
+    close_cutoff = 22,
+    close_emphasis = 'size',
     close_size_delta = 1,
     close_stroke_delta = 0.5,
+    close_offset_x = 2,
+    -- Reserved for a future A/B test; intentionally not active.
+    inner_close_cutoff = 15,
 }
 
 -- Semantic colors keep range logic meaningful while allowing the palette to
@@ -196,7 +215,7 @@ local themes = {
 settings = config.load(defaults)
 
 local function distance_format()
-    local decimals = tonumber(settings.ui.decimals) or 2
+    local decimals = tonumber(settings.ui.decimals) or 1
     decimals = math.max(0, math.min(12, math.floor(decimals)))
     return '${value||%.'..decimals..'f}'
 end
@@ -286,12 +305,12 @@ end
 local close_style_signature = nil
 local function sync_close_emphasis(distance_actual)
     local mode = (settings.ui.close_emphasis or 'off'):lower()
-    local cutoff = tonumber(settings.ui.close_cutoff) or 15
+    local cutoff = tonumber(settings.ui.close_cutoff) or 22
     local active = option == 'Default' and settings.ui.bands_enabled and
         mode ~= 'off' and distance_actual and distance_actual <= cutoff
 
-    local base_size = tonumber(settings.main.text.size) or 14
-    local base_stroke = tonumber(settings.main.text.stroke.width) or 1.5
+    local base_size = tonumber(settings.main.text.size) or 11
+    local base_stroke = tonumber(settings.main.text.stroke.width) or 1
     local size_delta = tonumber(settings.ui.close_size_delta) or 1
     local stroke_delta = tonumber(settings.ui.close_stroke_delta) or 0.5
     local display_size = base_size
@@ -303,13 +322,26 @@ local function sync_close_emphasis(distance_actual)
         display_stroke = base_stroke + stroke_delta
     end
 
+    local base_x, base_y = distance:pos()
     local signature = table.concat({
-        tostring(active), mode, tostring(display_size), tostring(display_stroke)
+        tostring(active), mode, tostring(display_size), tostring(display_stroke),
+        tostring(base_x), tostring(base_y)
     }, '|')
 
     if signature ~= close_style_signature then
         windower.text.set_font_size(distance._name, display_size)
         windower.text.set_stroke_width(distance._name, display_stroke)
+
+        -- Main distance is right-justified. Growing the font expands leftward,
+        -- so nudge the rendered primitive right while emphasized to keep the
+        -- number visually centered. This does not alter the saved position.
+        local ws = windower.get_windower_settings()
+        local rendered_x = base_x + (settings.main.flags.right and ws.ui_x_res or 0)
+        if active and mode == 'size' then
+            rendered_x = rendered_x + (tonumber(settings.ui.close_offset_x) or 2)
+        end
+        windower.text.set_location(distance._name, rendered_x, base_y)
+
         close_style_signature = signature
     end
 end
@@ -359,9 +391,20 @@ windower.register_event('mouse', function(type)
 end)
 
 
-option = "Default"
+-- Keep the player's deliberate mode separate from transient AutoJob choices.
+-- An older settings.xml will simply receive the new defaults on config.load().
+local valid_modes = {Default = true, Magic = true, Gun = true,
+    Bow = true, Xbow = true, Ninjutsu = true}
+if not valid_modes[settings.ui.mode] then settings.ui.mode = 'Default' end
+option = settings.ui.mode
 showabilities = false
 showheight = false
+
+local function choose_manual_mode(mode)
+    option = mode
+    settings.ui.mode = mode
+    config.save(settings)
+end
 
 -- ============================================================================
 -- OPTIMIZATION: Pre-compute squared distance thresholds
@@ -419,6 +462,8 @@ function displayabilities(distance,master_pet_distance,s,t)
     abilities:visible(showabilities)
 end
 
+-- Original Sammeh job->mode mapping remains intact. We only invoke it when
+-- AutoJob is on; it deliberately does not overwrite the saved manual mode.
 function check_job()
     windower.add_to_chat(8,'*****DP Job Selection:'..self.main_job..'*****')
     if self.main_job == 'RDM' or self.main_job == 'BLM' or self.main_job == 'GEO' or self.main_job == 'SCH' or self.main_job == 'WHM' or self.main_job == 'BRD'  then
@@ -699,11 +744,12 @@ windower.register_event('addon command', function(command, ...)
 
     if command == 'help' or command == '?' then
         add_chat(8, 'Commands: mode | style | display. Changes save immediately.')
-        add_chat(8, '//dp gun|bow|xbow|magic|ninjutsu|default')
+        add_chat(8, '//dp gun|bow|xbow|magic|ninjutsu|default  |  //dp autojob [on|off|toggle]')
         add_chat(8, '//dp bg on|off  |  //dp bg alpha <0-255>  |  //dp bg color <r> <g> <b>')
         add_chat(8, '//dp stroke <0-10>|off  |  //dp stroke color <r> <g> <b>  |  //dp stroke alpha <0-255>')
         add_chat(8, '//dp font <name>  |  //dp size <n>  |  //dp bold on|off')
-        add_chat(8, '//dp lock | unlock  |  //dp pos <x> <y>  |  //dp decimals <0-12>')
+        add_chat(8, '//dp lock | unlock  |  //dp pos <x> <y> | reset [main|pet|abilities|height|all]')
+        add_chat(8, '//dp decimals <0-12>')
         add_chat(8, '//dp theme classic|ffxi|mono  |  //dp color normal|good|warning|best|danger|near|mid|far <r> <g> <b>')
         add_chat(8, '//dp bands on|off | near <n> | far <n> | <near> <far>')
         add_chat(8, '//dp close <distance>  |  //dp closeemphasis stroke|size|off')
@@ -714,41 +760,67 @@ windower.register_event('addon command', function(command, ...)
     elseif command == 'status' or command == 'settings' then
         local x, y = distance:pos()
         local r, g, b = distance:bg_color()
-        add_chat(8, ('Mode=%s | Theme=%s | Decimals=%d'):format(option, settings.ui.theme or 'custom', settings.ui.decimals or 2))
+        add_chat(8, ('Mode=%s | AutoJob=%s | Theme=%s | Decimals=%d'):format(
+            option, settings.ui.autojob and 'on' or 'off', settings.ui.theme or 'custom', settings.ui.decimals or 1))
         add_chat(8, ('Main pos=(%d,%d) | font=%s | size=%s | draggable=%s'):format(x, y, distance:font(), tostring(distance:size()), tostring(distance:draggable())))
         add_chat(8, ('Background=%s alpha=%d rgb=(%d,%d,%d) | stroke=%s alpha=%d'):format(
             tostring(distance:bg_visible()), distance:bg_alpha(), r, g, b, tostring(distance:stroke_width()), distance:stroke_alpha()))
         add_chat(8, ('Bands=%s near<=%s mid<=%s far>%s | close<=%s emphasis=%s'):format(
             settings.ui.bands_enabled and 'on' or 'off', tostring(settings.ui.near_cutoff or 22),
             tostring(settings.ui.far_cutoff or 30), tostring(settings.ui.far_cutoff or 30),
-            tostring(settings.ui.close_cutoff or 15), tostring(settings.ui.close_emphasis or 'off')))
+            tostring(settings.ui.close_cutoff or 22), tostring(settings.ui.close_emphasis or 'off')))
         add_chat(8, ('JA=%s | Height=%s'):format(tostring(showabilities), tostring(showheight)))
 
     elseif command == 'gun' then
-        option = 'Gun'
+        choose_manual_mode('Gun')
         add_chat(207, 'Mode: Gun. warning=ranged, good=Square Shot, best=True Shot.')
 
     elseif command == 'xbow' then
-        option = 'Xbow'
+        choose_manual_mode('Xbow')
         add_chat(207, 'Mode: XBow. warning=ranged, good=Square Shot, best=True Shot.')
 
     elseif command == 'bow' then
-        option = 'Bow'
+        choose_manual_mode('Bow')
         add_chat(207, 'Mode: Bow. warning=ranged, good=Square Shot, best=True Shot.')
 
     elseif command == 'magic' then
-        option = 'Magic'
+        choose_manual_mode('Magic')
         add_chat(207, 'Mode: Magic. good=in casting range.')
 
     elseif command == 'ninjutsu' then
-        option = 'Ninjutsu'
+        choose_manual_mode('Ninjutsu')
         add_chat(207, 'Mode: Ninjutsu. good=in casting range.')
 
     elseif command == 'default' then
-        option = 'Default'
+        choose_manual_mode('Default')
         MaxDistance = 25
         sync_close_emphasis(nil)
         add_chat(207, 'Mode: Default. FFXI distance bands are '..(settings.ui.bands_enabled and 'on.' or 'off.'))
+
+    elseif command == 'autojob' then
+        -- With no argument this is a toggle, like //dp ja and //dp height.
+        -- Switching it on applies the original job mapping immediately;
+        -- switching it off restores the player's last manually chosen mode.
+        local enabled = parse_on_off(args[1], settings.ui.autojob)
+        if enabled == nil or #args > 1 then
+            add_chat(123, 'Usage: //dp autojob [on|off|toggle]')
+        else
+            settings.ui.autojob = enabled
+            save_settings()
+            if enabled then
+                self = windower.ffxi.get_player() or self
+                if self and self.main_job then
+                    check_job()
+                else
+                    add_chat(8, 'AutoJob will select a mode at next login.')
+                end
+            else
+                option = settings.ui.mode
+                if option == 'Default' then MaxDistance = 25 end
+            end
+            sync_close_emphasis(nil)
+            add_chat(207, ('AutoJob=%s | Mode=%s.'):format(enabled and 'on' or 'off', option))
+        end
 
     elseif command == 'maxdecimal' then
         apply_decimal_format(12)
@@ -876,13 +948,30 @@ windower.register_event('addon command', function(command, ...)
         save_settings(('%s (%s).'):format(command == 'lock' and 'position locked' or 'position unlocked', target))
 
     elseif command == 'pos' or command == 'position' then
-        local x, y = tonumber(args[1]), tonumber(args[2])
-        local target = normalize_target(args[3]) or 'main'
-        if not x or not y or target == 'all' then
-            add_chat(123, 'Usage: //dp pos <x> <y> [main|pet|abilities|height]')
+        if args[1] and args[1]:lower() == 'reset' then
+            -- Use the known on-screen original positions, not the previous
+            -- saved position (which may now be outside a smaller resolution).
+            local requested = args[2] and normalize_target(args[2]) or 'main'
+            if not requested or args[3] then
+                add_chat(123, 'Usage: //dp pos reset [main|pet|abilities|height|all]')
+            else
+                for_targets(requested, function(obj, name)
+                    local home = default_positions[name]
+                    obj:pos(home.x, home.y)
+                end)
+                -- Reset the render-only size-emphasis offset calculation too.
+                close_style_signature = nil
+                save_settings(('position reset to defaults (%s).'):format(requested))
+            end
         else
-            for_targets(target, function(obj) obj:pos(x, y) end)
-            save_settings(('%s position saved (%d, %d).'):format(target, x, y))
+            local x, y = tonumber(args[1]), tonumber(args[2])
+            local target = args[3] and normalize_target(args[3]) or 'main'
+            if not x or not y or target == 'all' then
+                add_chat(123, 'Usage: //dp pos <x> <y> [main|pet|abilities|height] | //dp pos reset [target]')
+            else
+                for_targets(target, function(obj) obj:pos(x, y) end)
+                save_settings(('%s position saved (%d, %d).'):format(target, x, y))
+            end
         end
 
     elseif command == 'bands' or command == 'band' then
@@ -1011,7 +1100,7 @@ end)
 windower.register_event('job change', function()
     coroutine.sleep(2) -- sleeping because jobchange too fast doesn't show new abilities
     self = windower.ffxi.get_player()
-    check_job()
+    if settings.ui.autojob then check_job() end
     abilitylist = windower.ffxi.get_abilities().job_abilities
     abilities:visible(false)
     abilities.value = ""
@@ -1022,7 +1111,7 @@ windower.register_event('load', function()
     if windower.ffxi.get_player() then 
         coroutine.sleep(2) -- sleeping because jobchange too fast doesn't show new abilities
         self = windower.ffxi.get_player()
-        check_job()
+        if settings.ui.autojob then check_job() end
         abilitylist = windower.ffxi.get_abilities().job_abilities
         displayabilities()
         add_chat(207, 'v'.._addon.version..' loaded. //dp help for UI commands.')
@@ -1033,7 +1122,7 @@ end)
 windower.register_event('login', function()
     coroutine.sleep(2) -- sleeping because jobchange too fast doesn't show new abilities
     self = windower.ffxi.get_player()
-    check_job()
+    if settings.ui.autojob then check_job() end
     abilitylist = windower.ffxi.get_abilities().job_abilities
     displayabilities()
 end)
