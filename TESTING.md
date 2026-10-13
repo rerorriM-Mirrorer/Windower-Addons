@@ -25,6 +25,8 @@ No historical test results were reconstructed or verified during this documentat
 
 ## Cumulative changelog
 
+- **2026-10-13 — Navigation refinement:** Corrected the heading levels for the Testing Packages and Shared Development Conventions sections in `WORKFLOW.md` ([`ca3b01b`](https://github.com/rerorriM-Mirrorer/Windower-Addons/commit/ca3b01bc98d1017a27d5bddc1f9fe15f89eaef7f)). Documentation only; no addon code changed.
+
 - **2026-10-13:** Adopted the shared two-document development convention without changing executable addon behavior.
 
 ## Delivered packages and documents
