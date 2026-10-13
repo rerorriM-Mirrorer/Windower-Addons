@@ -12,6 +12,9 @@ Read this first when preparing or evaluating a development/testing batch. This c
 - **Verification:** Check root filenames and links; compare migration against its starting commit and confirm only Markdown documentation changed.
 - **In-game testing:** Not performed for this documentation-only change; existing addon behavior has not been revalidated.
 
+- **Recorded migration commit:** [`16a05d6`](https://github.com/rerorriM-Mirrorer/Windower-Addons/commit/16a05d601ee5b23a9503f2e20bbeee9b9e9ab4c0).
+- **Verified result:** Git comparison against the recorded starting commit lists Markdown changes only; `WORKFLOW.md` and `TESTING.md` exist at the repository root. No Lua source paths changed.
+
 ## Tests for the next functional batch
 
 List the requested change, actions to perform, expected outcomes, previously working behavior to retest, and results actually observed. This repository may maintain multiple addons; name the addon and its testing branch in each future batch.
@@ -28,7 +31,7 @@ No historical test results were reconstructed or verified during this documentat
 
 | Date | Batch | Item | Type | Commit/reference | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 2026-10-13 | Documentation adoption | WORKFLOW.md; TESTING.md | Repository documents | Migration commit in Git history | No testing package or Lua changes |
+| 2026-10-13 | Documentation adoption | WORKFLOW.md; TESTING.md | Repository documents | [`16a05d6`](https://github.com/rerorriM-Mirrorer/Windower-Addons/commit/16a05d601ee5b23a9503f2e20bbeee9b9e9ab4c0) | No testing package or Lua changes |
 
 ## User-provided materials, observations, and requests
 
