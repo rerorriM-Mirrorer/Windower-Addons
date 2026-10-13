@@ -2,11 +2,12 @@
 
 ## Current delivery
 
-**Batch:** Test 2.4.1 (2026-10-13)  
-**Build ID:** `1.0.0.4-icons-test2.4.1`  
-**Base:** Test 2.4 recovered source snapshot, commit `a92dda3` on `work/debuffed-icons` (other presentation behavior unchanged)  
+**Batch:** Test 2.4.2 (2026-10-13)  
+**Build ID:** `1.0.0.4-icons-test2.4.2`  
+**Base:** Test 2.4.1 help-color refinement, commit `02f38d1` on `work/debuffed-icons` (all other behavior unchanged)  
 **Git:** Test 2.4 recovered as a real GitHub commit `a92dda3`; Test 2.4.1 is a separate help-color refinement on `work/debuffed-icons`. Both await live validation.  
 **Original tracker:** From `function handle_overwrites` through the incoming-chunk handler, byte-for-byte identical to Test 2.3 (scripted comparison).
+**Delta from 2.4.1:** UI timer formatting only: truncated minutes/hours and seconds only below one minute; edit-loop sample format updated; manual preview unchanged. Docs/build ID updated. Original tracking still untouched.
 
 ### Installation precautions
 
@@ -16,7 +17,7 @@ Extract at `Windower/addons/` (archive contains `Debuffed/`). Avoid nesting `Deb
 
 1. In game: `//lua reload Debuffed`. Confirm short intro and fade. Optionally use `//db status` to verify Test 2.4.1.
 2. Run `//db slots 16` and `//db wrap 16`, since existing settings can still say 32.
-3. Run `//db edit` and confirm 16 familiar **outlined edit squares** each containing a semi-transparent example icon and `1:10` countdown resetting after `0:00`. Check that moving field works and `//db edit off` removes the samples without losing the position.
+3. Run `//db edit` and confirm 16 familiar **outlined edit squares** each containing a semi-transparent example icon. The timer should show `1m` for its first 11 seconds, then `59`, `58` ... `0`, resetting to `1m` each cycle. Check that moving field works and `//db edit off` removes the samples without losing the position.
 4. Run `//db preview` outside edit mode. Confirm 11..0 labels on example icons over 12 seconds, then faded disappearance. Confirm that actual debuff tracker is unaffected.
 5. Adjust `//db timersize 7`, `//db timerx -2`, `//db timery -4` while editing; confirm sample timers reposition/sizes update. Restore preferences.
 6. Run `//db help`, verify the full BattleStations-like palette: yellow/warm borders, contrasting title/section, accented `db` and `=>`, light syntax, neutral descriptions. Help appears **only in FFXI chat**, not duplicated in console.
@@ -26,11 +27,13 @@ Extract at `Windower/addons/` (archive contains `Debuffed/`). Avoid nesting `Deb
 ### Offline checks completed
 
 - Syntax: `luatex --luaonly` loadfile for both Lua modules: **PASS**.
-- Renderer mock: intro; fade; 11..0 manual; 1:10→0:00→reset edit samples; guide + icon + timer layering; X/Y timer offsets; resizing; wrapping; live sprite; orderly cleanup; fade before unload: **PASS**.
+- Renderer mock: intro; fade; 11..0 manual; 1:10→0:00→reset edit samples; guide + icon + timer layering; X/Y timer offsets; resizing; wrapping; live sprite; orderly cleanup; fade before unload: **PASS** (from Test 2.4.1; the timer-format change is separately checked below).
 - Command mock: default slots/wrap 16, help output via chat only, edit on, wrapping/slot changes, manual preview notice, shutdown delay, exactly one `lua r Debuffed` or `lua u Debuffed` after fade: **PASS**.
 - Original tracking section compared to Test 2.3: **PASS / unchanged**.
 
 **Not tested:** actual Windower runtime, XivParty texture rendering and color codes in the FFXI chat window, physical controller behavior, live effect expiration semantics. Do not assume offline simulations establish those.
+
+- Test 2.4.2 timer formatting cases: `1796s → 29m`, `70s → 1m`, `60s → 1m`, `59.9s → 59`, `1s → 1`, plus edit 70..0 and manual 11..0: **PASS** (offline; pending in-game).
 
 ### Known risks / follow-ups
 
@@ -41,6 +44,8 @@ Extract at `Windower/addons/` (archive contains `Debuffed/`). Avoid nesting `Deb
 - Native FFXI text extents and `Arial Bold Italic` presentation may differ from offline estimates.
 
 ## Earlier batches
+
+- **Test 2.4.1 (2026-10-13):** BattleStations color hierarchy on top of Test 2.4; committed as `02f38d1`.
 
 - **Test 2.4 (2026-10-13):** preserved in Git as commit `a92dda3` after the original testing ZIPs had remained uncommitted. This catch-up does **not** fabricate separate historical commits. Added animated 11..0 preview, edit sample countdowns, 16-slot defaults, fade-aware reload/unload, colored help. User liked the help appearance, but the precise color palette was not yet verified in-game.
 

@@ -115,11 +115,12 @@ end
 
 local function timer_label(remains)
     if not remains or remains <= 0 then return nil end
-    -- These are *estimated* durations. Compact text matches FFXI's tiny
-    -- under-icon timer convention, not an observed server expiration time.
-    if remains >= 3600 then return tostring(math.ceil(remains / 3600)) .. 'h' end
-    if remains >= 120 then return tostring(math.ceil(remains / 60)) .. 'm' end
-    return tostring(math.ceil(remains))
+    -- Match the native icon readout: completed hours/minutes only, then
+    -- integer seconds when under a minute. All real durations remain estimates.
+    if remains >= 3600 then return tostring(math.floor(remains / 3600)) .. 'h' end
+    if remains >= 60 then return tostring(math.floor(remains / 60)) .. 'm' end
+    -- Avoid printing '60' during the fractional second just below 1 minute.
+    return tostring(math.max(1, math.floor(remains)))
 end
 
 function IconRenderer.new(settings)
@@ -492,7 +493,7 @@ function IconRenderer:tick()
         -- 70,69,...0,70; no network or tracking data is involved.
         local elapsed = math.floor(math.max(0, now - self.edit_started))
         local second = 70 - (elapsed % EDIT_CYCLE)
-        dummy_label = ('%d:%02d'):format(math.floor(second / 60), second % 60)
+        dummy_label = timer_label(second) or '0'
     end
 
     local exit_factor = 1
@@ -523,7 +524,7 @@ function IconRenderer:tick()
         self.sample_timer_label = dummy_label
         if dummy_label then
             for _, timer in ipairs(self.sample_timers) do timer.value = dummy_label end
-            -- Text width depends on whether label is 11, 9 or 1:10.
+            -- Text width depends on whether label is 11, 9 or 1m.
             self:layout()
         end
     end
