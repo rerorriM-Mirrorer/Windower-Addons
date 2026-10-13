@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -- Windower version 1.0.0.4. The new renderer only reads debuffed_mobs.
 _addon.name = 'Debuffed'
 _addon.author = 'Xathe (Asura); icon presentation: A'
-_addon.version = '1.0.0.4-icons-test2.4'
+_addon.version = '1.0.0.4-icons-test2.4.1'
 _addon.commands = {'dbf', 'db', 'debuffed'}
 
 config = require('config')
@@ -378,10 +378,12 @@ windower.register_event('unload', function()
     texts.destroy(box)
 end)
 
--- BattleStations-inspired help: one chat line per command, subtle per-part
--- colors, no console duplication. Keep the argument notation consistent:
+-- BattleStations-inspired chat help. Color individual fragments exactly as
+-- BattleStations does (primary=200, secondary=207, info=0, warning=140,
+-- contrasting heading=167). Unlike BattleStations, do not write a duplicate
+-- stripped version to the console. Use ipairs-equivalent explicit ordering.
 -- <required>, [optional], and a|b for choices.
-local HELP_COLORS = {title = 200, command = 207, detail = 0, separator = 140}
+local HELP_COLORS = {primary = 200, secondary = 207, info = 0, warn = 140, heading = 167}
 local function colored(str, color)
     return tostring(str):color(color)
 end
@@ -391,19 +393,33 @@ local function help_emit(message)
     else print(message) end
 end
 
+local function help_border()
+    help_emit(colored(string.rep('=', 38), HELP_COLORS.warn))
+end
+
 local function help_heading(name)
-    help_emit(colored('------------ ' .. name .. ' ------------', HELP_COLORS.title))
+    help_emit(colored('Debuffed Help: ', HELP_COLORS.primary)
+        .. colored(name, HELP_COLORS.heading))
+end
+
+local function help_section(name)
+    help_emit(colored('---- ', HELP_COLORS.warn)
+        .. colored(name, HELP_COLORS.heading)
+        .. colored(' ----', HELP_COLORS.warn))
 end
 
 local function help_entry(syntax, description)
-    help_emit(colored('//db ' .. syntax, HELP_COLORS.command)
-        .. colored('  =>  ', HELP_COLORS.separator)
-        .. colored(description, HELP_COLORS.detail))
+    help_emit(colored('db', HELP_COLORS.primary)
+        .. ' ' .. colored(syntax, HELP_COLORS.secondary)
+        .. ' ' .. colored('=>', HELP_COLORS.primary)
+        .. ' ' .. colored(description, HELP_COLORS.info))
 end
 
 local function show_help()
-    help_emit(colored('============== Debuffed Help ==============', HELP_COLORS.title))
-    help_heading('Display')
+    help_border()
+    help_heading('Commands')
+    help_border()
+    help_section('Display')
     help_entry('edit [on|off]', 'Position sample icons and timers')
     help_entry('preview', '12-second sample countdown')
     help_entry('display <icons|text>', 'Choose presentation')
@@ -415,13 +431,13 @@ local function show_help()
     help_entry('layout <horizontal|vertical>', 'Grid direction')
     help_entry('targetname [on|off]', 'Show enemy name')
     help_entry('background [on|off|0-255]', 'Background opacity')
-    help_heading('Timers')
+    help_section('Timers')
     help_entry('timers', 'Toggle real timers')
     help_entry('timersize <6-24>', 'Timer font size')
     help_entry('timerx <pixels>', 'Move timers left or right')
     help_entry('timery <pixels>', 'Move timers up or down')
     help_entry('timeroffset <x> <y>', 'Move timers on both axes')
-    help_heading('Tracking and Addon')
+    help_section('Tracking and Addon')
     help_entry('mode', 'Switch blacklist/whitelist')
     help_entry('blacklist <add|remove> <spell>', 'Exclude a spell')
     help_entry('whitelist <add|remove> <spell>', 'Include a spell')
@@ -432,7 +448,7 @@ local function show_help()
     help_entry('diagnose', 'Icon path and rendering details')
     help_entry('restart', 'Fade out then reload Debuffed')
     help_entry('unload', 'Fade out then unload Debuffed')
-    help_emit(colored('===========================================', HELP_COLORS.title))
+    help_border()
 end
 
 local function start_shutdown(action)

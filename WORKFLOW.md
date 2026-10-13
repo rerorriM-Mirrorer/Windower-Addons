@@ -77,6 +77,10 @@ Assume partial success.
 - Use `local` variables and functions by default. Create globals only when something outside their local scope must access them.
 - As commands grow, keep command parsing small and hand individual commands to separate local handler functions rather than one large `if/elseif` chain.
 - Every addon provides useful `help` and `status` commands. A bare addon command may report status where appropriate.
+
+- Present in-game addon help in an easily scanned, BattleStations-inspired format. Color **individual fragments** with Windower's `require('chat')` / `string.color`: warm separators (140), contrasting headings (167), accented addon prefix and arrow (200), light command syntax (207), and neutral descriptions (0). Choose legible equivalent hues only when a theme genuinely requires them.
+- Show full command examples, concise descriptions, and consistent `<required>` / `[optional]` notation; sort help entries deterministically. Prefer user-facing `windower.add_to_chat` output only: do not also mirror routine help into the Windower console. Reserve console output for deliberate diagnostics.
+
 - Prefer existing Windower libraries and definitions over recreating equivalent behavior.
 
 

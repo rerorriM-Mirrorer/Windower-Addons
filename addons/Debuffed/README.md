@@ -1,8 +1,8 @@
-# Debuffed — Icon Presentation Test 2.4
+# Debuffed — Icon Presentation Test 2.4.1
 
 Original addon: Xathe, `Debuffed` v1.0.0.4 (Windower/Lua).  
 Icon presentation, help, and transitions: A.  
-Testing build: `1.0.0.4-icons-test2.4` (2026-10-13).
+Testing build: `1.0.0.4-icons-test2.4.1` (2026-10-13).
 
 ## Installation
 
@@ -82,3 +82,8 @@ Lua parser checks and mocked renderer/command simulations passed, including manu
 - **Test 2.1 (2026-10-10):** More reliable startup sample-image loading and preview diagnostics.
 - **Test 2 (2026-10-10):** Dia-first sorting, timer repositioning, opening and disappearing fades, drag/edit outlines.
 - **Test 1 (2026-10-08):** Initial status-ID icons using installed XivParty art; kept original tracker.
+
+
+### Test 2.4.1 (2026-10-13) — BattleStations-style color hierarchy
+
+Chat help now gives separate colors to the warm `=`/`----` separators (140), accented `db` prefix and `=>` (200), light command syntax (207), contrasting `Commands`/section heading (167), and neutral descriptions (0). Like BattleStations, help is built from small formatter helpers; unlike it, output is chat-only, never duplicated in the console. No gameplay behavior changed. Git catch-up was committed separately as Test 2.4.
