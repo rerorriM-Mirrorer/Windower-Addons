@@ -55,10 +55,11 @@ jobs:
           build "Stage-3-Glow" 54e4ff0b6688dcc9ae14554cd14343939ff78420
           build "Stage-4-Any-Menu" eccec4d46c450f175c36096b5a92ce14ff655ffe
           build "Stage-5-Help-and-Lifecycle" 3d1a6aaf9a94c6154b5f970113cff44a9c3778bf
-          build "Stage-6-Final-Test-Batch" HEAD
+          build "Stage-6-Reveal-Polish" 3432b75852bb111c1b0486c37c13d14e56d52efa
+          build "Stage-7-Equipment-Help-Final" HEAD
           sha256sum dist/*.zip | tee dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: InvTracker-20261014-Test-Packages
+          name: InvTracker-20261014-Test-Packages-Batch7
           path: dist/
           if-no-files-found: error
