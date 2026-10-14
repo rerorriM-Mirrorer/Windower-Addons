@@ -28,7 +28,7 @@
 
 _addon.name = 'invtracker'
 _addon.author = 'sylandro'
-_addon.version = '1.0.1-a.20261014.2' -- Awake: drag visible grid without move mode
+_addon.version = '1.0.1-a.20261014.3' -- Awake: optional non-interactive white reveal highlight
 _addon.language = 'English'
 _addon.commands = {'invtracker','inv','i'}
 
@@ -72,6 +72,7 @@ defaults = {}
 defaults.HideKey = SCROLL_LOCK_KEY
 defaults.autoHide = {enabled=true, hold=60, fadeIn=0.13, fadeOut=0.32}
 defaults.dragLocked = false
+defaults.glow = {enabled=true, duration=0.65, alpha=65}
 defaults.slotImage = {}
 defaults.slotImage.sort = true
 defaults.slotImage.spacing = 4
@@ -284,6 +285,68 @@ local function independent_image_settings(prototype)
     }
 end
 
+-- One short, faint white highlight per visible inventory *block*, not per
+-- slot. Avoid hundreds of additional images when multiboxing.
+local glow = {started=-100, overlays={}}
+local function start_glow()
+    if settings.glow.enabled then glow.started = now() end
+end
+
+local function stop_glow()
+    glow.started = -100
+    for _,image in pairs(glow.overlays) do image:hide() end
+end
+
+local function update_glow()
+    local duration = math.max(0.1,tonumber(settings.glow.duration) or 0.65)
+    local progress = (now()-glow.started)/duration
+    if not settings.glow.enabled or progress >= 1 or vis.opacity <= 0 or not inventory_loaded then
+        for _,image in pairs(glow.overlays) do image:hide() end
+        return
+    end
+    -- Quick white illumination with a trailing soft fade. The slot color
+    -- primitives remain untouched, so item status colors cannot be corrupted.
+    local strength = progress < 0.12 and (progress/0.12)
+        or math.max(0, 1-(progress-0.12)/0.88)
+    local alpha = math.floor(math.max(0,math.min(110,
+        tonumber(settings.glow.alpha) or 65))*strength*vis.opacity+0.5)
+    for index,block in ipairs(slot_images) do
+        local left,top,right,bottom
+        for _,slot in ipairs(block) do
+            if slot.background and (slot.bg_alpha or 0) > 0 then
+                local x,y=slot.background:pos()
+                local w=tonumber(settings.slotImage.spacing) or 4
+                left=math.min(left or x,x); top=math.min(top or y,y)
+                right=math.max(right or x,x+w); bottom=math.max(bottom or y,y+w)
+            end
+        end
+        if left and alpha > 0 then
+            if not glow.overlays[index] then
+                glow.overlays[index] = images.new({
+                    pos={x=0,y=0},
+                    draggable=false,
+                    visible=false,
+                    size={width=1,height=1},
+                    color={alpha=0,red=255,green=255,blue=255},
+                    texture={path=windower.addon_path..'slot.png',fit=true},
+                    repeatable={x=1,y=1},
+                })
+            end
+            local image=glow.overlays[index]
+            image:pos(left,top)
+            image:size(math.max(1,right-left),math.max(1,bottom-top))
+            image:color(255,255,255)
+            image:alpha(alpha)
+            image:show()
+        elseif glow.overlays[index] then
+            glow.overlays[index]:hide()
+        end
+    end
+    for index=#slot_images+1,#glow.overlays do
+        glow.overlays[index]:hide()
+    end
+end
+
 -- Translate existing primitives as one group. NEVER re-run slot index layout to drag.
 local function shift_grid(dx,dy)
     if dx == 0 and dy == 0 then return end
@@ -321,6 +384,7 @@ local function apply_opacity(value)
 end
 
 function refresh_visibility(immediate)
+    local previous = vis.target
     local target = 1
     if is_hidden_by_key or is_hidden_by_cutscene or not inventory_loaded then
         target = 0
@@ -334,7 +398,9 @@ function refresh_visibility(immediate)
     if immediate then
         vis.target, vis.from = target, target
         apply_opacity(target)
+        if target == 1 and previous ~= 1 then start_glow() end
     elseif target ~= vis.target then
+        if target == 1 then start_glow() end
         vis.from, vis.target, vis.start = vis.opacity, target, now()
         vis.duration = math.max(0.01, tonumber(target == 1 and settings.autoHide.fadeIn or settings.autoHide.fadeOut) or 0.25)
         if target == 1 and vis.opacity == 0 then apply_opacity(0.001) end
@@ -350,6 +416,7 @@ end
 
 windower.register_event('prerender',function()
     if settings.autoHide.enabled and vis.manual == 'auto' then refresh_visibility() end
+    update_glow()
     if math.abs(vis.opacity-vis.target) < 0.001 then return end
     local progress = math.max(0,math.min(1,(now()-vis.start)/vis.duration))
     local alpha = vis.from+(vis.target-vis.from)*progress
@@ -466,6 +533,18 @@ windower.register_event('addon command',function(command,...)
             refresh_visibility()
         end
         message('Autohide '..(settings.autoHide.enabled and 'ON' or 'OFF'))
+    elseif cmd == 'glow' then
+        local arg = args[1] and tostring(args[1]):lower() or ''
+        if arg == '' then settings.glow.enabled = not settings.glow.enabled
+        elseif arg == 'on' or arg == 'off' then settings.glow.enabled = (arg == 'on')
+        elseif arg == 'preview' then
+            start_glow()
+            message('Previewing white reveal highlight.')
+            return
+        else message('Use //i glow [on|off|preview].') return end
+        if not settings.glow.enabled then stop_glow() end
+        config.save(settings)
+        message('Glow '..(settings.glow.enabled and 'ON' or 'OFF'))
     elseif cmd == 'hold' then
         local value = tonumber(args[1])
         if value then
@@ -925,6 +1004,7 @@ function hide()
 end
 
 function clear()
+    stop_glow()
     slot_images = {}
 end
 
