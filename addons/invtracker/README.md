@@ -1,7 +1,7 @@
 # InvTracker — inventory grid HUD
 
 Originally by sylandro. Enhanced by Awake (FFXI / Windower 4).
-**Testing build:** `1.0.1-a.20261014.6` — not yet tested in a live game client.
+**Testing build:** `1.0.1-a.20261014.7` — not yet tested in a live game client.
 
 InvTracker displays grouped inventory, equipment, storage, temporary item, and
 treasure slots. **The original status sorting, per-bag layout, and grid rendering
@@ -27,6 +27,7 @@ See `TESTING.md` at the ZIP root before testing on multiple clients.
 | Fade in / out | 0.13 / 0.32 seconds |
 | Factory position | X = -224, Y = -19 (resolution-relative) |
 | Dragging | ON, unlocked |
+| Equipment block displayed | OFF (new configurations) |
 | Reveal on loaded inventory / new zone | ON |
 | Reveal when *any* in-game menu opens | ON |
 | Reveal when items are added or removed, treasure changes, or bazaar updates | ON |
@@ -37,9 +38,10 @@ See `TESTING.md` at the ZIP root before testing on multiple clients.
 
 | Command | Result |
 | --- | --- |
-| `//i` | Reveal for the current hold duration; reset its timer |
+| `//i` | Reveal for the current hold duration **and display colored help** |
 | `//i help` | BattleStations-inspired colored chat help |
 | `//i status` | Version, visibility, current position and settings |
+| `//i equipment [on\|off]` | Toggle the equipment block; save and rebuild layout |
 | `//i autohide [on\|off]` | Toggle automatic visibility or set explicitly |
 | `//i hold <seconds>` | Hold duration, 0.5–3600 seconds (default 60) |
 | `//i show` | Pin visible until another visibility command/event |
@@ -55,8 +57,15 @@ See `TESTING.md` at the ZIP root before testing on multiple clients.
 | `//i restart` | Reload InvTracker |
 | `//i unload` | Unload InvTracker |
 
-Invalid commands show the help menu. Typing bare `//i` is the intentional
-exception to the usual bare-command-help convention.
+Invalid commands show the help menu. Bare `//i` and bare `//inv` perform the
+primary 60-second reveal **and** display the same colored help menu.
+
+**Existing character XML:** older installations can keep
+`<equipment><visible>true</visible></equipment>` regardless of the new factory
+`false` setting. Enter `//i equipment off` on each affected character to
+persist the choice and automatically reload the addon. `//i equipment on`
+restores that region. This doesn't change your coordinates, other inventory
+blocks, or other characters' saved XML.
 
 ## Visibility and input details
 
@@ -94,6 +103,11 @@ the HUD only. No direct inventory/item movements are performed by InvTracker.
   review if live tests reveal stale stack counts.
 
 ## Cumulative changelog
+
+- **2026-10-14 / Batch 7:** Factory equipment block hidden (new installs);
+  `//i equipment on|off` or bare toggle saves and rebuilds an existing
+  character's layout; bare `//i` reveals **and** prints colored help.
+  Commit `303ed91`.
 
 - **2026-10-14 / Batch 6:** Fixed forced glow preview with glow disabled and
   starting the reveal pulse on inventory initialization; explicit move cancel
