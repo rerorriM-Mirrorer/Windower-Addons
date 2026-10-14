@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -- Windower version 1.0.0.4. The new renderer only reads debuffed_mobs.
 _addon.name = 'Debuffed'
 _addon.author = 'Xathe (Asura); icon presentation: A'
-_addon.version = '1.0.0.4-icons-test2.4.2'
+_addon.version = '1.0.0.4-icons-test2.4.3'
 _addon.commands = {'dbf', 'db', 'debuffed'}
 
 config = require('config')
@@ -389,7 +389,10 @@ local function colored(str, color)
 end
 
 local function help_emit(message)
-    if windower.add_to_chat then windower.add_to_chat(207, message)
+    -- BattleStations uses neutral chat color 0 so uncolored text is white.
+    -- Windower's :color(0) adds no inline color code; it cannot turn
+    -- a 207 base-colored line white. Color the other fragments explicitly.
+    if windower.add_to_chat then windower.add_to_chat(0, message)
     else print(message) end
 end
 
@@ -409,10 +412,10 @@ local function help_section(name)
 end
 
 local function help_entry(syntax, description)
-    help_emit(colored('db', HELP_COLORS.primary)
+    help_emit(colored('//db', HELP_COLORS.primary)
         .. ' ' .. colored(syntax, HELP_COLORS.secondary)
-        .. ' ' .. colored('=>', HELP_COLORS.primary)
-        .. ' ' .. colored(description, HELP_COLORS.info))
+        .. ' ' .. colored('->', HELP_COLORS.primary)
+        .. ' ' .. tostring(description)) -- native/neutral white from chat color 0
 end
 
 local function show_help()

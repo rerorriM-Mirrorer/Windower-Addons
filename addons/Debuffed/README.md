@@ -1,8 +1,8 @@
-# Debuffed — Icon Presentation Test 2.4.2
+# Debuffed — Icon Presentation Test 2.4.3
 
 Original addon: Xathe, `Debuffed` v1.0.0.4 (Windower/Lua).  
 Icon presentation, help, and transitions: A.  
-Testing build: `1.0.0.4-icons-test2.4.2` (2026-10-13).
+Testing build: `1.0.0.4-icons-test2.4.3` (2026-10-13).
 
 ## Installation
 
@@ -18,7 +18,7 @@ Command aliases: `//db`, `//dbf`, `//debuffed`. `//db` is the short alias; `//db
 ## New in Test 2.4
 
 - `//db preview` — full **12-second** visual preview: 11, 10, ... 0 (one count per second), then a 0.65-second fade-out. Samples are **not** reported as enemy debuffs. The *automatic* startup animation remains brief (1.2-second hold plus 0.65-second fade).
-- `//db edit` — 16 outlined slot guides by default, with dimmed sample status icons and individual timer labels. Their underlying 70-second cycle repeats, displayed as **1m → 59 → ... → 0 → 1m** until editing is turned off. Real tracked icons are temporarily hidden during edit mode. Timer X/Y offsets and timer size apply to these dummy labels too.
+- `//db edit` — 16 outlined slot guides by default, with dimmed sample status icons and individual timer labels. Their 62-second sample cycle repeats, displayed as **1m → 1m → 59 → ... → 0 → 1m** until editing is turned off. Real tracked icons are temporarily hidden during edit mode. Timer X/Y offsets and timer size apply to these dummy labels too.
 - Default `slots=16`, `wrap=16`, horizontal orientation (one row). **Existing saved settings override defaults**: run `//db slots 16` and `//db wrap 16` once if your prior installation retained `32`.
 - `//db restart` — reports action in the FFXI chat log, fades visible UI for ~0.36s, then sends `lua r Debuffed` once.
 - `//db unload` — same closing transition followed by `lua u Debuffed` once.
@@ -92,4 +92,12 @@ Chat help now gives separate colors to the warm `=`/`----` separators (140), acc
 
 ### Test 2.4.2 (2026-10-13) — Native-style timer text
 
-Adjusted **display formatting only**: minutes start at 60 seconds instead of 120 and round down rather than up (`29:56` → `29m`). Hours similarly show completed hours. Under 60 seconds, show whole seconds. The looping edit preview uses the same formatter (`1m` then `59`…`0`), while the manual 11-to-0 countdown remains unchanged. Tracking code and icon layout are unchanged.
+Adjusted **display formatting only**: minutes start at 60 seconds instead of 120 and round down rather than up (`29:56` → `29m`). Hours similarly show completed hours. Under 60 seconds, show whole seconds. The looping edit preview uses the same formatter, while the manual 11-to-0 countdown remains unchanged. Tracking code and icon layout are unchanged.
+
+
+### Test 2.4.3 (2026-10-13) — Help colors and edit timer polish
+
+- Chat help now uses neutral base color `0`, so the description is genuinely white instead of inheriting the light-colored `207` line. Syntax `207`, prefix and arrow `200`, heading `167`, and borders `140` remain independently colored. Normal help prints **only** to the FFXI chat log.
+- Every help command is printed with its full `//db` prefix; replaced `=>` with `->` as an in-game glyph test.
+- Edit-mode sample countdown now begins at **61 seconds** (`1:01` internally), showing `1m` for two beats before `59` and continuing to `0`; repeats every 62 seconds. The manual 11→0 preview, real tracking, restart and unload are unchanged.
+- Install by extracting the included `Debuffed/` into `Windower/addons/` and run `//lua reload Debuffed`. Existing per-character settings are preserved.

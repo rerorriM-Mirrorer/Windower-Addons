@@ -26,7 +26,7 @@ local FADE_SEC = 0.32     -- only visual; expired debuffs are not inferred here
 local PULSE_HOLD = 1.20  -- brief startup confirmation
 local PULSE_FADE = 0.65
 local MANUAL_HOLD = 12.0  -- show 11, 10, ... 0 for one second each
-local EDIT_CYCLE = 71    -- 1:10, 1:09, ... 0:00, then reset
+local EDIT_CYCLE = 62    -- 1:01, 1:00, 0:59, ... 0:00, then reset
 local EXIT_FADE = 0.36  -- all visible primitives fade before reload/unload
 local PREVIEW_ALPHA = 205
 
@@ -137,7 +137,7 @@ function IconRenderer.new(settings)
     self.guide_opacity = nil -- avoid 32 unnecessary primitive updates per idle frame
     self.guide_style = nil
     self.guide_warmup_frames = 0
-    self.edit_started = nil -- edit preview timer starts at 1:10 when edit is enabled
+    self.edit_started = nil -- edit preview timer starts at 1:01 when edit is enabled
 
     -- This hit rectangle retains the FULL configured slot footprint even with no
     -- debuffs. Alpha zero is still mouse-draggable in Windower's image API.
@@ -454,7 +454,7 @@ function IconRenderer:render(target, entries)
 end
 
 -- Determine sample layering independently of any real tracked effects.
--- A normal preview counts 11..0 and fades; edit mode runs a 1:10 loop.
+-- A normal preview counts 11..0 and fades; edit mode runs a 1:01 loop.
 -- Outline squares remain beneath the samples in edit mode.
 function IconRenderer:tick()
     if not self.visible then return end
@@ -490,9 +490,9 @@ function IconRenderer:tick()
     end
     if not pulse_active and edit then
         sample_alpha, guide_alpha, timer_alpha = 155, 145, 220
-        -- 70,69,...0,70; no network or tracking data is involved.
+        -- 61,60,...0,61; no network or tracking data is involved.
         local elapsed = math.floor(math.max(0, now - self.edit_started))
-        local second = 70 - (elapsed % EDIT_CYCLE)
+        local second = 61 - (elapsed % EDIT_CYCLE)
         dummy_label = timer_label(second) or '0'
     end
 
