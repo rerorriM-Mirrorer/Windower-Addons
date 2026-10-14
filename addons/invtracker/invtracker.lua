@@ -28,7 +28,7 @@
 
 _addon.name = 'invtracker'
 _addon.author = 'sylandro'
-_addon.version = '1.0.1-a.20261014.1' -- Awake: durable startup coordinates and current defaults
+_addon.version = '1.0.1-a.20261014.2' -- Awake: drag visible grid without move mode
 _addon.language = 'English'
 _addon.commands = {'invtracker','inv','i'}
 
@@ -71,6 +71,7 @@ local function message(s) windower.add_to_chat(207, '[InvTracker] '..s) end
 defaults = {}
 defaults.HideKey = SCROLL_LOCK_KEY
 defaults.autoHide = {enabled=true, hold=60, fadeIn=0.13, fadeOut=0.32}
+defaults.dragLocked = false
 defaults.slotImage = {}
 defaults.slotImage.sort = true
 defaults.slotImage.spacing = 4
@@ -323,7 +324,7 @@ function refresh_visibility(immediate)
     local target = 1
     if is_hidden_by_key or is_hidden_by_cutscene or not inventory_loaded then
         target = 0
-    elseif moving or vis.manual == 'show' then
+    elseif moving or drag.active or vis.manual == 'show' then
         target = 1
     elseif vis.manual == 'hide' then
         target = 0
@@ -359,23 +360,55 @@ windower.register_event('prerender',function()
     end
 end)
 
--- Move mode consumes mouse input so the camera does not turn while dragging.
+-- Visible slot groups have independent hit regions. We do not install a
+-- full-screen invisible drag primitive: that would swallow game mouse input.
+-- A generous rectangle around each *drawn block* covers slots and gaps while
+-- avoiding empty space between separate inventory blocks.
+local function over_visible_grid(px, py)
+    if not inventory_loaded or vis.opacity <= 0.05 then return false end
+    for _,block in ipairs(slot_images) do
+        local left,top,right,bottom
+        for _,slot in ipairs(block) do
+            if slot.background and (slot.bg_alpha or 0) > 0 then
+                local x,y = slot.background:pos()
+                local w = tonumber(settings.slotImage.spacing) or 4
+                left = math.min(left or x,x)
+                right = math.max(right or x,x+w)
+                top = math.min(top or y,y)
+                bottom = math.max(bottom or y,y+w)
+            end
+        end
+        local margin = 3
+        if left and px >= left-margin and px <= right+margin
+                and py >= top-margin and py <= bottom+margin then
+            return true
+        end
+    end
+    return false
+end
+
+-- Native images.lua dragging is disabled on all slot primitives. Only this
+-- handler drags the *entire* grid; move mode remains a recovery option.
 windower.register_event('mouse',function(kind,x,y,delta,blocked)
-    if not moving then return end
-    if blocked and not drag.active then return end
-    if kind == 1 and not drag.active then
-        drag.active, drag.x, drag.y = true,x,y
-        return true
-    elseif kind == 0 and drag.active then
-        shift_grid(x-drag.x,y-drag.y)
-        drag.x,drag.y = x,y
-        return true
-    elseif kind == 2 and drag.active then
-        shift_grid(x-drag.x,y-drag.y)
-        moving,drag.active = false,false
-        vis.until_time = now() + (tonumber(settings.autoHide.hold) or 4)
-        config.save(settings)
-        message(('Position saved: %d, %d'):format(xBase,yBase))
+    if drag.active then
+        if kind == 0 then
+            shift_grid(x-drag.x,y-drag.y)
+            drag.x,drag.y = x,y
+            return true
+        elseif kind == 2 then
+            shift_grid(x-drag.x,y-drag.y)
+            moving,drag.active = false,false
+            vis.until_time = now() + (tonumber(settings.autoHide.hold) or 60)
+            config.save(settings)
+            message(('Position saved: %d, %d'):format(xBase,yBase))
+            refresh_visibility()
+            return true
+        end
+        return
+    end
+    if kind ~= 1 or blocked or settings.dragLocked then return end
+    if moving or over_visible_grid(x,y) then
+        drag.active,drag.x,drag.y = true,x,y
         refresh_visibility()
         return true
     end
@@ -386,6 +419,7 @@ windower.register_event('addon command',function(command,...)
     local cmd = (command or 'status'):lower()
     if cmd == 'move' then
         if not inventory_loaded then message('Log in first.') return end
+        if settings.dragLocked then message('Drag locked. Use //i unlock.') return end
         drag.original_x,drag.original_y = xBase,yBase
         vis.manual = 'auto'
         moving,drag.active = true,false
@@ -413,6 +447,15 @@ windower.register_event('addon command',function(command,...)
         config.save(settings)
         refresh_visibility()
         message(('Position saved: %d, %d'):format(xBase,yBase))
+    elseif cmd == 'lock' or cmd == 'unlock' then
+        local requested = cmd == 'lock'
+        local arg = args[1] and tostring(args[1]):lower() or ''
+        if arg == 'on' then requested = true
+        elseif arg == 'off' then requested = false
+        elseif arg ~= '' then message('Use //i lock [on|off] or //i unlock.') return end
+        settings.dragLocked = requested
+        config.save(settings)
+        message('Drag '..(requested and 'LOCKED' or 'UNLOCKED'))
     elseif cmd == 'autohide' then
         local arg = args[1] and tostring(args[1]):lower() or ''
         if arg == '' or arg == 'on' or arg == 'off' then
