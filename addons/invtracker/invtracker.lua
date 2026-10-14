@@ -28,7 +28,7 @@
 
 _addon.name = 'invtracker'
 _addon.author = 'sylandro'
-_addon.version = '1.0.1-a.20261014.6' -- Awake: release candidate
+_addon.version = '1.0.1-a.20261014.7' -- Awake: equipment default off; bare alias shows help
 _addon.language = 'English'
 _addon.commands = {'invtracker','inv','i'}
 
@@ -79,7 +79,8 @@ local function command_help()
     windower.add_to_chat(0, ('InvTracker  '.._addon.version):color(167))
     windower.add_to_chat(0, ('Aliases: //i, //inv, //invtracker'):color(167))
     local rows = {
-        {'', 'Reveal the tracker for the configured duration'},
+        {'', 'Reveal for the configured duration and show help'},
+        {'equipment [on|off]', 'Toggle or set the equipment slot block; reloads grid'},
         {'help', 'Show this command list'},
         {'status', 'Show version, visibility, position and toggles'},
         {'autohide [on|off]', 'Toggle automatic hiding or set it explicitly'},
@@ -120,7 +121,7 @@ defaults.slotImage.pos = {}
 defaults.slotImage.pos.x = -224
 defaults.slotImage.pos.y = -19
 defaults.slotImage.equipment = {}
-defaults.slotImage.equipment.visible = true
+defaults.slotImage.equipment.visible = false
 defaults.slotImage.equipment.maxColumns = 4
 defaults.slotImage.inventory = {}
 defaults.slotImage.inventory.visible = true
@@ -588,6 +589,24 @@ windower.register_event('addon command',function(command,...)
         config.save(settings)
         refresh_visibility()
         message(('Position saved: %d, %d'):format(xBase,yBase))
+    elseif cmd == 'equipment' then
+        local arg = args[1] and tostring(args[1]):lower() or ''
+        if arg ~= '' and arg ~= 'on' and arg ~= 'off' then
+            message('Use //i equipment [on|off].')
+            return
+        end
+        local enabled = arg == '' and not settings.slotImage.equipment.visible or arg == 'on'
+        if settings.slotImage.equipment.visible == enabled then
+            message('Equipment block already '..(enabled and 'ON' or 'OFF')..'.')
+            return
+        end
+        settings.slotImage.equipment.visible = enabled
+        config.save(settings)
+        -- The current grid is block-indexed: changing this setting alters
+        -- every subsequent block's index. Reload destroys the old images
+        -- before constructing a new layout; a live reflow could orphan prims.
+        message('Equipment block '..(enabled and 'ON' or 'OFF')..'. Rebuilding layout.')
+        windower.send_command('lua r invtracker')
     elseif cmd == 'lock' or cmd == 'unlock' then
         local requested = cmd == 'lock'
         local arg = args[1] and tostring(args[1]):lower() or ''
@@ -643,6 +662,7 @@ windower.register_event('addon command',function(command,...)
         vis.manual = 'peek'
         vis.until_time = now() + math.max(0.5,tonumber(settings.autoHide.hold) or 60)
         refresh_visibility()
+        if cmd == '' then command_help() end
     else
         message('Unknown command: '..tostring(cmd))
         command_help()
