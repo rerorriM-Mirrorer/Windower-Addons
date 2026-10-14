@@ -5,7 +5,7 @@ Working branch: `invtracker-layout-autohide-20261009`
 Status: **STATIC REVIEW IN PROGRESS; LIVE FFXI TESTS NOT RUN BY A**.
 Do not merge this working branch into `dev` until live-tested.
 
-## Current test batch — 2026-10-14 (five cumulative increments)
+## Current test batch — 2026-10-14 (six cumulative increments)
 
 Follow these in order on **one** client first, then Killala and the other
 Fenrir clients. Back up each character's XML first.
@@ -37,6 +37,11 @@ Fenrir clients. Back up each character's XML first.
    chat-only command list. Test `//i status`, `//i restart`,
    `//i unload`, explicit `autohide on/off`, and bare autohide toggle.
    Restart should reveal as normal once inventory finishes loading.
+
+6. **Batch 6, commits `3138b84` / `cae6681` — reveal polish.**
+   With glow disabled, run `//i glow preview` and confirm it still
+   previews without changing the saved enabled setting. Reload during a zone
+   and confirm the initial reveal pulse; help includes `//i cancel`.
 
 ### Cross-client regression matrix
 
@@ -86,7 +91,8 @@ Fenrir clients. Back up each character's XML first.
 | 3 | `54e4ff0` | reveal glow and preview | Pending |
 | 4 | `eccec4d` | menu transitions and silent equipment | Pending |
 | 5 | `3d1a6aa` | bare reveal and standardized commands | Pending |
-| docs | `dd44100` | README and cumulative changelog | Pending |
+| 6 | `3138b84` / `cae6681` | glow preview, load pulse, cancel help | Pending |
+| docs | `dd44100` / `888dfc5` | README and cumulative changelog | Pending |
 
 ## User-provided requests / referenced materials
 
