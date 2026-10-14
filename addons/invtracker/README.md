@@ -1,63 +1,111 @@
-# invtracker
-This addon displays a grid detailing empty and filled inventory slots, similar to the FFXIV Inventory Grid HUD widget.
+# InvTracker — inventory grid HUD
 
-![Imgur](https://i.imgur.com/PgiMxRZ.png)
+Originally by sylandro. Enhanced by Awake (FFXI / Windower 4).
+**Testing build:** `1.0.1-a.20261014.5` — not yet tested in a live game client.
 
-## How to edit the settings
-1. Login to your character in FFXI
-2. Edit the addon settings file: **_Windower4\addons\invtracker\data\settings.xml_**
-3. Save the file
-4. Press Insert in FFXI to access the windower console
-5. Type ``` lua r invtracker ``` to reload the addon
-6. Press Insert in FFXI again to close the windower console
+InvTracker displays grouped inventory, equipment, storage, temporary item, and
+treasure slots. **The original status sorting, per-bag layout, and grid rendering
+remain in place.** Its HUD fades out when not in use and can be dragged.
 
-## Issues:
-1. There is no way to get the inventory sort order, so all items in the grid will be ordered by status and item count.
+## Install
 
-## Awake testing build: layout-safe movement and autohide
+Copy the package's `invtracker/` folder over
+`Windower4/addons/invtracker/`, **preserving `data/settings.xml`** and any
+character-specific settings. The existing `slot.png` is included. Then use
+`//lua r invtracker`. The game's previously configured positions remain
+unchanged; the new factory coordinates apply to fresh configurations or
+`//i pos reset`.
 
-This is a test build; it has **not** been live-tested in FFXI. The existing
-inventory grouping and item tracking have not been intentionally changed.
+See `TESTING.md` at the ZIP root before testing on multiple clients.
 
-- `//inv move` — click and drag **anywhere on the screen**. Every slot follows
-  one shared movement delta. Releasing the left mouse button saves the position and restarts the
-  visibility hold timer.
-- `//inv cancel` — leave move mode without saving a drag.
-- `//inv pos X Y` — set the traditional, resolution-relative coordinates.
-- `//inv pos reset` — restore the original offset (`-365 -50`).
-- `//inv autohide` — toggle on/off; `//inv autohide on` / `//inv autohide off` set the state explicitly. Opt in/out of reveal on inventory
-  or equipment activity; default is **off**.
-- `//inv hold 4` — set seconds to remain fully visible following activity
-  (range 0.5–30; default 4).
-- `//inv show` — pin visible until changed manually.
-- `//inv hide` — hide now; when autohide is on, new inventory/equipment activity
-  can reveal the tracker again.
-- `//inv status` / `//inv help` — display current options.
+## Defaults
 
-With autohide enabled, the HUD fades in quickly when you add/remove an item,
-change equipment, change bazaar state, or receive treasure; it remains visible
-for four seconds, then fades out more gently. Cutscene and Scroll Lock hiding
-continue to take precedence. Position changes affect only the grid origin,
-not the arrangement of inventory slots.
+| Setting | Fresh-install default |
+| --- | --- |
+| Autohide | ON |
+| Reveal duration | 60 seconds |
+| Fade in / out | 0.13 / 0.32 seconds |
+| Factory position | X = -224, Y = -19 (resolution-relative) |
+| Dragging | ON, unlocked |
+| Reveal on loaded inventory / new zone | ON |
+| Reveal when *any* in-game menu opens | ON |
+| Reveal when items are added or removed, treasure changes, or bazaar updates | ON |
+| Reveal when equipment changes | OFF (equipment status still redraws) |
+| Short white reveal highlight | ON, 0.65 seconds; one overlay per displayed block |
 
-**Test sequence:** Back up `data/settings.xml`, replace only
-`addons/invtracker/invtracker.lua`, reload with `//lua r invtracker`, then
-try `//inv move`, confirm the grid shape remains unchanged while dragging,
-reload to verify its saved location, and finally try
-`//inv autohide on` with an item added/removed. Check both short/fat and
-low-resolution UI layouts and that a cutscene does not reveal the tracker.
+## Commands (all aliases: `//i`, `//inv`, `//invtracker`)
 
-### Test build .2 corrections (2026-10-09)
+| Command | Result |
+| --- | --- |
+| `//i` | Reveal for the current hold duration; reset its timer |
+| `//i help` | BattleStations-inspired colored chat help |
+| `//i status` | Version, visibility, current position and settings |
+| `//i autohide [on\|off]` | Toggle automatic visibility or set explicitly |
+| `//i hold <seconds>` | Hold duration, 0.5–3600 seconds (default 60) |
+| `//i show` | Pin visible until another visibility command/event |
+| `//i hide` | Hide immediately, subject to later triggers |
+| `//i move` | Reveal and drag anywhere once to reposition |
+| `//i lock [on\|off]` | Prevent dragging or set lock explicitly |
+| `//i unlock` | Allow normal dragging on visible grid |
+| `//i pos <x> <y>` | Save resolution-relative position |
+| `//i pos reset` | Restore factory position |
+| `//i glow [on\|off]` | Toggle optional highlight |
+| `//i glow preview` | Preview white highlight |
+| `//i restart` | Reload InvTracker |
+| `//i unload` | Unload InvTracker |
 
-- Every background/border primitive has independent images.lua settings
-  (position, alpha and color). Sharing settings made drag collapse multiple
-  slots at the same coordinates and interfered with status redraws.
-- Native per-slot dragging is disabled: only `//inv move` controls movement.
-- Redrawing inventory status restores image visibility when the HUD is shown.
-  Underlying inventory packet/update logic is unchanged.
-- Bare `//inv autohide` toggles on/off; explicit on/off remain supported.
-- Moving the HUD starts a fresh auto-hide hold period on release.
+Invalid commands show the help menu. Typing bare `//i` is the intentional
+exception to the usual bare-command-help convention.
 
-Regression checks: drag and release (HUD should remain visible), add/remove an
-inventory item both with autohide on and off (slot colors/count change),
-reload (position persists), and run the bare autohide command twice.
+## Visibility and input details
+
+Only a *new* transition from menu closed to menu open refreshes visibility.
+Equipment changes still update the HUD's item-status colors but do not wake it.
+The old Scroll Lock hide toggle remains; menu-open checks work around the
+game's broad cutscene/menu status when a menu is actually open.
+
+To drag, click an existing slot block while visible. Each block is a draggable
+hit region; empty screen space is not intercepted. If the HUD is hidden or
+off-screen, `//i move` enables a one-time click-and-drag anywhere on the screen.
+Releasing the mouse saves the position and starts a new reveal duration.
+`//i cancel` cancels an active explicit move (legacy command, still supported).
+
+The glow is a brief, translucent white overlay using the existing 1px `slot.png`.
+It is **not** a true blurred shader; preview its appearance at your resolution
+and disable it with `//i glow off` if the illumination is too strong.
+
+**Timing:** This test branch retains Windower's commonly used `os.clock()`
+timebase to avoid altering previously working fades. Long-duration wall-clock
+accuracy still needs live confirmation on slower or multiboxed clients.
+
+**Note:** `//i` does **not** open the game's native inventory menu. It reveals
+the HUD only. No direct inventory/item movements are performed by InvTracker.
+
+## Known limitations
+
+- FFXI's true inventory sorting order isn't exposed by this version; slots are
+  grouped using the original status/count sorting.
+- Existing configs have priority over factory defaults.
+- No new snapshot/quantity-difference tracking, cleanup engine, reset/undo,
+  or specific-menu recognition is included in this release.
+- Automatic inventory quantity updates still depend on the original Windower
+  inventory events and the addon refresh path. This is the next subsystem to
+  review if live tests reveal stale stack counts.
+
+## Cumulative changelog
+
+- **2026-10-14 / Batch 1:** Initialized x/y from loaded XML before any position
+  command; fresh defaults autohide on, hold 60, position -224/-19; `//i` alias.
+  Commit `cadb847`.
+- **2026-10-14 / Batch 2:** Drag existing visible slot groups without entering
+  move mode; lock/unlock; preserve recovery move mode. Commit `5ff8bd0`.
+- **2026-10-14 / Batch 3:** Optional white reveal pulse and preview. Commit
+  `54e4ff0`.
+- **2026-10-14 / Batch 4:** Reveal on any menu opening, but not on equipment
+  changes; retained silent equipment redraw. Commit `eccec4d`.
+- **2026-10-14 / Batch 5:** Bare `//i` timed reveal; colored formatted help,
+  status, restart and unload. Commit `3d1a6aa`.
+- **2026-10-09 / Earlier test build:** Independent settings per slot fixed
+  grid-collapse during drag; bare autohide toggle; retained layout/status code.
+  Commits `d53292b`, `d7d7a17`.
+- **Earlier upstream:** sylandro's original InvTracker grid and sort logic.
