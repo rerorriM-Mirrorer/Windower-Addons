@@ -28,9 +28,9 @@
 
 _addon.name = 'invtracker'
 _addon.author = 'sylandro'
-_addon.version = '1.0.1-a.20261009.2' -- Awake: stable independent image primitives and autohide
+_addon.version = '1.0.1-a.20261014.1' -- Awake: durable startup coordinates and current defaults
 _addon.language = 'English'
-_addon.commands = {'invtracker','inv'}
+_addon.commands = {'invtracker','inv','i'}
 
 config = require('config')
 images = require('images')
@@ -70,15 +70,15 @@ local function message(s) windower.add_to_chat(207, '[InvTracker] '..s) end
 
 defaults = {}
 defaults.HideKey = SCROLL_LOCK_KEY
-defaults.autoHide = {enabled=false, hold=4, fadeIn=0.13, fadeOut=0.32}
+defaults.autoHide = {enabled=true, hold=60, fadeIn=0.13, fadeOut=0.32}
 defaults.slotImage = {}
 defaults.slotImage.sort = true
 defaults.slotImage.spacing = 4
 defaults.slotImage.blockSpacing = 4
 defaults.slotImage.visible = true
 defaults.slotImage.pos = {}
-defaults.slotImage.pos.x = -365
-defaults.slotImage.pos.y = -50
+defaults.slotImage.pos.x = -224
+defaults.slotImage.pos.y = -19
 defaults.slotImage.equipment = {}
 defaults.slotImage.equipment.visible = true
 defaults.slotImage.equipment.maxColumns = 4
@@ -211,7 +211,11 @@ defaults.slotImage.status.empty.background.color.green = 0
 defaults.slotImage.status.empty.background.color.blue = 0
 
 local settings = config.load(defaults)
-config.save(settings)
+-- Use persisted coordinates *immediately*. config.register callbacks execute on
+-- later reload events, not upon registration; /pos can run before those events.
+local xBase = tonumber(settings.slotImage.pos.x) or defaults.slotImage.pos.x
+local yBase = tonumber(settings.slotImage.pos.y) or defaults.slotImage.pos.y
+-- Keep existing user settings: new factory values only affect new installations.
 
 settings.slotImage.box = {}
 settings.slotImage.box.size = {}
@@ -422,7 +426,7 @@ windower.register_event('addon command',function(command,...)
     elseif cmd == 'hold' then
         local value = tonumber(args[1])
         if value then
-            settings.autoHide.hold = math.max(0.5, math.min(30,value))
+            settings.autoHide.hold = math.max(0.5, math.min(3600,value))
             config.save(settings)
         end
         message('Hold '..tostring(settings.autoHide.hold)..' seconds')
@@ -447,8 +451,8 @@ end)
 
 config.register(settings, function(settings)
     hideKey = settings.HideKey
-    xBase = settings.slotImage.pos.x
-    yBase = settings.slotImage.pos.y
+    xBase = tonumber(settings.slotImage.pos.x) or defaults.slotImage.pos.x
+    yBase = tonumber(settings.slotImage.pos.y) or defaults.slotImage.pos.y
 end)
 
 windower.register_event('load',function()
