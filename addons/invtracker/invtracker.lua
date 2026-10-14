@@ -28,7 +28,7 @@
 
 _addon.name = 'invtracker'
 _addon.author = 'sylandro'
-_addon.version = '1.0.1-a.20261014.5' -- Awake: standardized help, bare reveal and lifecycle
+_addon.version = '1.0.1-a.20261014.6' -- Awake: release candidate
 _addon.language = 'English'
 _addon.commands = {'invtracker','inv','i'}
 
@@ -324,20 +324,24 @@ end
 
 -- One short, faint white highlight per visible inventory *block*, not per
 -- slot. Avoid hundreds of additional images when multiboxing.
-local glow = {started=-100, overlays={}}
-local function start_glow()
-    if settings.glow.enabled then glow.started = now() end
+local glow = {started=-100, forced=false, overlays={}}
+local function start_glow(force)
+    glow.forced = force == true
+    if settings.glow.enabled or glow.forced then glow.started = now() end
 end
 
 local function stop_glow()
     glow.started = -100
+    glow.forced = false
     for _,image in pairs(glow.overlays) do image:hide() end
 end
 
 local function update_glow()
     local duration = math.max(0.1,tonumber(settings.glow.duration) or 0.65)
     local progress = (now()-glow.started)/duration
-    if not settings.glow.enabled or progress >= 1 or vis.opacity <= 0 or not inventory_loaded then
+    if (not settings.glow.enabled and not glow.forced) or progress >= 1
+            or vis.opacity <= 0 or not inventory_loaded then
+        if progress >= 1 then glow.forced = false end
         for _,image in pairs(glow.overlays) do image:hide() end
         return
     end
@@ -611,7 +615,7 @@ windower.register_event('addon command',function(command,...)
             vis.manual='peek'
             vis.until_time=now() + (tonumber(settings.autoHide.hold) or 60)
             refresh_visibility()
-            start_glow()
+            start_glow(true)
             message('Previewing white reveal highlight.')
             return
         else message('Use //i glow [on|off|preview].') return end
@@ -734,8 +738,9 @@ function initialize()
     refresh_all = false
     refresh_items = false
     refresh_inventory = false
-    vis.until_time = now() + (tonumber(settings.autoHide.hold) or 4)
+    vis.until_time = now() + (tonumber(settings.autoHide.hold) or 60)
     refresh_visibility(true)
+    if vis.target == 1 then start_glow() end
 end
 
 function update_all()
