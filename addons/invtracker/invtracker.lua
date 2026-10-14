@@ -28,7 +28,7 @@
 
 _addon.name = 'invtracker'
 _addon.author = 'sylandro'
-_addon.version = '1.0.1-a.20261014.4' -- Awake: any-menu reveal independent of gear changes
+_addon.version = '1.0.1-a.20261014.5' -- Awake: standardized help, bare reveal and lifecycle
 _addon.language = 'English'
 _addon.commands = {'invtracker','inv','i'}
 
@@ -37,6 +37,7 @@ images = require('images')
 texts = require('texts')
 res = require('resources')
 packets = require('packets')
+require('chat') -- Standard BattleStations-inspired colored command help.
 
 local CUTSCENE_STATUS_ID = 4
 local SCROLL_LOCK_KEY = 70
@@ -68,6 +69,41 @@ local drag = {active=false, x=0, y=0, original_x=0, original_y=0}
 local vis = {opacity=1, target=1, from=1, start=0, duration=1, until_time=0, manual='auto', step=-1}
 local function now() return os.clock() end
 local function message(s) windower.add_to_chat(207, '[InvTracker] '..s) end
+
+-- BattleStations-style in-game help, per the shared NPCmirror WORKFLOW.md.
+-- Each fragment is independently colored so the command and explanation are
+-- readable in every Windower chat theme.
+local function command_help()
+    local sep = ('----------------------------------------'):color(140)
+    windower.add_to_chat(0, sep)
+    windower.add_to_chat(0, ('InvTracker  '.._addon.version):color(167))
+    windower.add_to_chat(0, ('Aliases: //i, //inv, //invtracker'):color(167))
+    local rows = {
+        {'', 'Reveal the tracker for the configured duration'},
+        {'help', 'Show this command list'},
+        {'status', 'Show version, visibility, position and toggles'},
+        {'autohide [on|off]', 'Toggle automatic hiding or set it explicitly'},
+        {'hold <seconds>', 'Set reveal duration (0.5-3600s)'},
+        {'show', 'Pin visible until hidden or another automatic event'},
+        {'hide', 'Hide until the next relevant event'},
+        {'move', 'Reveal and drag anywhere once to save position'},
+        {'lock [on|off]', 'Lock dragging, or explicitly unlock'},
+        {'unlock', 'Enable dragging the visible grid'},
+        {'pos <x> <y>', 'Set resolution-relative position'},
+        {'pos reset', 'Restore factory position -224,-19'},
+        {'glow [on|off]', 'Toggle the white reveal highlight'},
+        {'glow preview', 'Preview the highlight now'},
+        {'restart', 'Reload InvTracker (reveal on login/zone ready)'},
+        {'unload', 'Unload InvTracker'},
+    }
+    for _,row in ipairs(rows) do
+        local prefix='//i'
+        local command=row[1] ~= '' and (' '..row[1]) or ''
+        windower.add_to_chat(0,prefix:color(200)..command:color(207)..
+            (' -> '):color(200)..row[2])
+    end
+    windower.add_to_chat(0,sep)
+end
 
 defaults = {}
 defaults.HideKey = SCROLL_LOCK_KEY
@@ -395,6 +431,8 @@ function refresh_visibility(immediate)
         target = 1
     elseif vis.manual == 'hide' then
         target = 0
+    elseif vis.manual == 'peek' then
+        target = now() < vis.until_time and 1 or 0
     elseif settings.autoHide.enabled and now() >= vis.until_time then
         target = 0
     end
@@ -431,7 +469,9 @@ windower.register_event('prerender',function()
         last_menu_open = menu_open
         refresh_visibility()
     end
-    if settings.autoHide.enabled and vis.manual == 'auto' then refresh_visibility() end
+    if (settings.autoHide.enabled and vis.manual == 'auto') or vis.manual == 'peek' then
+        refresh_visibility()
+    end
     update_glow()
     if math.abs(vis.opacity-vis.target) < 0.001 then return end
     local progress = math.max(0,math.min(1,(now()-vis.start)/vis.duration))
@@ -499,8 +539,21 @@ end)
 
 windower.register_event('addon command',function(command,...)
     local args = {...}
-    local cmd = (command or 'status'):lower()
-    if cmd == 'move' then
+    local cmd = (command or ''):lower()
+    if cmd == 'status' then
+        message(('v%s | pos %d,%d | autohide %s | hold %ss | drag %s | glow %s | display %s'):format(
+            _addon.version,xBase,yBase,settings.autoHide.enabled and 'on' or 'off',
+            tostring(settings.autoHide.hold),settings.dragLocked and 'locked' or 'unlocked',
+            settings.glow.enabled and 'on' or 'off',vis.manual))
+    elseif cmd == 'help' then
+        command_help()
+    elseif cmd == 'restart' then
+        message('Restarting.')
+        windower.send_command('lua r invtracker')
+    elseif cmd == 'unload' then
+        message('Unloading.')
+        windower.send_command('lua u invtracker')
+    elseif cmd == 'move' then
         if not inventory_loaded then message('Log in first.') return end
         if settings.dragLocked then message('Drag locked. Use //i unlock.') return end
         drag.original_x,drag.original_y = xBase,yBase
@@ -554,6 +607,10 @@ windower.register_event('addon command',function(command,...)
         if arg == '' then settings.glow.enabled = not settings.glow.enabled
         elseif arg == 'on' or arg == 'off' then settings.glow.enabled = (arg == 'on')
         elseif arg == 'preview' then
+            if not inventory_loaded then message('Inventory not loaded yet.') return end
+            vis.manual='peek'
+            vis.until_time=now() + (tonumber(settings.autoHide.hold) or 60)
+            refresh_visibility()
             start_glow()
             message('Previewing white reveal highlight.')
             return
@@ -576,14 +633,14 @@ windower.register_event('addon command',function(command,...)
         vis.manual = 'hide'
         refresh_visibility()
         message(settings.autoHide.enabled and 'Hidden until next inventory change or //inv show.' or 'Hidden until //inv show.')
-    elseif cmd == 'help' or cmd == 'status' then
-        message(('Position %d,%d | autohide %s | hold %ss | mode %s'):format(
-            xBase,yBase, settings.autoHide.enabled and 'on' or 'off',settings.autoHide.hold,vis.manual))
-        if cmd == 'help' then
-            message('move / cancel / pos X Y / pos reset / autohide [on|off] / hold SECONDS / show / hide / status')
-        end
+    elseif cmd == '' or cmd == 'reveal' or cmd == 'peek' then
+        if not inventory_loaded then message('Inventory is not loaded yet.') return end
+        vis.manual = 'peek'
+        vis.until_time = now() + math.max(0.5,tonumber(settings.autoHide.hold) or 60)
+        refresh_visibility()
     else
-        message('Unknown command. Use //inv help.')
+        message('Unknown command: '..tostring(cmd))
+        command_help()
     end
 end)
 
