@@ -8,6 +8,8 @@ on:
       - 'WORKFLOW.md'
       - 'TESTING.md'
       - '.github/workflows/package-invtracker.yml'
+  pull_request:
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
