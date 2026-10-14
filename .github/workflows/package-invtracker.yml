@@ -1,0 +1,62 @@
+name: Package InvTracker test builds
+
+on:
+  push:
+    branches: [invtracker-layout-autohide-20261009]
+    paths:
+      - 'addons/invtracker/**'
+      - 'WORKFLOW.md'
+      - 'TESTING.md'
+      - '.github/workflows/package-invtracker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check InvTracker Lua 5.1 syntax
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1 >/dev/null
+          luac5.1 -p addons/invtracker/invtracker.lua
+      - name: Build full and incremental install ZIPs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp_workflow() {
+            local dir="$1"
+            mkdir -p "$dir/invtracker"
+            cp WORKFLOW.md TESTING.md "$dir/"
+            cp addons/invtracker/slot.png "$dir/invtracker/slot.png"
+            cp addons/invtracker/README.md "$dir/invtracker/README.md"
+          }
+          build() {
+            local label="$1"
+            local ref="$2"
+            local tmp
+            tmp="$(mktemp -d)"
+            cp_workflow "$tmp"
+            git show "$ref:addons/invtracker/invtracker.lua" > "$tmp/invtracker/invtracker.lua"
+            luac5.1 -p "$tmp/invtracker/invtracker.lua"
+            ( cd "$tmp"; zip -q -r "$GITHUB_WORKSPACE/dist/InvTracker-$label.zip" TESTING.md WORKFLOW.md invtracker )
+            rm -rf "$tmp"
+          }
+          build "Stage-1-Coordinates-Defaults" cadb847a4c88b86e005e76a2b7367477c49da6ef
+          build "Stage-2-Always-Drag" 5ff8bd0fda40d47127cab1198fb64c85b7a9bf11
+          build "Stage-3-Glow" 54e4ff0b6688dcc9ae14554cd14343939ff78420
+          build "Stage-4-Any-Menu" eccec4d46c450f175c36096b5a92ce14ff655ffe
+          build "Stage-5-Help-and-Lifecycle" 3d1a6aaf9a94c6154b5f970113cff44a9c3778bf
+          build "Stage-6-Final-Test-Batch" HEAD
+          sha256sum dist/*.zip | tee dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: InvTracker-20261014-Test-Packages
+          path: dist/
+          if-no-files-found: error
