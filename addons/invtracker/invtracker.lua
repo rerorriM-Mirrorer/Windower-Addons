@@ -28,7 +28,7 @@
 
 _addon.name = 'invtracker'
 _addon.author = 'sylandro'
-_addon.version = '1.0.1-a.20261014.3' -- Awake: optional non-interactive white reveal highlight
+_addon.version = '1.0.1-a.20261014.4' -- Awake: any-menu reveal independent of gear changes
 _addon.language = 'English'
 _addon.commands = {'invtracker','inv','i'}
 
@@ -60,6 +60,7 @@ local NO_ITEM_ID = 0
 local hideKey = SCROLL_LOCK_KEY
 local is_hidden_by_cutscene = false
 local is_hidden_by_key = false
+local last_menu_open = false
 
 -- Awake: presentation state only; inventory sorting and block indexing are untouched.
 local moving = false
@@ -386,7 +387,9 @@ end
 function refresh_visibility(immediate)
     local previous = vis.target
     local target = 1
-    if is_hidden_by_key or is_hidden_by_cutscene or not inventory_loaded then
+    -- FFXI status 4 covers menus as well as cutscenes. A known open menu
+    -- takes priority over that coarse status when deciding to hide the HUD.
+    if is_hidden_by_key or (is_hidden_by_cutscene and not last_menu_open) or not inventory_loaded then
         target = 0
     elseif moving or drag.active or vis.manual == 'show' then
         target = 1
@@ -415,6 +418,19 @@ function activity()
 end
 
 windower.register_event('prerender',function()
+    local info = windower.ffxi.get_info()
+    local menu_open = info and info.logged_in and info.menu_open == true or false
+    if menu_open and not last_menu_open and inventory_loaded then
+        -- Only react to an opening edge; not once per frame. This exposes
+        -- InvTracker when *any* FFXI menu opens, without keybinding assumptions.
+        last_menu_open = true
+        vis.manual = 'auto'
+        vis.until_time = now() + math.max(0.5,tonumber(settings.autoHide.hold) or 60)
+        refresh_visibility()
+    elseif menu_open ~= last_menu_open then
+        last_menu_open = menu_open
+        refresh_visibility()
+    end
     if settings.autoHide.enabled and vis.manual == 'auto' then refresh_visibility() end
     update_glow()
     if math.abs(vis.opacity-vis.target) < 0.001 then return end
@@ -589,6 +605,7 @@ windower.register_event('login',function()
 end)
 
 windower.register_event('logout', function(...)
+    last_menu_open = false
     inventory_loaded = false
     hide()
     clear()
@@ -627,8 +644,8 @@ end)
 
 windower.register_event('outgoing chunk',function(id,org,_modi,_is_injected,_is_blocked)
     if (id == EQUIPMENT_CHANGED_PACKET or id == EQUIPSET_CHANGED_PACKET) then
+        -- Equipment still updates status colors; it no longer wakes the HUD.
         refresh_all = true
-        activity()
     elseif (id == BAZAAR_PRICE_PACKET) then
         refresh_inventory = true
         activity()
