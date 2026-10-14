@@ -1,7 +1,7 @@
 # InvTracker — inventory grid HUD
 
 Originally by sylandro. Enhanced by Awake (FFXI / Windower 4).
-**Testing build:** `1.0.1-a.20261014.5` — not yet tested in a live game client.
+**Testing build:** `1.0.1-a.20261014.6` — not yet tested in a live game client.
 
 InvTracker displays grouped inventory, equipment, storage, temporary item, and
 treasure slots. **The original status sorting, per-bag layout, and grid rendering
@@ -45,6 +45,7 @@ See `TESTING.md` at the ZIP root before testing on multiple clients.
 | `//i show` | Pin visible until another visibility command/event |
 | `//i hide` | Hide immediately, subject to later triggers |
 | `//i move` | Reveal and drag anywhere once to reposition |
+| `//i cancel` | Cancel an explicit move and restore position |
 | `//i lock [on\|off]` | Prevent dragging or set lock explicitly |
 | `//i unlock` | Allow normal dragging on visible grid |
 | `//i pos <x> <y>` | Save resolution-relative position |
@@ -93,6 +94,10 @@ the HUD only. No direct inventory/item movements are performed by InvTracker.
   review if live tests reveal stale stack counts.
 
 ## Cumulative changelog
+
+- **2026-10-14 / Batch 6:** Fixed forced glow preview with glow disabled and
+  starting the reveal pulse on inventory initialization; explicit move cancel
+  added to in-game help. Commits `3138b84`, `cae6681`.
 
 - **2026-10-14 / Batch 1:** Initialized x/y from loaded XML before any position
   command; fresh defaults autohide on, hold 60, position -224/-19; `//i` alias.
