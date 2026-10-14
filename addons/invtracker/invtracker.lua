@@ -87,6 +87,7 @@ local function command_help()
         {'show', 'Pin visible until hidden or another automatic event'},
         {'hide', 'Hide until the next relevant event'},
         {'move', 'Reveal and drag anywhere once to save position'},
+        {'cancel', 'Cancel an explicit move and restore previous position'},
         {'lock [on|off]', 'Lock dragging, or explicitly unlock'},
         {'unlock', 'Enable dragging the visible grid'},
         {'pos <x> <y>', 'Set resolution-relative position'},
