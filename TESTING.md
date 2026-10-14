@@ -5,7 +5,7 @@ Working branch: `invtracker-layout-autohide-20261009`
 Status: **STATIC REVIEW IN PROGRESS; LIVE FFXI TESTS NOT RUN BY A**.
 Do not merge this working branch into `dev` until live-tested.
 
-## Current test batch — 2026-10-14 (six cumulative increments)
+## Current test batch — 2026-10-14 (seven cumulative increments)
 
 Follow these in order on **one** client first, then Killala and the other
 Fenrir clients. Back up each character's XML first.
@@ -42,6 +42,13 @@ Fenrir clients. Back up each character's XML first.
    With glow disabled, run `//i glow preview` and confirm it still
    previews without changing the saved enabled setting. Reload during a zone
    and confirm the initial reveal pulse; help includes `//i cancel`.
+7. **Batch 7, commit `303ed91` — equipment block default and bare help.**
+   On a fresh config, equipment block defaults to hidden. On an existing
+   profile with XML set to true, `//i equipment off` should persist false
+   and rebuild only the grid layout. Re-enable using `//i equipment on`.
+   Enter bare `//i`: reveal the tracker for the configured duration **and**
+   print the full colored help menu once. `//i help` only shows the list.
+   Confirm normal dragging, glow, saved X/Y, and other bag groups still work.
 
 ### Cross-client regression matrix
 
@@ -60,6 +67,8 @@ Fenrir clients. Back up each character's XML first.
   `Windower4/addons/invtracker/`; don't replace/delete `data/settings.xml`.
   Keep `slot.png` from the package or the original addon.
 - **Factory defaults are non-destructive.** Existing XML values override them.
+  `//i equipment off` saves a character-specific correction to equipment
+  visibility and restarts the addon; no manual XML editing is necessary.
   `//i pos reset` intentionally restores only the saved factory coordinates.
 - **No cleanup, Itemizer/Organizer/MogMover, snapshot, or drop action is added.**
   No packet injection or item movement introduced.
@@ -67,6 +76,13 @@ Fenrir clients. Back up each character's XML first.
   appearance of the overlay remain unverified until the user tests.
 
 ## Previous field observations and historical checks
+
+- 2026-10-14 — User live-tested the fresh package: **always dragging works,
+  reveal glow looks great, `//i` alias works, new factory position is correct,
+  and colored help output looks excellent.** Reported unexpected visible
+  equipment block on all characters; user requests hardcoded equipment
+  default false and bare `//i` to reveal + show help. Corrected in Batch 7.
+  These positive observations are limited to features explicitly confirmed.
 
 - 2026-10-14 — User reported on Killala that `//pos` caused arithmetic on
   global `xBase` at reported lines 842 and 406; reloading made it work.
@@ -91,7 +107,8 @@ Fenrir clients. Back up each character's XML first.
 | 3 | `54e4ff0` | reveal glow and preview | Pending |
 | 4 | `eccec4d` | menu transitions and silent equipment | Pending |
 | 5 | `3d1a6aa` | bare reveal and standardized commands | Pending |
-| 6 | `3138b84` / `cae6681` | glow preview, load pulse, cancel help | Pending |
+| 6 | `3138b84` / `cae6681` | glow preview, load pulse, cancel help | Partial user validation of glow |
+| 7 | `303ed91` | equipment visibility default/migration and bare reveal+help | Pending |
 | docs | `dd44100` / `888dfc5` | README and cumulative changelog | Pending |
 
 ## User-provided requests / referenced materials
