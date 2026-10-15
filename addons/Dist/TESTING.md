@@ -37,4 +37,4 @@
 
 ### Delivery register
 
-- 2026-10-15 — First standalone clean-install ZIP (`Dist_0.1.0_test.zip`), Dist folder + root `TESTING.md` + `WORKFLOW.md`. Git commit to be recorded if pushed.
+- 2026-10-15 — First standalone clean-install ZIP (`Dist_0.1.0_test.zip`), Dist folder + root `TESTING.md` + `WORKFLOW.md`. Published as draft PR #4 (https://github.com/rerorriM-Mirrorer/Windower-Addons/pull/4); initial code commit `affa6e94673534474238357dff1221188b4f0950` on `dist-minimal-20261015`. Live-test status remains unverified.
