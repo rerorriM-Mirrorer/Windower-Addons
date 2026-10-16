@@ -1,5 +1,12 @@
 # TESTING.md
 
+## Agent entry-point adoption — 2026-10-16
+
+- Added [`AGENTS.md`](AGENTS.md) to direct repository-aware coding agents to read the current `WORKFLOW.md` and `TESTING.md` before making changes.
+- **Commit:** [`f0651c0`](https://github.com/rerorriM-Mirrorer/Windower-Addons/commit/f0651c0f9ed0104803611a2309f3039dba078c2a).
+- **Scope:** Documentation only; no addon code changed, testing ZIP generated, or in-game test performed.
+- **Continuity:** Earlier testing and development records below remain intact.
+
 ## Package layout convention — 2026-10-16
 
 - **Repository:** Keep `WORKFLOW.md` and `TESTING.md` at the repository root.
