@@ -2,6 +2,8 @@
 
 An FFXI-style frame for the Windower 4 console, with XIVParty's violet stripes, silver rails, a soft glow, and a fading right edge. Windower still draws the text and handles commands. ConsoleBG+ draws the frame around it.
 
+Development status and live checklist: [TESTING.md](https://github.com/rerorriM-Mirrorer/Windower-Addons/blob/consolebg-plus/TESTING.md). The installable ZIP keeps that guide beside this README.
+
 ## Install and update
 
 Extract the ConsoleBGPlus folder into Windower/addons. When updating, replace the addon files and **keep your data folder**; the ZIP contains no settings file. In FFXI chat, run **//lua load ConsoleBGPlus** for a first install or **//lua reload ConsoleBGPlus** after updating. Unload the original ConsoleBG addon if it is running.
@@ -11,6 +13,8 @@ Fresh settings start at **16,48** with equal left and right margins, a 344-pixel
 ## Move and resize
 
 Run **//cbg edit** to toggle edit mode. A band of pale diagonal lines marks the draggable top edge; drag anywhere along it to move the frame. The matching mark at the lower-right corner resizes it. Each grip gains a soft pink wash on hover; while pressed, the wash goes away and its lines turn pale pink. Release the mouse to save. Run **//cbg edit** again when you finish. Closing the native console with Insert also ends edit and preview modes.
+
+Hold **either Ctrl key** while dragging to floor the parent anchor to a shared screen-origin grid, initially **10 UI pixels**. **//cbg grid 7** saves a different spacing; bare **//cbg grid** reports it. Free dragging remains pixel-precise. The grid does not resize the widget or snap its individual children. Screen edges take precedence; Ctrl+resize keeps its existing behavior.
 
 In screen-width mode, dragging left or right keeps matching side margins. Resizing sets a fixed width; **//cbg width screen** returns to screen-width mode. When console movement is linked, the native text follows the frame.
 
@@ -23,6 +27,7 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
 **//cbg tabstyle** and **//cbg tabstyle toggle** both switch between the native grey plaque and red lettering.
 
     Layout
+    //cbg grid [pixels]                        Ctrl+drag grid, default 10 UI pixels
     //cbg edit [on|off]                         Toggle or set mouse edit mode
     //cbg position [<x> <y>]                      Move the frame to pixel coordinates
     //cbg size [<width> <height>]                 Set the outer size and fixed width
@@ -41,6 +46,9 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
     //cbg labelsize [<title> <input>]             Set label sizes (6-16)
     //cbg labeloffset <-12 to 12>              Move Input label vertically
     //cbg font [<font name> <size>]             Linked font/size; no args reports it
+    //cbg calibrate                            Measure current font; fit 15 rows
+    //cbg calibrate status                     Report current font calibration
+    //cbg calibrate <line> [top [bottom [input]]]  Set exact pixel calibration
     //cbg nativefont [<font name> <size>]         Set native console font (size 6-24)
     //cbg nativecolor <a> <r> <g> <b>           Set native console color (0-255)
 
@@ -74,7 +82,22 @@ The bundled open and close cues play once at each native console visibility tran
 
 ## Linked font calibration
 
-**//cbg font Trebuchet MS 18** sets both native console text and frame labels. Changing size scales the existing label sizes, Input strip height, label vertical offset, and native console vertical offset. The full frame grows or shrinks with the strip, preserving the compact output body's height. Horizontal position, bottom padding, and saved fade settings are kept. Font sizes are 6-24; labels are limited to 6-16. **//cbg font** reports current values. Repeating the same font/size keeps your calibration.
+Start with the installed Arial Rounded face:
+
+```text
+//cbg font "Arial Rounded MT Bold" 8
+//cbg calibrate
+```
+
+The linked font command sets native console text and frame labels, restoring a saved layout for that exact font/size. A new pair gets an estimate derived from the original size-12 design: 15 output rows with fixed top/bottom margins and a separate Input row. It no longer keeps the output background at size-12 height. Font sizes remain 6-24; label sizes remain 6-16. Rails retain their native pixel dimensions. Existing layouts are not automatically recalibrated on upgrade or reload.
+
+**//cbg calibrate** renders two invisible addon text probes (one and three lines), waits for stable positive extents, and estimates line spacing as `(three-line height - single-line height) / 2`. It fits 15 output rows, uses one line of that spacing for Input, and saves the result by font/size. Failure to settle within 90 render frames leaves the layout intact. Another layout command, a drag, settings reload, or unloading cancels a pending probe. No probe text is written to console.log.
+
+**These are addon-text measurements, not measurements of the native console.** Windows font substitution and different renderer metrics can still affect the result. We cannot detect whether the requested face is installed. Compare all 15 native output rows, then open Input and check its extra row. Begin with Arial Rounded MT Bold at 8, 10, and 12; repeat for Tahoma and Verdana after the first face fits.
+
+**//cbg calibrate status** reports spacing, source, margins, and height. **//cbg diagnose** also records single/three-line measurements, the requested font, and the viewport. To correct a native-renderer mismatch, use **//cbg calibrate 12.5 10 6 13**: this example means 12.5px line spacing, 10px top margin/native text offset, 6px bottom allowance, and 13px Input height. These are example values, not a verified preset. Omitted margins/Input keep current values. Spacing accepts 4-128 pixels; top/bottom accept 0-128 and Input 6-256. The frame is still clipped to the viewport if all 15 rows cannot fit.
+
+Profiles save absolute height, Input height, label calibration, and native text offsets. Switching repeatedly does not compound rounding. Manual layout adjustments are retained when leaving a profile. Position, width, colors, fade, and activity controls remain shared settings. Reload reapplies the active saved font/layout. **//cbg reset** clears the profiles as well as restoring defaults.
 
 Verdana 12 is an initial default, not a forced font. Load/reload reapplies the saved font. **//cbg nativefont** changes native text alone; labelfont and labelsize remain available for individual adjustments. Native text has no documented font/extent getter, so a different typeface may still need **//cbg offset**, **//cbg labeloffset**, or **//cbg input on <height>** after inspecting it with preview. Changing console_font outside the addon is not detected and is overwritten by the saved font on reload.
 
@@ -90,3 +113,18 @@ The addon cannot read native console input, output text, or live fade opacity. I
 
 Derived from [ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/addons/ConsoleBG). Textures derive from [XIVParty by Tylas](https://github.com/Tylas11/XivParty/tree/master/assets/ffxi); terms and attribution are in LICENSE.txt. The addon uses Windower's built-in config library and does not require XIVParty to be installed.
 
+
+
+## Changelog
+
+### 0.1.21 — calibration and Ctrl+drag test
+
+- Screen-origin Ctrl+drag parent-anchor snapping with saved grid spacing; free drag and resize retained.
+- Fifteen-row font sizing, opt-in invisible text measurements, exact pixel overrides, and per-font/size absolute profiles.
+- Calibration/grid diagnostics and current root WORKFLOW/TESTING guidance.
+- Lua 5.1 syntax and Lua 5.4 mocked checks pass; native font fit and mouse behavior await live acceptance.
+
+### 0.1.20 — previous batch
+
+- Independent frame/native activity controls, linked font command, 450ms fresh/reset fade, and bare setting readouts.
+- Original delivery notes and two-client checklist remain in CHANGELOG.md.

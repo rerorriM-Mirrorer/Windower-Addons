@@ -1,5 +1,14 @@
 # ConsoleBG+ changes
 
+## 0.1.21 — test batch
+
+- Ctrl+drag floors one frame anchor to a saved 10px screen-origin grid; free dragging and resize preserved.
+- New font/size pairs get a 15-row estimate; calibrate measures addon-text spacing and stores absolute profiles. Exact pixel corrections are supported.
+- Start with `//cbg font "Arial Rounded MT Bold" 8`, then `//cbg calibrate`. Use `//cbg calibrate status` and `//cbg diagnose` for the comparison.
+- Full instructions and current verification status: TESTING.md, included beside this file in the ZIP.
+- The history below describes v0.1.20; its fixed output-body font behavior is superseded by v0.1.21.
+
+
 ## 0.1.20 — test batch
 
 - Independent frame activity and nativeactivity switches; both preserve logging.
@@ -21,3 +30,4 @@
 9. Use bare font/pos/size/offset/fade for readouts. Turn preview off before timing tests; trace on before reproducing an issue, trace off and diagnose afterward.
 
 Offline checks are mocked Windower API checks; they do not establish native rendering or multi-client file-writing behavior.
+

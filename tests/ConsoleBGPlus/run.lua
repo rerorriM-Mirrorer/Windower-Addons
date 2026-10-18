@@ -949,6 +949,6 @@ assert(queued[#queued-4] == 'console_font "Arial Rounded MT Bold" 8' and rectang
 run('calibrate'); callbacks.unload()
 assert(next(text_objects) == nil and count() == 0, 'Unload deletes pending probes and all frame objects')
 io.open = real_open
-print('PASS: fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
+print('PASS: Ctrl+drag grid matrix, per-font 15-row calibration/profile matrix, proxy failure/cancellation, and fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
 
 
