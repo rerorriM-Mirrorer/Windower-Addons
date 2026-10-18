@@ -1,7 +1,7 @@
 -- ConsoleBG+ is derived from ConsoleBG by StarHawk, Copyright 2015 Windower.
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
-_addon.author = 'StarHawk; Awake'
+_addon.author = 'StarHawk; A'
 _addon.version = '0.1.20'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
