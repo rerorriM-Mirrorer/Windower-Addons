@@ -26,7 +26,7 @@
         SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ]]
 _addon.name = 'Equipviewer'
-_addon.version = '3.3.3-dev.1'
+_addon.version = '3.3.3-dev.2'
 _addon.author = 'Tako, Rubenator, A'
 _addon.commands = { 'equipviewer', 'ev' }
 
@@ -106,6 +106,7 @@ local defaults = {
     hide_on_cutscene = true,
     left_justify = false,
     draggable = true,
+    drag_grid = 10, -- Absolute UI pixels, never scaled with the item slots.
     visibility = {
         mode = 'show', -- Preserve the live-tested default; auto is opt-in.
         delay = 4,
@@ -197,11 +198,43 @@ local drag_state = {
     start_y = nil,
 }
 
-local function ammo_text_position()
-    if settings.left_justify then
+local drag_keys = {[29] = false, [157] = false}
+
+local function reset_drag_keys()
+    drag_keys[29], drag_keys[157] = false, false
+end
+
+local function drag_grid_size()
+    local grid = tonumber(settings.drag_grid)
+    if not grid or grid ~= grid or grid < 1 or grid == math.huge or grid % 1 ~= 0 then return 10 end
+    return grid
+end
+
+-- A: images.lua still owns capture and the original cursor-to-anchor offset.
+-- Only its moved parent anchor is quantized; children never snap separately.
+local function drag_position(x, y)
+    if not drag_keys[29] and not drag_keys[157] then return x, y end
+    local info = windower.get_windower_settings() or {}
+    local grid, extent = drag_grid_size(), settings.size * 4
+    local function snap_axis(value, limit)
+        value = math.max(0, value)
+        limit = tonumber(limit)
+        if limit and limit > 0 and limit < math.huge then
+            value = math.min(value, math.max(0, limit - extent))
+        end
+        return math.floor(value / grid) * grid
+    end
+    return snap_axis(x, info.ui_x_res or info.x_res), snap_axis(y, info.ui_y_res or info.y_res)
+end
+
+local function ammo_text_position(left_justify)
+    if left_justify == nil then left_justify = settings.left_justify end
+    if left_justify then
         return settings.pos.x + settings.size*3, settings.pos.y + settings.size*0.58
     end
 
+    -- texts.lua adds ui_x_res back for right-justified coordinates. Both setup
+    -- and dragging use this same conversion, keeping the screen anchor stable.
     return (windower.get_windower_settings().ui_x_res - (settings.pos.x + settings.size*4))*-1,
         settings.pos.y + settings.size*0.58
 end
@@ -211,6 +244,7 @@ local function sync_ui_to_position(x, y)
 
     settings.pos.x = x
     settings.pos.y = y
+    if bg_image then bg_image:pos(x, y) end
 
     for _, slot in pairs(equipment_data) do
         if slot.image then
@@ -350,9 +384,17 @@ windower.register_event('prerender', function()
         end
         drag_state.dirty = true
         ui_state.dragging = true
+        x, y = drag_position(x, y)
         sync_ui_to_position(x, y)
     end
 end)
+
+-- Observe both Ctrl keys, including releases marked blocked by another addon;
+-- return nothing so this feature never consumes keyboard input.
+windower.register_event('keyboard', function(dik, down)
+    if dik == 29 or dik == 157 then drag_keys[dik] = down and true or false end
+end)
+windower.register_event('lose focus', reset_drag_keys)
 
 windower.register_event('mouse', function(event_type, x, y)
     ui_state.mouse_x, ui_state.mouse_y = x, y
@@ -378,6 +420,7 @@ windower.register_event('mouse', function(type, x, y, delta, blocked)
     if not drag_state.dirty and pos_x == settings.pos.x and pos_y == settings.pos.y then return end
     local start_x = drag_state.start_x or settings.pos.x
     local start_y = drag_state.start_y or settings.pos.y
+    pos_x, pos_y = drag_position(pos_x, pos_y)
     sync_ui_to_position(pos_x, pos_y)
     config.save(settings)
 
@@ -404,6 +447,7 @@ end)
 
 -- Called whenever character logs out.
 windower.register_event('logout', function()
+    reset_drag_keys()
     ui_state.logged_in = false
     ui_state.dragging = false
     visibility = Visibility.new(os.clock(), 'hide')
@@ -641,10 +685,21 @@ local function handle_visibility_command(cmd, args)
             config.save(settings)
         end
         log('Fade in: '..settings.visibility.fade_in..'s | Fade out: '..settings.visibility.fade_out..'s')
+    elseif cmd == 'grid' then
+        if args[1] then
+            local grid = tonumber(args[1])
+            if #args ~= 1 or not grid or grid ~= grid or grid < 1 or grid == math.huge or grid % 1 ~= 0 then
+                log('Usage: //ev grid <positive whole UI pixels>'); return true
+            end
+            settings.drag_grid = grid
+            config.save(settings)
+        end
+        log('Ctrl+drag grid: '..drag_grid_size()..' UI pixels, origin 0,0')
     elseif cmd == 'status' then
-        log(('EquipViewer %s | Mode=%s | Visible=%s | Alpha=%d%% | Delay=%ss | Hover=%s | Scale=%s | Pos=%s,%s'):format(
+        log(('EquipViewer %s | Mode=%s | Visible=%s | Alpha=%d%% | Delay=%ss | Hover=%s | Scale=%s | Pos=%s,%s | Grid=%spx'):format(
             _addon.version, settings.visibility.mode, tostring(display_visible()), math.floor(visibility.alpha * 100),
-            settings.visibility.delay, tostring(settings.visibility.hover), settings.size / 32, settings.pos.x, settings.pos.y))
+            settings.visibility.delay, tostring(settings.visibility.hover), settings.size / 32, settings.pos.x, settings.pos.y,
+            drag_grid_size()))
     else
         return false
     end
@@ -895,10 +950,13 @@ windower.register_event('addon command', function (...)
         log('ev lock: prevents accidental dragging')
         log('ev unlock: enables dragging and saved position')
         log('ev draggable <on|off>: sets/toggles dragging')
+        log('ev grid [pixels]: Ctrl+drag screen-origin grid spacing (default 10 UI pixels)')
     end
 end)
 
 function refresh_ui_settings()
+    local ammo_right_x, ammo_y = ammo_text_position(false)
+    local ammo_left_x = ammo_text_position(true)
     --Image and text settings
     bg_image_settings = {
         alpha = settings.bg.alpha,
@@ -972,8 +1030,8 @@ function refresh_ui_settings()
             green = 255
         },
         pos = {
-            x = (windower.get_windower_settings().ui_x_res - (settings.pos.x + settings.size*4))*-1,
-            y = settings.pos.y + settings.size*0.58,
+            x = ammo_right_x,
+            y = ammo_y,
         },
         flags = {
             draggable = false,
@@ -1004,8 +1062,8 @@ function refresh_ui_settings()
             green = 255
         },
         pos = {
-            x = settings.pos.x + settings.size*3,
-            y = settings.pos.y + settings.size*0.58
+            x = ammo_left_x,
+            y = ammo_y
         },
         flags = {
             draggable = false,
