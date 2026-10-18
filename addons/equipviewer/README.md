@@ -1,6 +1,10 @@
 **Author:** Tako, Rubenator; fork changes by A<br>
-**Version:** 3.3.3-dev.1 (testing)<br>
-**Date:** October 8, 2026<br>
+**Version:** 3.3.3-dev.2 (testing)<br>
+**Date:** October 18, 2026<br>
+
+Current development: Ctrl+drag grid snapping is ready for live testing on
+`equipviewer-ctrl-grid-2026-10-18`. See repository-root `TESTING.md` for current
+status, completed simulations, and the preserved earlier testing record.
 
 * Displays current equipment grid on screen. Also can show current Ammo count and current Encumbrance.
 
@@ -11,6 +15,30 @@
 * Most settings can be modified via commands, but you can edit the settings.xml directly for a few uncommon settings.
 
 **Abbreviation:** `//ev`
+
+## Positioning and Ctrl+drag
+
+Normal dragging keeps the existing smooth, unrestricted positioning. Hold either
+left or right Ctrl during a drag to floor the **background's top-left anchor** to
+the shared screen-origin `(0,0)` grid: `(273,57)` becomes `(270,50)` with 10px spacing.
+The grid is measured in Windower **UI pixels** and does not change with widget scale.
+Icons, encumbrance marks, and ammo text follow the parent; they do not snap separately.
+
+`//ev grid` reports the spacing; `//ev grid 10` saves 10px spacing. Any positive whole
+number of UI pixels is accepted. Changing the setting or pressing Ctrl without
+moving the grid does not reposition it. Releasing the mouse saves the final anchor
+using the existing settings and confirmation message. `//ev status` includes spacing.
+
+Ctrl-snapped placements respect the current UI viewport's edges when the 4x4 grid
+fits. An oversized dimension anchors at zero on that axis; an oversized grid cannot
+be fully contained. Normal dragging and `//ev pos x y` retain their previous ability
+to place the grid off-screen. Recover it with, for example, `//ev pos 100 100`.
+
+Locking, hidden-mode input behavior, visibility fades, and scale remain unchanged.
+The existing scale setting computes each slot from `32 * factor`; neither grid
+spacing nor saved positions are rescaled. Fractional slot offsets/font metrics
+are preserved. See `docs/EQUIPVIEWER_ALIGNMENT.md` in the source or this package for
+the coordinate audit and visual limitations awaiting live testing.
 
 ## Visibility
 
@@ -85,6 +113,17 @@ game_path <path>: sets path to FFXI folder where you want dats extracted from. B
 ```
 
 ## Changelog
+
+### 3.3.3-dev.2 — October 18, 2026 — awaiting live testing
+
+- Added either-Ctrl floor snapping of the parent anchor to a shared `(0,0)` grid,
+  configurable with `//ev grid [pixels]`, default 10 UI pixels independent of scale.
+- Bounded snapped grid rectangles to the UI viewport while preserving free dragging.
+  Retained native image-library mouse capture, locking, saved positions, and visibility.
+- Unified setup/movement ammo-position calculations without changing text design.
+- Added 70 simulated resolution/scale/alignment cases and checks using the real
+  image-library mouse callback with mocked primitives. Updated cumulative testing
+  status and adopted the current consolidated workflow; no live baseline was replaced.
 
 ### 3.3.3-dev.1 — October 8, 2026 — awaiting live testing
 

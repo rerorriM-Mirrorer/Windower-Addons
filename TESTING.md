@@ -1,3 +1,80 @@
+# Current Development Status — EquipViewer
+
+- **Repository / branch:** `rerorriM-Mirrorer/Windower-Addons` / `equipviewer-ctrl-grid-2026-10-18`.
+- **Runtime:** `3.3.3-dev.2`, Windower 4; no additional companion addon.
+- **Tested starting/source checkpoint:** `a43f5e2c02b3d4130576bdbe7cb0353fef6e14e8` on the existing autohide branch (runtime `3.3.3-dev.1`). The source branch and default `dev` remain unchanged by this delivery.
+- **Most recent user-confirmed live behavior (2026-10-08):** `ev hide` hid the window; autohide revealed it on equipment changes and worked very well so far. The user was continuing testing. This confirms those observations, not the entire earlier matrix or new snapping.
+- **Current automated checks:** Lua 5.1 parsing passed; smoke/regression passed with system Lua 5.4 and mocked Windower APIs. A second run executed the real source image-library mouse callback against mocked primitives. Both covered 70 resolution/scale/ammo-alignment combinations.
+- **Unresolved/live:** Ctrl snapping still needs Windows/Windower/FFXI acceptance. Native text appearance, real XML serialization/reload, overlapping addon input, and dynamic resolution changes remain live checks.
+- **Next step:** install Test 2; check free drag vs both Ctrl keys, modifier changes mid-drag, saved anchors after release/reload, and appearance at small/large scales. Do not promote this branch before acceptance.
+
+## 2026-10-18 — Test 2: shared screen-grid snapping
+
+**Ideal:** align the top-left corner with other addons on demand while normal dragging and internal layout remain unchanged. The existing parent is `settings.pos`, the background image's top-left; no independent sub-widget anchors exist.
+
+**Code commit:** [b49dfe1](https://github.com/rerorriM-Mirrorer/Windower-Addons/commit/b49dfe1aa5ce0cd76e0de1eb3792ac438017c98e). This identifies code changes, not the final documentation/package head. The final published checkpoint is supplied in the handoff and Git history, avoiding a self-referential hash in this file.
+
+### Installation — complete addon folder
+
+1. Back up your existing `Windower/addons/equipviewer/` folder and `data/settings.xml`.
+2. Copy the package's `equipviewer/` folder into `Windower/addons/`, merging rather than deleting your existing folder. Keep `data/` and cached `icons/`; neither is bundled or reset.
+3. Contents: main Lua, unchanged `visibility.lua`, `icon_extractor.lua`, `encumbrance.png`, README, consolidated WORKFLOW, this TESTING guide, alignment notes, and regression harness. Existing Windower libraries/resources are still required.
+4. Run `//lua reload equipviewer`, then `//ev status`. Expect `3.3.3-dev.2` and `Grid=10px`, unless another spacing was saved.
+5. Use `//ev show` and `//ev unlock` for positioning. Hold either Ctrl during movement. `//ev grid` reports spacing; `//ev grid 7` saves seven UI pixels. Changing spacing does not move the widget.
+
+Existing positions/settings remain. The new `drag_grid` default merges through config; no character XML is shipped. Roll back by restoring the backed-up folder/settings and reloading. This delivery retains the existing name `equipviewer`.
+
+### Current live acceptance — new checks pending
+
+| Check | Exercise | Expected | Live result |
+| --- | --- | --- | --- |
+| Free drag | Move without Ctrl, including screen edges | Existing smooth unrestricted placement, saved on release | Pending |
+| Either/both Ctrl | Drag with left, right, or both; release one while holding the other | Floor snapping from (0,0); 273,57 → 270,50 at 10px | Pending |
+| Modifier changes | Press/release Ctrl mid-drag; cross and return over cells | No accumulated grab-offset error; free motion resumes on movement | Pending |
+| Quick release | Move and release before the next frame | Final snapped coordinates saved and confirmed | Pending |
+| Persistence | Release; reload/logout/login | Same saved anchor and spacing; other settings retained | Pending |
+| Lock/hidden | Try Ctrl+drag locked or hidden | No new drag capture or unexpected movement | Pending |
+| Other input | Ctrl alone, blocked clicks/overlapping addons, Alt-Tab | No unsolicited snapping or consumed keyboard input | Pending |
+| Bounds | Ctrl+drag beyond all edges, then without Ctrl | Snapped rectangle fits when possible; free drag stays unrestricted | Pending |
+| Oversized widget | Exceed viewport on one/both axes | Anchor zero on oversized axes; full containment is impossible | Pending |
+| Scale/resolution | Small/fractional/large scales and client resolutions | Grid stays in UI pixels; children stay relative to parent | Pending |
+| Text | Both `ev justify` states, especially tiny scales | Native appearance acceptable, no new coordinate drift | Pending |
+| Prior behavior | Autohide/fades/gear updates and drag hold/release | Existing behavior retained | Pending |
+
+### Completed checks for Test 2
+
+- Read GitHub WORKFLOW/TESTING and recursive tree at the source checkpoint. No `AGENTS.md` existed; consulted NPCMirror's canonical consolidated workflow. Read BarFiller2's `docs/ALIGNMENT.md`, BarFiller2/EnemyBar2 input code, and Windower image/text methods. No mouse-handler transplant or addon rename was made.
+- Lua 5.1-aware parsing passed for main addon, visibility module, and tests, with existing Windower string-method shorthand normalized only in memory. New helpers/state are local; the main addon's global-name set is unchanged. Whitespace checks passed.
+- Mocked smoke/regression passed, including previous visibility checks plus **70 combinations**: resolutions 960×540, 1280×720, 1600×900, 1920×1080, 3840×2160; scale factors 0.03125, 0.25, 0.75, 1, 1.333, 2.5, 3.125; both ammo alignments. These span 1px–100px slots and fractional sizes.
+- Additional direct size checks used 200px/300px slots in a 960×540 viewport, exercising one/both oversized axes. Historical scale-command limits were preserved.
+- Repeated with the real `images.lua` mouse-handler body from blob `b54021025436d54a3cae94c71c8d3ad48ef01ba0`, against mocked primitives. Checked capture offset, blocked-event propagation, release ordering, cell crossings, modifier changes, and existing behavior. This was not a native Windows/Windower session or a full native rendering-library run.
+- Saved-position checks observe values passed to the config-save mock; actual XML serialization and persistence still need live acceptance. Fractional-offset assertions use a small numerical tolerance; production rounding was not changed.
+- A tiny-widget test initially clicked outside its 4px-high handle. Correcting the test pointer to remain inside the actual handle made the real-callback run pass. No production code was changed to mask that fixture mistake.
+
+From the repository root with standard Lua:
+
+```text
+lua tests/equipviewer/run.lua
+lua tests/equipviewer/run.lua addons/libs/images.lua
+```
+
+The second command executes the source mouse callback with mocks. The identical harness is packaged as `equipviewer/tests/run.lua`; from a Windower root, use `lua addons/equipviewer/tests/run.lua addons/libs/images.lua`. These are standalone simulations, not in-client commands.
+
+### Internal alignment findings — separately assessed
+
+No inconsistent coordinate formulas were found beyond duplicated equivalent setup/movement ammo calculations, now shared through one helper. Positions and dimensions already derive directly from the original 32px design slot rather than scaling previously scaled coordinates. Existing fractional text offsets/font metrics remain unchanged. The clamp measures the grid rectangle, not native text extents; tiny-scale font appearance and dynamic resolution changes without a move/rebuild remain visual checks. See `docs/EQUIPVIEWER_ALIGNMENT.md`.
+
+### Delivery register, observations, and dated corrections
+
+- **Test 2 / 3.3.3-dev.2:** code/tests in `b49dfe1`; documentation follows on the same development branch. The complete install corresponds to the final identifiable published checkpoint given in the handoff.
+- **2026-10-18 correction:** the preserved Test 1 wording ~~Current live checks — all pending~~ described its original delivery. The 2026-10-08 user report subsequently confirmed window hiding and equipment-change reveal. Broader packet/zone/persistence checks and new Ctrl snapping remain pending. The earlier tables below are historical delivery records.
+- **2026-10-18 packaging update:** earlier instructions requested separate AGATHOS/DESIGN at the ZIP root. NPCMirror now consolidates them into WORKFLOW and places WORKFLOW/TESTING beside addon code. Test 2 follows the current rule. Historical repository documents and testing information are not deleted.
+- **Current request recorded:** shared-grid Ctrl dragging; retain free input/layout/scaling and saved positions; inspect current GitHub records/reference first; test boundaries, resolutions, and extreme scales; report alignment concerns separately; push development changes without replacing a live baseline.
+
+## Preserved Test 1 delivery record
+
+The text below is the original 2026-10-08 delivery. Its branch/version, package layout, and pending labels are historical. The dated status and corrections above take precedence; no previous testing information has been removed.
+
 # EquipViewer — testing batch 1: visibility
 
 ## Start here
