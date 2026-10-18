@@ -1,6 +1,15 @@
 # TESTING.md — InvTracker (Windower-Addons working branch)
 
-Author: Awake
+## Current Development Status — 2026-10-18 (attribution normalization)
+
+- **Branch / starting source:** `invtracker-layout-autohide-20261009` / `14216b52f599abd4851f24761d139cae18a83e4a`.
+- **Change:** Standardize the collaborative author label as **A** in this cumulative record, the addon README, and source comments. Upstream attribution and previous testing records are otherwise preserved.
+- **Verification:** Text-only diff and exact-word search; no code behavior, default settings, or saved data changed. No new live FFXI test was run.
+- **Next:** Continue the existing InvTracker live acceptance checks; confirm the published branch head after commit.
+
+---
+
+Author: A
 Working branch: `invtracker-layout-autohide-20261009`
 Status: **STATIC REVIEW IN PROGRESS; LIVE FFXI TESTS NOT RUN BY A**.
 Do not merge this working branch into `dev` until live-tested.

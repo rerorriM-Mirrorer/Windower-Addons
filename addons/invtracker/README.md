@@ -1,6 +1,6 @@
 # InvTracker — inventory grid HUD
 
-Originally by sylandro. Enhanced by Awake (FFXI / Windower 4).
+Originally by sylandro. Enhanced by A (FFXI / Windower 4).
 **Testing build:** `1.0.1-a.20261014.7` — not yet tested in a live game client.
 
 InvTracker displays grouped inventory, equipment, storage, temporary item, and

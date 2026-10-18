@@ -28,7 +28,7 @@
 
 _addon.name = 'invtracker'
 _addon.author = 'sylandro'
-_addon.version = '1.0.1-a.20261014.7' -- Awake: equipment default off; bare alias shows help
+_addon.version = '1.0.1-a.20261014.7' -- A: equipment default off; bare alias shows help
 _addon.language = 'English'
 _addon.commands = {'invtracker','inv','i'}
 
@@ -63,7 +63,7 @@ local is_hidden_by_cutscene = false
 local is_hidden_by_key = false
 local last_menu_open = false
 
--- Awake: presentation state only; inventory sorting and block indexing are untouched.
+-- A: presentation state only; inventory sorting and block indexing are untouched.
 local moving = false
 local drag = {active=false, x=0, y=0, original_x=0, original_y=0}
 local vis = {opacity=1, target=1, from=1, start=0, duration=1, until_time=0, manual='auto', step=-1}
@@ -296,7 +296,7 @@ local refresh_inventory = false
 local refresh_linkshell = false
 local last_treasure_count = 0
 
--- Awake: Windower images.new(table) RETAINS the supplied settings table.
+-- A: Windower images.new(table) RETAINS the supplied settings table.
 -- Its pos()/alpha()/color() methods write back to that table. Passing the
 -- shared s.box/s.background prototype made every slot report the coordinates
 -- of the last drawn slot. On drag, all primitives stacked at one location;
