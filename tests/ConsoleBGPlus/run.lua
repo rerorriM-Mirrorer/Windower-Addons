@@ -9,6 +9,7 @@ local save_calls, positions, console_writes = 0, {}, 0
 local diagnostic_files, fail_diagnostics = {}, false
 local render_frame, style_calls, measurement_calls = 0, 0, 0
 local render_latency = 2
+local fail_probe = false
 local test_seconds, fake_log_size, log_polls = 1791050000, nil, 0
 local played_sounds, focused = {}, true
 package.preload.socket = function() return {gettime = function() return test_seconds end} end
@@ -152,6 +153,7 @@ end
 function windower.text.get_extents(name)
     local object = text_objects[name]
     measurement_calls = measurement_calls + 1
+    if fail_probe and name:find('ConsoleBGPlus_probe_', 1, true) then return 0, 0 end
     if not object.visible then return 0, 0 end
     return object.rendered_width or 0, object.rendered_height or 0
 end
@@ -176,7 +178,8 @@ local function tick(seconds)
             local width_factor = object.font == 'Meiryo' and 0.9 or 0.8
             local height_factor = object.font == 'Meiryo' and 2.4 or 1.4
             object.rendered_width = math.ceil(#object.text * object.size * width_factor)
-            object.rendered_height = math.ceil(object.size * height_factor)
+            local _, newlines = object.text:gsub('\n', '')
+            object.rendered_height = math.ceil(object.size * height_factor) * (newlines + 1)
         end
     end
 end
@@ -624,12 +627,12 @@ run('font', 'Trebuchet', 'MS', '18')
 assert(saved.native.font == 'Trebuchet MS' and saved.native.size == 18
     and saved.labels.font == 'Trebuchet MS' and saved.labels.title_size == 12
     and saved.labels.input_size == 11 and saved.input.height == 23
-    and saved.console.offset_y == 23 and saved.extents.y - saved.input.height == output_body_height)
+    and saved.console.offset_y == 15 and saved.extents.y == 502)
 local font_save_count = save_calls
 run('font')
 assert(save_calls == font_save_count and logs[#logs][2]:find('Trebuchet MS 18', 1, true))
 run('font', 'Trebuchet', 'MS', '18')
-assert(saved.input.height == 23 and saved.console.offset_y == 23,
+assert(saved.input.height == 23 and saved.console.offset_y == 15,
     'Repeated identical font command must preserve calibration')
 local invalid_font_save_count = save_calls
 run('font', 'Verdana;console_log', '12')
@@ -878,7 +881,7 @@ for _, screen in ipairs({{960,540},{1280,720},{1366,768},{3840,2160}}) do
         local x,y = saved.pos.x,saved.pos.y
         config.callback()
         assert(rectangle().x == x and rectangle().y == y, 'Saved anchor survives settings reload')
-        run('pos', '23', '47'); run('width')
+        run('pos', '23', '47'); run('width'); callbacks.keyboard(29, true)
         assert(mouse(1, 25, 50)); mouse(0, 9999, 9999); mouse(2, 9999, 9999)
         r = rectangle()
         assert(r.x % 7 == 0 and r.y % 7 == 0 and r.x+r.width <= screen_width)
@@ -888,11 +891,63 @@ for _, screen in ipairs({{960,540},{1280,720},{1366,768},{3840,2160}}) do
     end
 end
 run('size', '240', '160'); run('pos', '23', '47')
-callbacks.keyboard(29, true); callbacks['focus change'](false)
+callbacks.keyboard(29, true); focused = false; tick(); focused = true
 assert(mouse(1, 25, 50)); mouse(0, 32, 59); mouse(2, 32, 59)
 assert(saved.pos.x == 30 and saved.pos.y == 56, 'Focus loss clears stale Ctrl')
 run('edit', 'off'); assert(mouse(1, 31, 57) == false)
 callbacks.unload()
+-- Invisible text probes, exact overrides, absolute profiles, and cleanup.
+screen_width, screen_height = 1366, 768
+console_open = true
+dofile(addon_path .. 'ConsoleBGPlus.lua')
+run('reset'); run('preview', 'on')
+for _, font in ipairs({'Arial Rounded MT Bold', 'Tahoma', 'Verdana'}) do
+    for _, size in ipairs({'8', '10', '12'}) do
+        run('font', font, size)
+        run('calibrate'); settle()
+        local spacing = math.ceil(tonumber(size) * 1.4)
+        assert(saved.fontmetrics.source == 'addon-proxy' and saved.fontmetrics.spacing == spacing)
+        assert(saved.fontmetrics.single == spacing and saved.fontmetrics.multi == 3*spacing)
+        assert(saved.extents.y == 15 + 15*spacing + 7 + spacing + 7)
+        assert(not text_objects.ConsoleBGPlus_probe_single and not text_objects.ConsoleBGPlus_probe_multi)
+        local current_height = saved.extents.y
+        run('font', font, size); assert(saved.extents.y == current_height)
+    end
+end
+run('font', 'Arial Rounded MT Bold', '8')
+run('calibrate', '12.5', '10', '6', '13')
+assert(saved.extents.y == 224 and saved.console.offset_y == 10 and saved.fontmetrics.source == 'manual')
+run('font', 'Tahoma', '10'); run('font', 'Arial Rounded MT Bold', '8')
+assert(saved.extents.y == 224 and saved.console.offset_y == 10)
+local before_report = save_calls
+run('calibrate', 'status'); run('calibrate', '0'); run('calibrate', 'nan')
+run('calibrate', '12', '-1'); run('calibrate', '12', '10', '6', '0')
+assert(save_calls == before_report)
+run('calibrate'); run('pos', '30', '40'); settle()
+assert(not text_objects.ConsoleBGPlus_probe_single and saved.fontmetrics.source == 'manual',
+    'Changing layout cancels a pending measurement')
+run('calibrate'); config.callback(); settle()
+assert(not text_objects.ConsoleBGPlus_probe_multi and saved.fontmetrics.source == 'manual')
+fail_probe = true
+before_report = save_calls
+run('calibrate'); for _ = 1, 100 do tick() end
+assert(save_calls == before_report and not text_objects.ConsoleBGPlus_probe_single)
+fail_probe = false
+for _, screen in ipairs({{960,540},{1280,720},{1366,768},{3840,2160}}) do
+    screen_width, screen_height = screen[1], screen[2]
+    for _, size in ipairs({'6', '24'}) do
+        run('font', 'Arial Rounded MT Bold', size); run('calibrate'); settle()
+        local r = rectangle()
+        assert(r.x >= 0 and r.y >= 0 and r.x+r.width <= screen_width and r.y+r.height <= screen_height)
+        run('diagnose')
+        assert(diagnostic_files[addon_path .. 'data/diagnostics.txt'].text:find('fontmetrics.source=addon-proxy', 1, true))
+    end
+end
+run('font', 'Arial Rounded MT Bold', '8')
+callbacks.unload(); dofile(addon_path .. 'ConsoleBGPlus.lua'); tick()
+assert(queued[#queued-4] == 'console_font "Arial Rounded MT Bold" 8' and rectangle().height == 224)
+run('calibrate'); callbacks.unload()
+assert(next(text_objects) == nil and count() == 0, 'Unload deletes pending probes and all frame objects')
 io.open = real_open
 print('PASS: fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
 

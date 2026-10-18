@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.20'
+_addon.version = '0.1.21'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -10,6 +10,8 @@ local layout = require('cbg_layout')
 local skin = require('cbg_skin')
 local diagnostics = require('cbg_diagnostics')
 local activity = require('cbg_activity')
+local calibration = require('cbg_calibration')
+local font_probe = calibration.new()
 local defaults = {
     bg = {alpha = 255, red = 255, green = 255, blue = 255},
     pos = {x = 16, y = 48},
@@ -26,6 +28,8 @@ local defaults = {
         native_delay_owned = false},
     sound = {open = true, close = true},
     grid = {spacing = 10},
+    fontprofiles = {},
+    fontmetrics = {source = 'unmeasured', spacing = 0, single = 0, multi = 0, top = 15, bottom = 7},
 }
 local settings = config.load(defaults)
 local primitives, top_primitives, top_by_key, grip_primitives = {}, {}, {}, {}
@@ -522,10 +526,36 @@ local function activity_command(action, args)
         .. (group[key] and 'on' or 'off') .. '. Console logging stays on.')
 end
 
--- Scale the user's existing calibration, so custom offsets survive a
--- size change and repeating the same command never compounds a scale.
--- Label bounds settle through measure_labels; native text has no getter,
--- so the strip and console baseline remain an approximation to test live.
+-- Profiles keep absolute pixel values per font/size. Never multiply a
+-- previously rounded layout, and preserve manual calibration when switching.
+local function capture_font_profile()
+    local p = {}
+    for key, value in pairs(settings.fontmetrics) do p[key] = value end
+    p.height, p.input = settings.extents.y, settings.input.height
+    p.title, p.label, p.label_y = settings.labels.title_size, settings.labels.input_size, settings.labels.offset_y
+    p.offset_x, p.offset_y, p.labelfont = settings.console.offset_x, settings.console.offset_y, settings.labels.font
+    settings.fontprofiles[calibration.key(settings.native.font, settings.native.size)] = p
+    return p
+end
+
+local function apply_font_profile(p)
+    settings.extents.y, settings.input.height = p.height, p.input
+    settings.labels.title_size, settings.labels.input_size, settings.labels.offset_y = p.title, p.label, p.label_y
+    settings.console.offset_x, settings.console.offset_y = p.offset_x, p.offset_y
+    settings.labels.font = p.labelfont
+    for _, key in ipairs({'source', 'spacing', 'single', 'multi', 'top', 'bottom'}) do
+        settings.fontmetrics[key] = p[key]
+    end
+    position_dirty = true
+end
+
+local function fitted_height(p)
+    -- 15 output rows, one separate Input row, and the existing seven-pixel
+    -- compact/full-frame allowance. Rails keep their native pixel dimensions.
+    return math.max(40, math.floor(p.top + 15 * p.spacing + p.bottom
+        + (settings.input.enabled and p.input or 0) + 7 - settings.input.padding + 0.5))
+end
+
 local function font_command(args)
     if #args == 0 then
         return message(string.format('Font: %s %d; labels %s %d/%d; input height %d; console offset %d,%d.',
@@ -536,23 +566,61 @@ local function font_command(args)
     local size = args[#args] and integer(args[#args], 6, 24)
     local font = table.concat(args, ' ', 1, #args - 1)
     if not size or not safe_native_font(font) then return usage('font <font name> <size 6-24>') end
-    local ratio = size / (integer(settings.native.size, 6, 24) or defaults.native.size)
-    local function scale(value, minimum, maximum)
-        return math.max(minimum, math.min(maximum, math.floor(value * ratio + 0.5)))
+    capture_font_profile()
+    local p = settings.fontprofiles[calibration.key(font, size)]
+    if not p then
+        local function scaled(value, minimum) return math.max(minimum, math.floor(value * size / 12 + 0.5)) end
+        p = {source = 'estimate', spacing = size * 20 / 12, single = 0, multi = 0,
+            top = 15, bottom = 7, input = scaled(15, 6), title = scaled(8, 6),
+            label = scaled(7, 6), label_y = scaled(2, 0),
+            offset_x = settings.console.offset_x, offset_y = 15, labelfont = font}
+        p.height = fitted_height(p)
     end
-    local old_height = settings.input.height
-    settings.input.height = scale(old_height, 6, 256)
-    -- Match the full frame to the changed strip; the output body stays put.
-    settings.extents.y = math.max(40, settings.extents.y + settings.input.height - old_height)
-    settings.labels.title_size = scale(settings.labels.title_size, 6, 16)
-    settings.labels.input_size = scale(settings.labels.input_size, 6, 16)
-    settings.labels.offset_y = scale(settings.labels.offset_y, -12, 12)
-    settings.console.offset_y = scale(settings.console.offset_y, -32768, 32768)
-    settings.labels.font, settings.native.font, settings.native.size = font, font, size
-    position_dirty = true
+    settings.native.font, settings.native.size = font, size
+    apply_font_profile(p)
     sync_native_profile()
     save()
-    message('Linked font saved: ' .. font .. ' ' .. size .. '. Check alignment with //cbg preview; offset/input can fine-tune it.')
+    message('Linked font saved: ' .. font .. ' ' .. size .. '. Use //cbg calibrate to measure 15-row spacing.')
+end
+
+local function report_calibration()
+    local p = settings.fontmetrics
+    message(string.format('%s %d: %s, line %.2fpx, 15 rows, top/bottom %d/%d, Input %d, full height %d.',
+        settings.native.font, settings.native.size, p.source, p.spacing,
+        p.top, p.bottom, settings.input.height, settings.extents.y + settings.input.padding))
+end
+
+local function accept_calibration(spacing, top, bottom, input, source, single, multi)
+    end_drag()
+    local p = capture_font_profile()
+    p.spacing, p.top, p.bottom, p.input = spacing, top, bottom, input
+    p.source, p.single, p.multi = source, single or 0, multi or 0
+    p.offset_y = top
+    p.height = fitted_height(p)
+    apply_font_profile(p)
+    capture_font_profile()
+    save()
+    report_calibration()
+end
+
+local function calibrate_command(args)
+    if #args == 1 and args[1]:lower() == 'status' then return report_calibration() end
+    if #args == 0 then
+        font_probe.start(settings.native.font, settings.native.size)
+        return message('Measuring ' .. settings.native.font .. ' ' .. settings.native.size
+            .. '. Addon text is a proxy; compare 15 filled native lines in-game.')
+    end
+    local spacing = tonumber(args[1])
+    local top = args[2] and integer(args[2], 0, 128) or settings.fontmetrics.top
+    local bottom = args[3] and integer(args[3], 0, 128) or settings.fontmetrics.bottom
+    local input = args[4] and integer(args[4], 6, 256) or settings.input.height
+    if #args > 4 or not spacing or spacing ~= spacing or spacing < 4 or spacing > 128
+        or (args[2] and not integer(args[2], 0, 128))
+        or (args[3] and not integer(args[3], 0, 128))
+        or (args[4] and not integer(args[4], 6, 256)) then
+        return usage('calibrate [line pixels 4-128 [top 0-128 [bottom 0-128 [input 6-256]]]] | status')
+    end
+    accept_calibration(spacing, top, bottom, input, 'manual')
 end
 
 -- Readouts never save or send native commands, so checking a calibration
@@ -586,7 +654,10 @@ local function command(action, ...)
     local args = {...}
     if #args == 0 and report_setting(action) then return end
     end_drag()
-    if action == 'grid' then
+    font_probe.cancel()
+    if action == 'calibrate' then
+        calibrate_command(args)
+    elseif action == 'grid' then
         if #args == 0 then
             return message('Ctrl+drag grid: ' .. settings.grid.spacing .. ' screen pixels, origin 0,0.')
         end
@@ -816,6 +887,7 @@ local function command(action, ...)
         for group, values in pairs(defaults) do
             for key, value in pairs(values) do settings[group][key] = value end
         end
+        settings.fontprofiles = {}
         watcher.restart()
         auto_alpha = 0
         position_dirty = true
@@ -839,6 +911,7 @@ local function command(action, ...)
         if #args ~= 0 then return usage('help') end
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] | console on|off | offset <x> <y>')
+        message('//cbg calibrate [line pixels [top [bottom [input]]]] | calibrate status')
         message('//cbg grid [pixels] | Hold either Ctrl while dragging to snap the frame anchor.')
         message('//cbg font [<font> <size>] (linked) | nativefont <font> <size> | nativecolor <alpha> <red> <green> <blue>')
         message('//cbg width [screen|<pixels>] | glow <alpha> [height]')
@@ -859,6 +932,8 @@ end
 refresh()
 sync_native_profile()
 local registration = config.register(settings, function()
+    font_probe.cancel()
+    ctrl[29], ctrl[157] = false, false
     drag, hover_target, position_dirty, opening_stage = nil, nil, true, false
     watcher.restart()
     auto_alpha = 0
@@ -869,6 +944,15 @@ end)
 windower.register_event('addon command', command)
 windower.register_event('prerender', function()
     frame = frame + 1
+    if windower.has_focus and not windower.has_focus() then
+        ctrl[29], ctrl[157] = false, false
+        end_drag()
+    end
+    local measured, measurement_error = font_probe.poll()
+    if measured then
+        accept_calibration(measured.spacing, settings.fontmetrics.top, settings.fontmetrics.bottom,
+            math.max(6, math.floor(measured.spacing + 0.5)), 'addon-proxy', measured.single, measured.multi)
+    elseif measurement_error then message(measurement_error, true) end
     local console_visible = windower.console.visible()
     if console_visible then startup_since, startup_alpha = nil, 0 end
     if manual_was_open and not console_visible then
@@ -937,13 +1021,6 @@ end
 windower.register_event('keyboard', function(dik, down)
     if ctrl[dik] ~= nil then ctrl[dik] = down and true or false end
 end)
-windower.register_event('focus change', function(focused)
-    if not focused then
-        ctrl[29], ctrl[157] = false, false
-        end_drag()
-    end
-end)
-
 windower.register_event('mouse', function(kind, x, y, delta, blocked)
     -- A release claimed by another addon still ends our own drag.
     if kind == 2 and drag then
@@ -959,6 +1036,7 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
     if kind == 1 then
         local target = hit_grip(x, y)
         if not target then return false end
+        font_probe.cancel()
         local rect = actual_rectangle
         drag = {kind = target == 'resize' and 'resize' or 'drag', x = x, y = y,
             rectangle = {x = rect.x, y = rect.y, width = rect.width, height = rect.height}, changed = false}
@@ -1007,6 +1085,7 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
     return false
 end)
 windower.register_event('unload', function()
+    font_probe.cancel()
     if drag and drag.changed then config.save(settings) end
     drag = nil
     recorder.stop()

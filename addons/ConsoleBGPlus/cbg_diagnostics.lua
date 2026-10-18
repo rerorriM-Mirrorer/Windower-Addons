@@ -5,7 +5,7 @@ local native_fields = {
     'profile_name', 'branch', 'ffxi_version', 'launcher_version', 'hook_version',
     'x_res', 'y_res', 'ui_x_res', 'ui_y_res', 'window_x_pos', 'window_y_pos',
 }
-local setting_groups = {'pos', 'extents', 'bg', 'gradient', 'border', 'glow', 'input', 'labels', 'console', 'native', 'activity', 'sound'}
+local setting_groups = {'pos', 'extents', 'bg', 'gradient', 'border', 'glow', 'input', 'labels', 'console', 'native', 'activity', 'sound', 'grid', 'fontmetrics'}
 
 local function clean(value)
     return tostring(value):gsub('[\r\n\t]', ' ')
@@ -25,6 +25,7 @@ local function header(context, version)
     local lines = {'ConsoleBG+ v' .. version,
         'UTC: ' .. os.date('!%Y-%m-%dT%H:%M:%SZ'), sample(context),
         'The full frame includes input.padding; output-only mode removes the saved input height plus 7 pixels.',
+        'fontmetrics uses invisible addon-text probes, not native console measurements. Fifteen output rows plus one Input row.',
         'Native position below is the last position written by this addon, not a queried position.',
         'Native console font, input text, output buffer, fade delay, and fade opacity: no documented getters.',
         'Input styling follows manual console opening; log growth only controls the output frame.',
@@ -146,4 +147,5 @@ function diagnostics.new(root, version)
 end
 
 return diagnostics
+
 
