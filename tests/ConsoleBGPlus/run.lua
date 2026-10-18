@@ -849,6 +849,51 @@ assert(#played_sounds == sound_count_at_reload,
 assert(rectangle().height == saved.extents.y + saved.input.padding,
     'An already open native console should begin with the full manual frame')
 callbacks.unload()
+-- Shared screen-origin Ctrl+drag contract; this addon has no global scale.
+dofile(addon_path .. 'ConsoleBGPlus.lua')
+run('edit', 'on'); run('size', '240', '160'); run('pos', '23', '47')
+assert(callbacks.keyboard(29, true) == nil)
+assert(mouse(1, 30, 50)); assert(mouse(0, 53, 67)); assert(mouse(2, 53, 67))
+assert(saved.pos.x == 40 and saved.pos.y == 60)
+callbacks.keyboard(157, true); callbacks.keyboard(29, false)
+assert(mouse(1, 45, 65)); mouse(0, 72, 82); mouse(2, 72, 82)
+assert(saved.pos.x == 60 and saved.pos.y == 70, 'Right Ctrl survives left release')
+callbacks.keyboard(157, false)
+assert(mouse(1, 65, 75)); mouse(0, 72, 84); mouse(2, 72, 84)
+assert(saved.pos.x == 67 and saved.pos.y == 79, 'Free drag keeps pixel precision')
+run('grid', '7'); assert(saved.grid.spacing == 7)
+local before_invalid_grid = save_calls
+run('grid', '0'); run('grid', 'nan'); run('grid', '1.5'); run('grid', '7', '8')
+assert(save_calls == before_invalid_grid)
+for _, screen in ipairs({{960,540},{1280,720},{1366,768},{3840,2160}}) do
+    screen_width, screen_height = screen[1], screen[2]
+    for _, size in ipairs({'6', '24'}) do
+        run('nativefont', 'Verdana', size)
+        run('size', '240', '160'); run('pos', '23', '47')
+        callbacks.keyboard(29, true)
+        assert(mouse(1, 25, 50)); mouse(0, 9999, 9999); mouse(2, 9999, 9999)
+        local r = rectangle()
+        assert(r.x % 7 == 0 and r.y % 7 == 0)
+        assert(r.x >= 0 and r.y >= 0 and r.x+r.width <= screen_width and r.y+r.height <= screen_height)
+        local x,y = saved.pos.x,saved.pos.y
+        config.callback()
+        assert(rectangle().x == x and rectangle().y == y, 'Saved anchor survives settings reload')
+        run('pos', '23', '47'); run('width')
+        assert(mouse(1, 25, 50)); mouse(0, 9999, 9999); mouse(2, 9999, 9999)
+        r = rectangle()
+        assert(r.x % 7 == 0 and r.y % 7 == 0 and r.x+r.width <= screen_width)
+        assert(mouse(1, r.x+1, r.y+1)); mouse(0, -9999, -9999); mouse(2, -9999, -9999)
+        assert(saved.pos.x == 0 and saved.pos.y == 0)
+        callbacks.keyboard(29, false)
+    end
+end
+run('size', '240', '160'); run('pos', '23', '47')
+callbacks.keyboard(29, true); callbacks['focus change'](false)
+assert(mouse(1, 25, 50)); mouse(0, 32, 59); mouse(2, 32, 59)
+assert(saved.pos.x == 30 and saved.pos.y == 56, 'Focus loss clears stale Ctrl')
+run('edit', 'off'); assert(mouse(1, 31, 57) == false)
+callbacks.unload()
 io.open = real_open
 print('PASS: fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
+
 

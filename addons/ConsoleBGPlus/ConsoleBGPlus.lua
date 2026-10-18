@@ -25,6 +25,7 @@ local defaults = {
     activity = {enabled = true, delay_ms = 1000, fade_ms = 450,
         native_delay_owned = false},
     sound = {open = true, close = true},
+    grid = {spacing = 10},
 }
 local settings = config.load(defaults)
 local primitives, top_primitives, top_by_key, grip_primitives = {}, {}, {}, {}
@@ -32,6 +33,7 @@ local shown, preview, editing = false, false, false
 local last_viewport, actual_rectangle = nil, nil
 local labels = {}
 local drag, native_position, position_warning = nil, nil, false
+local ctrl = {[29] = false, [157] = false}
 local hover_target = nil
 local position_dirty = true
 local frame = 0
@@ -584,7 +586,16 @@ local function command(action, ...)
     local args = {...}
     if #args == 0 and report_setting(action) then return end
     end_drag()
-    if action == 'position' then
+    if action == 'grid' then
+        if #args == 0 then
+            return message('Ctrl+drag grid: ' .. settings.grid.spacing .. ' screen pixels, origin 0,0.')
+        end
+        local spacing = #args == 1 and integer(args[1], 1, 32768)
+        if not spacing then return usage('grid [screen pixels 1-32768]') end
+        settings.grid.spacing = spacing
+        save()
+        message('Ctrl+drag grid saved: ' .. spacing .. ' screen pixels.')
+    elseif action == 'position' then
         local value = numbers(args, 2, 0, 32768)
         if not value then return usage('position <x> <y> (nonnegative integers)') end
         settings.pos.x, settings.pos.y = value[1], value[2]
@@ -828,6 +839,7 @@ local function command(action, ...)
         if #args ~= 0 then return usage('help') end
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] | console on|off | offset <x> <y>')
+        message('//cbg grid [pixels] | Hold either Ctrl while dragging to snap the frame anchor.')
         message('//cbg font [<font> <size>] (linked) | nativefont <font> <size> | nativecolor <alpha> <red> <green> <blue>')
         message('//cbg width [screen|<pixels>] | glow <alpha> [height]')
         message('//cbg gradient <top> <bottom> | alpha <0-255> | border <0-255>|link|free')
@@ -921,6 +933,17 @@ local function hit_grip(x, y)
     if y < rect.y + 18 then return 'drag' end
 end
 
+-- Observe modifier state even if another addon owns the key; never consume it.
+windower.register_event('keyboard', function(dik, down)
+    if ctrl[dik] ~= nil then ctrl[dik] = down and true or false end
+end)
+windower.register_event('focus change', function(focused)
+    if not focused then
+        ctrl[29], ctrl[157] = false, false
+        end_drag()
+    end
+end)
+
 windower.register_event('mouse', function(kind, x, y, delta, blocked)
     -- A release claimed by another addon still ends our own drag.
     if kind == 2 and drag then
@@ -963,6 +986,13 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
                 or math.max(0, screen.width - rect.width)
             settings.pos.x = clamp(rect.x + dx, 0, maximum_x)
             settings.pos.y = clamp(rect.y + dy, 0, math.max(0, screen.height - rect.height))
+            if ctrl[29] or ctrl[157] then
+                -- Floor after clamping: bounds and the screen-origin lattice
+                -- both hold, including when the far edge is not a grid multiple.
+                local grid = integer(settings.grid.spacing, 1, 32768) or 10
+                settings.pos.x = math.floor(settings.pos.x / grid) * grid
+                settings.pos.y = math.floor(settings.pos.y / grid) * grid
+            end
         end
         drag.changed = true
         refresh(screen)
@@ -988,4 +1018,5 @@ windower.register_event('unload', function()
     labels = {}
     if config.unregister then config.unregister(settings, registration) end
 end)
+
 
