@@ -30,6 +30,29 @@ local EDIT_CYCLE = 62    -- 1:01, 1:00, 0:59, ... 0:00, then reset
 local EXIT_FADE = 0.36  -- all visible primitives fade before reload/unload
 local PREVIEW_ALPHA = 205
 
+-- The grid is shared across addons in Windower UI screen coordinates (0,0).
+-- This renderer's transparent draggable backdrop is the ONLY movable anchor;
+-- all guides, icons, text and timers derive their positions from it.
+local function ui_dimensions()
+    local ws = windower.get_windower_settings and windower.get_windower_settings() or {}
+    return tonumber(ws.ui_x_res or ws.x_res) or 800,
+        tonumber(ws.ui_y_res or ws.y_res) or 600
+end
+
+local function within(value, minimum, maximum)
+    return math.max(minimum, math.min(maximum, value))
+end
+
+local function anchor_coordinate(value, maximum, grid)
+    local bounded = within(value, 0, maximum)
+    if grid then
+        -- Floor to screen-origin grid multiples, not multiples of icon size.
+        -- If no complete widget fits onscreen, (0,0) remains recoverable.
+        return math.floor(bounded / grid) * grid
+    end
+    return bounded
+end
+
 -- This startup-only sampler is deliberately independent of tracking. It
 -- uses 32 familiar status IDs from the installed XivParty icons. They are
 -- NOT recorded as effects on any mob; the real display uses the tracker.
@@ -132,6 +155,8 @@ function IconRenderer.new(settings)
     self.asset_base = icon_base(settings.iconpath)
     self.visible = false
     self.drag_dirty = false
+    self.footprint_width, self.footprint_height = 940, 45
+    self.last_ui_w, self.last_ui_h = nil, nil
     self.pulse_started = nil
     self.pulse_mode = nil
     self.guide_opacity = nil -- avoid 32 unnecessary primitive updates per idle frame
@@ -255,6 +280,18 @@ function IconRenderer:set_icon_path(path)
     for _, sprite in pairs(self.sprites) do sprite.icon_path = nil; sprite.load_frames = 0 end
 end
 
+-- Bounding uses the current (unscaled) layout footprint. Neither free drag
+-- nor Ctrl snapping changes local child offsets, icon dimensions or font sizes.
+function IconRenderer:constrain_anchor(x, y, snap, screen_w, screen_h)
+    local w, h = screen_w, screen_h
+    if not w or not h then w, h = ui_dimensions() end
+    local max_x = math.max(0, w - self.footprint_width)
+    local max_y = math.max(0, h - self.footprint_height)
+    local grid = snap and (tonumber(self.settings.draggrid) or 10) or nil
+    if grid and (grid < 1 or grid > 200 or grid ~= math.floor(grid)) then grid = 10 end
+    return anchor_coordinate(x, max_x, grid), anchor_coordinate(y, max_y, grid)
+end
+
 function IconRenderer:set_position(x, y)
     self.backdrop:pos(x, y)
     if self.visible then self:layout() end
@@ -326,7 +363,15 @@ function IconRenderer:layout()
     local width = 2 * PAD + columns * size + (columns - 1) * gap
     local height = 2 * PAD + title_h + rows * size + (rows - 1) * gap + TIMER_DROP
 
+    self.footprint_width, self.footprint_height = width, height
+    local screen_w, screen_h = ui_dimensions()
+    self.last_ui_w, self.last_ui_h = screen_w, screen_h
     local x, y = self.backdrop:pos()
+    local bounded_x, bounded_y = self:constrain_anchor(x, y, false, screen_w, screen_h)
+    if bounded_x ~= x or bounded_y ~= y then
+        x, y = bounded_x, bounded_y
+        self.backdrop:pos(x, y)
+    end
     self.backdrop:size(width, height)
     -- Editing does not silently override the user's transparent background.
     self.backdrop:alpha(tonumber(s.background_alpha) or 0)
@@ -580,15 +625,26 @@ function IconRenderer:tick()
     end
 end
 
-function IconRenderer:sync_position()
+function IconRenderer:sync_position(ctrl_held)
     if not self.visible then return end
-    local x, y = self.backdrop:pos()
-    if x ~= self.settings.pos.x or y ~= self.settings.pos.y then
-        self.settings.pos.x = x
-        self.settings.pos.y = y
-        self.drag_dirty = true
-        self.last_moved = visual_time()
+    local screen_w, screen_h = ui_dimensions()
+    if self.last_ui_w ~= screen_w or self.last_ui_h ~= screen_h then
+        -- Rebound on a live client resolution change, even without a mouse move.
         self:layout()
+    end
+    local x, y = self.backdrop:pos()
+    local moved = x ~= self.settings.pos.x or y ~= self.settings.pos.y
+    if moved then
+        -- images.lua already owns mouse capture and has moved the backdrop.
+        -- Observe that motion; do not intercept or synthesize mouse events.
+        local nx, ny = self:constrain_anchor(x, y, ctrl_held, screen_w, screen_h)
+        if nx ~= x or ny ~= y then self.backdrop:pos(nx, ny) end
+        if nx ~= self.settings.pos.x or ny ~= self.settings.pos.y then
+            self.settings.pos.x, self.settings.pos.y = nx, ny
+            self.drag_dirty = true
+            self.last_moved = visual_time()
+        end
+        self:layout() -- child positions remain relative to the same anchor
     elseif self.drag_dirty and visual_time() - (self.last_moved or 0) > 0.65 then
         self.settings:save()
         self.drag_dirty = false

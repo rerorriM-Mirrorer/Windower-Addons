@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -- Windower version 1.0.0.4. The new renderer only reads debuffed_mobs.
 _addon.name = 'Debuffed'
 _addon.author = 'Xathe (Asura); icon presentation: A'
-_addon.version = '1.0.0.4-icons-test2.4.3'
+_addon.version = '1.0.0.4-icons-test2.4.4-grid1'
 _addon.commands = {'dbf', 'db', 'debuffed'}
 
 config = require('config')
@@ -76,6 +76,7 @@ defaults.display = 'icons'
 defaults.layout = 'horizontal'
 defaults.iconsize = 24
 defaults.iconspacing = 5
+defaults.draggrid = 10 -- Ctrl+drag, absolute screen-origin Windower UI pixels
 defaults.slots = 16 -- displayed effects AND individual edit/preview guides (1..64)
 defaults.wrap = 16  -- icons per row/column; 0 = no wrap
 defaults.timersize = 8
@@ -338,9 +339,16 @@ windower.register_event('incoming chunk', function(id, data)
     end
 end)
 
+-- Passive modifier observation only; Windower/images.lua keeps mouse capture.
+-- Left/right Ctrl are independent, so either held key enables snapping.
+local drag_ctrl = {[29] = false, [157] = false}
+windower.register_event('keyboard', function(dik, down)
+    if dik == 29 or dik == 157 then drag_ctrl[dik] = down and true or false end
+end)
+
 windower.register_event('prerender', function()
     -- Poll each frame so icons follow the background smoothly while dragging.
-    icon_view:sync_position()
+    icon_view:sync_position(drag_ctrl[29] or drag_ctrl[157])
     if shutdown_action then
         -- The fallback classic text view also fades before leaving.
         if not icon_view.visible then
@@ -430,6 +438,7 @@ local function show_help()
     help_entry('wrap <0-64>', 'Slots per row (0 = no wrap)')
     help_entry('iconsize <12-96>', 'Icon size in pixels')
     help_entry('iconspacing <0-40>', 'Gap between icons')
+    help_entry('grid [1-200]', 'Ctrl+drag screen snap, default 10px')
     help_entry('sort <priority|id>', 'Dia-first or numerical order')
     help_entry('layout <horizontal|vertical>', 'Grid direction')
     help_entry('targetname [on|off]', 'Show enemy name')
@@ -461,7 +470,7 @@ local function start_shutdown(action)
     end
     shutdown_action = action
     -- Flush any pending drag position through the normal renderer path first.
-    icon_view:sync_position()
+    icon_view:sync_position(drag_ctrl[29] or drag_ctrl[157])
     icon_view:begin_exit()
     notice(action == 'restart' and 'Restarting Debuffed...' or 'Unloading Debuffed...')
 end
@@ -514,6 +523,17 @@ windower.register_event('addon command', function(command1, command2, ...)
             update_display()
         else
             notice('Usage: //dbf iconspacing 0..40 (default 5)')
+        end
+    elseif command1 == 'grid' then
+        local pixels = tonumber(command2)
+        if not command2 then
+            notice(('Ctrl+drag grid: %d Windower UI pixels (origin 0,0).'):format(tonumber(settings.draggrid) or 10))
+        elseif pixels and pixels == math.floor(pixels) and pixels >= 1 and pixels <= 200 then
+            settings.draggrid = pixels
+            settings:save()
+            notice(('Ctrl+drag grid: %d Windower UI pixels (origin 0,0).'):format(pixels))
+        else
+            notice('Usage: //db grid 1..200 (default 10)')
         end
     elseif command1 == 'slots' then
         local count = tonumber(command2)
@@ -600,6 +620,7 @@ windower.register_event('addon command', function(command1, command2, ...)
         notice(('v%s; display=%s; edit=%s; icons=%d/%d'):format(_addon.version,
             tostring(settings.display), tostring(settings.edit), count, total))
         notice(('Field=(%d,%d); slots=%s; wrap=%s; icon directory=%s'):format(x, y, tostring(settings.slots), tostring(settings.wrap), settings.iconpath))
+        notice(('Ctrl+drag grid=%dpx (screen origin 0,0).'):format(tonumber(settings.draggrid) or 10))
         notice('Dia preview texture: ' .. sample)
     elseif command1 == 'targetname' or command1 == 'edit' then
         if toggle_bool(command1, command2) then

@@ -1,8 +1,8 @@
-# Debuffed — Icon Presentation Test 2.4.3
+# Debuffed — Icon Presentation Test 2.4.4 — Ctrl+drag screen-grid snapping
 
 Original addon: Xathe, `Debuffed` v1.0.0.4 (Windower/Lua).  
 Icon presentation, help, and transitions: A.  
-Testing build: `1.0.0.4-icons-test2.4.3` (2026-10-13).
+Testing build: `1.0.0.4-icons-test2.4.4-grid1` (2026-10-18).
 
 ## Installation
 
@@ -14,6 +14,14 @@ Testing build: `1.0.0.4-icons-test2.4.3` (2026-10-13).
 6. While logged in, run `//lua reload Debuffed`.
 
 Command aliases: `//db`, `//dbf`, `//debuffed`. `//db` is the short alias; `//dbf` remains available if a locally installed addon/plugin uses `db`.
+
+### Positioning and Ctrl+drag (Test 2.4.4)
+
+The icon field is always draggable as before. **Drag normally** for smooth, unrestricted pixel positioning within the current Windower UI viewport. **Hold either Ctrl key while dragging** to floor the field's top-left parent anchor onto the same shared, screen-origin grid as BarFiller2/EnemyBar2: `(273,57)` becomes `(270,50)` at the default 10px spacing. Child outlines, icon art, texts and timers follow that one anchor; individual elements do not snap independently.
+
+`//db grid` reports spacing, `//db grid 10` restores the default and `//db grid 16` sets 16px. This is independent of `//db iconsize`, `//db wrap` and timer size. Grid spacing and the moved location persist to the character's existing settings. The widget is clamped to the viewport. If it is larger than the viewport (for example, too many large icons), its anchor clamps to `(0,0)` on the overflowing axis; reduce slots, wrap, or icon size if needed.
+
+The classic text fallback retains its historical behavior; the new grid applies to the **icon** field's existing draggable backdrop, not an unrelated text widget. No extra keyboard or mouse blocking is introduced.
 
 ## New in Test 2.4
 
@@ -40,6 +48,7 @@ The bracket notation is `<required>` and `[optional]`. The `|` character indicat
 | `//db layout <horizontal\|vertical>` | Set primary fill direction |
 | `//db iconsize <12-96>` | Icon size in pixels (default 24) |
 | `//db iconspacing <0-40>` | Gap between slots (default 5) |
+| `//db grid [1-200]` | Show/set shared Ctrl+drag snap spacing in Windower UI pixels (default 10) |
 | `//db sort <priority\|id>` | Dia first or numeric buff status ID |
 | `//db timers` | Toggle estimated live timer text |
 | `//db timersize <6-24>` | Timer font size; default 8px Arial bold italic |
@@ -73,7 +82,7 @@ For example: `//db timerx -2`, `//db timery -4`, `//db slots 16`, `//db wrap 8`.
 
 ## Testing status
 
-Lua parser checks and mocked renderer/command simulations passed, including manual and edit countdowns, layout resize, `restart`/`unload`, and primitive cleanup. **Not yet live-tested in FFXI**. See `../TESTING.md` in the testing archive for procedures and scope.
+Lua parser checks and mocked renderer/command simulations passed, including manual and edit countdowns, layout resize, `restart`/`unload`, and primitive cleanup. **Not yet live-tested in FFXI**. See `TESTING.md` included with the addon in the testing archive for procedures and scope.
 
 ## Changelog
 
@@ -101,3 +110,10 @@ Adjusted **display formatting only**: minutes start at 60 seconds instead of 120
 - Every help command is printed with its full `//db` prefix; replaced `=>` with `->` as an in-game glyph test.
 - Edit-mode sample countdown now begins at **61 seconds** (`1:01` internally), showing `1m` for two beats before `59` and continuing to `0`; repeats every 62 seconds. The manual 11→0 preview, real tracking, restart and unload are unchanged.
 - Install by extracting the included `Debuffed/` into `Windower/addons/` and run `//lua reload Debuffed`. Existing per-character settings are preserved.
+
+### Test 2.4.4 (2026-10-18) — Ctrl+drag screen-grid snap
+
+- Supports both left/right Ctrl with independent key state; does not hook/intercept mouse input.
+- Uses the already draggable backdrop as the sole parent anchor, with a screen-origin 10px grid (`//db grid [1-200]`) independent of icon size.
+- Adds UI-viewport bounding and resolution-change recovery; the existing slot, sprite, sample timer and heading layout remains derived from the original pixel dimensions.
+- Keeps original tracker, preview/edit timers, help colors, and restart/unload logic unchanged. Source syntax and mock positioning checks passed; actual FFXI input rendering still needs validation.
