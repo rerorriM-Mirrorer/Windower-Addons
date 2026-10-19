@@ -9,7 +9,7 @@ local function bounded(value, fallback, minimum, maximum)
     return math.floor(math.max(minimum, math.min(maximum, number)) + 0.5)
 end
 
-function layout.build(settings, viewport, title_width, input_width, editing, input_text_height, output_only, grip_state)
+function layout.build(settings, viewport, title_width, input_width, editing, input_text_height, output_only, grip_state, top_trim)
     local screen_width = bounded(viewport.width, 1920, 1, 32768)
     local screen_height = bounded(viewport.height, 1080, 1, 32768)
     local minimum_width = math.min(120, screen_width)
@@ -22,6 +22,11 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     local padding = bounded(settings.input.padding, 4, 0, 32)
     local full_height = bounded((tonumber(settings.extents.y) or 344) + padding, 344,
         minimum_height, screen_height - y)
+    -- The saved parent anchor/native text stay fixed. In normal views only
+    -- the visible upper boundary contracts; editing restores the header.
+    local anchor_y = y
+    top_trim = editing and 0 or bounded(top_trim, 0, 0, math.min(8, full_height - minimum_height))
+    y, full_height = y + top_trim, full_height - top_trim
     local strip_height = settings.input.enabled == true and bounded(settings.input.height, 15, 6, 256) or 0
     -- A little breathing room below the last output row, beyond the Input strip.
     local compact_height = math.max(minimum_height, full_height - strip_height - 7)
@@ -40,7 +45,8 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     local green = bounded(settings.bg.green, 255, 0, 255)
     local blue = bounded(settings.bg.blue, 255, 0, 255)
     local pieces = {}
-    local rectangle = {x = x, y = y, width = width, height = height, padding = padding}
+    local rectangle = {x = x, y = y, width = width, height = height, padding = padding,
+        anchor_y = anchor_y, top_trim = top_trim}
 
     local function rail_alpha(progress)
         if settings.border.linked ~= true then return border_alpha end

@@ -219,7 +219,7 @@ end
 
 dofile(addon_path .. 'ConsoleBGPlus.lua')
 assert(count() > 10 and count() <= 199)
-run('status'); assert(logs[#logs][2]:find('1888x344 (screen width)', 1, true)
+run('status'); assert(logs[#logs][2]:find('1888x336 (screen width)', 1, true)
     and logs[#logs][2]:find('input on (15 + 0 padding)', 1, true)
     and logs[#logs][2]:find('log activity on', 1, true))
 assert(positions[#positions].x == 66 and positions[#positions].y == 63)
@@ -229,7 +229,7 @@ assert(not text_objects.ConsoleBGPlus_label_input.visible)
 all_visible(false)
 local top_rail_name, top_rail = rail('top_left')
 tick(0.01)
-assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 322
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 314
     and not text_objects.ConsoleBGPlus_label_input.visible and #played_sounds == 0,
     'Loading shows a silent compact output frame without relying on log activity')
 assert(objects[top_rail_name] == top_rail and top_rail.texture_sets == 1
@@ -253,7 +253,7 @@ for _, object in pairs(objects) do
 end
 assert(title_left and title_right and title.x < title_left.x + title_left.width
     and title.x + title.rendered_width > title_right.x
-    and title.y == 42, 'Title text should float over both end caps and sit two pixels higher')
+    and title.y == 50, 'Title text should float over both end caps and sit two pixels higher')
 local calls = visibility_calls
 local geometry = geometry_calls
 local styles, measurements = style_calls, measurement_calls
@@ -265,7 +265,7 @@ assert(#positions == native_calls, 'An unchanged frame must not rewrite console 
 assert(style_calls == styles and measurement_calls == measurements,
     'Settled labels must not reset fonts or poll native measurements on idle frames')
 console_open = false; tick()
-assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 322
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 314
     and not text_objects.ConsoleBGPlus_label_input.visible,
     'Manual close must immediately use the compact output frame')
 assert(objects[top_rail_name] == top_rail
@@ -311,9 +311,9 @@ console_open = true; tick()
 local r = rectangle()
 assert(mouse(1, r.x + 30, r.y + 2))
 assert(mouse(2, r.x + 30, r.y + 2))
-assert(not mouse(1, r.x + 100, r.y + 100))
-assert(not mouse(1, r.x + r.width - 8, r.y + r.height - 8))
-run('edit', 'on')
+assert(mouse(1, r.x + 100, r.y + 100)); mouse(2, r.x + 100, r.y + 100)
+assert(mouse(1, r.x + r.width - 8, r.y + r.height - 8)); mouse(2, r.x + r.width - 8, r.y + r.height - 8)
+run('edit', 'on'); r = rectangle()
 assert(text_objects.ConsoleBGPlus_label_edit.visible)
 local grip
 for _, object in pairs(objects) do
@@ -345,7 +345,7 @@ assert(text_objects.ConsoleBGPlus_label_edit.red == 255
     and text_objects.ConsoleBGPlus_label_edit.visible
     and text_objects.ConsoleBGPlus_label_edit_exit == nil)
 assert(not mouse(1, r.x + 30, r.y + 2, true))
-assert(not mouse(1, r.x + 100, r.y + 100))
+assert(mouse(1, r.x + 100, r.y + 100)); mouse(2, r.x + 100, r.y + 100)
 assert(not mouse(3, r.x + 30, r.y + 2))
 assert(not mouse(1, r.x - 1, r.y + 2))
 local saves_before_drag = save_calls
@@ -523,7 +523,7 @@ saved.extents.mode, saved.glow, saved.input.tab = nil, nil, nil
 saved.input.padding, saved.input.divider, saved.labels, saved.console, saved.native,
     saved.border.linked, saved.activity = nil, nil, nil, nil, nil, nil, nil
 dofile(addon_path .. 'ConsoleBGPlus.lua')
-run('status'); assert(logs[#logs][2]:find('1888x320 (screen width)', 1, true))
+run('status'); assert(logs[#logs][2]:find('1888x312 (screen width)', 1, true))
 assert(logs[#logs][2]:find('gradient 80 to 230', 1, true))
 config.callback()
 run('reset')
@@ -678,7 +678,7 @@ run('activity', 'off')
 run('input', 'on', '15')
 local inactive_polls = log_polls
 tick(0.5)
-assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 322
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 314
     and objects.ConsoleBGPlus_1.alpha > 0,
     'Startup frame should hold even when console logging is disabled')
 local startup_full_alpha = objects.ConsoleBGPlus_1.alpha
@@ -705,7 +705,7 @@ fake_log_size = 10014; tick(0.16)
 assert(text_objects.ConsoleBGPlus_label_title.visible)
 assert(#played_sounds == sound_count_before_output, 'Automatic output must be silent')
 local compact_height = rectangle().height
-assert(compact_height == saved.extents.y + saved.input.padding - saved.input.height - 7,
+assert(compact_height == saved.extents.y + saved.input.padding - saved.input.height - 7 - 8,
     'Automatic output should remove the input strip plus seven pixels')
 assert(not text_objects.ConsoleBGPlus_label_input.visible,
     'Automatic output must not imply typing focus or show the input label')
@@ -830,7 +830,7 @@ assert(queued[#queued - 2] == 'console_fadedelay 2000'
     and queued[#queued] == 'console_log 1',
     'The native profile should be restored after reload')
 tick(0.01)
-assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 322)
+assert(text_objects.ConsoleBGPlus_label_title.visible and rectangle().height == 314)
 local reload_full_alpha = objects.ConsoleBGPlus_1.alpha
 tick(1.8)
 assert(objects.ConsoleBGPlus_1.alpha == reload_full_alpha,
@@ -852,7 +852,7 @@ local sound_count_at_reload = #played_sounds
 dofile(addon_path .. 'ConsoleBGPlus.lua'); tick()
 assert(#played_sounds == sound_count_at_reload,
     'Loading while the console is already open must not play the opening cue')
-assert(rectangle().height == saved.extents.y + saved.input.padding,
+assert(rectangle().height == saved.extents.y + saved.input.padding - 8,
     'An already open native console should begin with the full manual frame')
 callbacks.unload()
 -- Shared screen-origin Ctrl+drag contract; this addon has no global scale.
@@ -897,7 +897,7 @@ run('size', '240', '160'); run('pos', '23', '47')
 callbacks.keyboard(29, true); focused = false; tick(); focused = true
 assert(mouse(1, 25, 50)); mouse(0, 32, 59); mouse(2, 32, 59)
 assert(saved.pos.x == 30 and saved.pos.y == 56, 'Focus loss clears stale Ctrl')
-run('edit', 'off'); assert(mouse(1, 31, 57)); mouse(2, 31, 57)
+run('edit', 'off'); assert(mouse(1, 31, 65)); mouse(2, 31, 65)
 callbacks.unload()
 -- Visible activity frames can be dragged without edit mode and do not
 -- disappear or gain an Input strip while the mouse is held.
@@ -924,7 +924,7 @@ console_open = true; tick(); tick()
 local nonedit_rect = rectangle()
 assert(mouse(1, nonedit_rect.x+5, nonedit_rect.y+3))
 mouse(0, nonedit_rect.x+12, nonedit_rect.y+12); mouse(2, -10, -10)
-assert(saved.pos.x == nonedit_rect.x+7 and saved.pos.y == nonedit_rect.y+9)
+assert(saved.pos.x == nonedit_rect.x+7 and saved.pos.y == nonedit_rect.y+1)
 assert(not text_objects.ConsoleBGPlus_label_edit.visible)
 callbacks.unload()
 -- Invisible text probes, exact overrides, absolute profiles, and cleanup.
@@ -976,9 +976,45 @@ for _, screen in ipairs({{960,540},{1280,720},{1366,768},{3840,2160}}) do
 end
 run('font', 'Arial Rounded MT Bold', '8')
 callbacks.unload(); dofile(addon_path .. 'ConsoleBGPlus.lua'); tick()
-assert(queued[#queued-4] == 'console_font "Arial Rounded MT Bold" 8' and rectangle().height == 224)
+assert(queued[#queued-4] == 'console_font "Arial Rounded MT Bold" 8' and rectangle().height == 221)
 run('calibrate'); callbacks.unload()
 assert(next(text_objects) == nil and count() == 0, 'Unload deletes pending probes and all frame objects')
+-- Compact normal header grows upward in edit mode without moving content.
+console_open = true; screen_width, screen_height = 1280, 720
+dofile(addon_path .. 'ConsoleBGPlus.lua')
+run('pos', '10', '12'); run('font', 'Arial Rounded MT Bold', '8')
+run('offset', '50', '15'); run('size', '1250', '237'); settle()
+local normal = rectangle()
+local native_before = positions[#positions]
+local input_before = text_objects.ConsoleBGPlus_label_input.y
+local _, bottom_before = rail('bottom_left')
+local bottom_y = bottom_before.y
+assert(normal.y == 20 and normal.height == 229)
+assert(not mouse(1, normal.x+5, normal.y-1), 'Retracted header has no invisible hit area')
+run('edit', 'on')
+local expanded = rectangle()
+assert(expanded.y == 12 and expanded.height == 237)
+assert(expanded.y+expanded.height == normal.y+normal.height)
+assert(positions[#positions].x == native_before.x and positions[#positions].y == native_before.y)
+assert(text_objects.ConsoleBGPlus_label_input.y == input_before)
+local _, bottom_after = rail('bottom_left'); assert(bottom_after.y == bottom_y)
+run('edit', 'off'); assert(rectangle().y == normal.y and rectangle().height == normal.height)
+assert(mouse(1, 500, 100)); mouse(0, 517, 109); mouse(2, 517, 109)
+assert(saved.pos.x == 27 and saved.pos.y == 21, 'Body dragging moves the saved parent by the pointer delta')
+callbacks.keyboard(157, true)
+local body = rectangle()
+assert(mouse(1, body.x+100, body.y+50)); mouse(0, body.x+123, body.y+67); mouse(2, 0, 0)
+assert(saved.pos.x % 10 == 0 and saved.pos.y % 10 == 0, 'Whole-body Ctrl drag snaps one saved parent')
+callbacks.keyboard(157, false)
+for _, offset in ipairs({'0','7','10','15'}) do
+    run('offset', '50', offset)
+    run('edit', 'off'); local n = rectangle(); local native_y = positions[#positions].y
+    run('edit', 'on'); local e = rectangle()
+    local trim = math.min(8, math.max(0, tonumber(offset)-7))
+    assert(n.y == e.y+trim and n.height == e.height-trim)
+    assert(positions[#positions].y == native_y, 'Custom text offsets remain fixed across edit toggles')
+end
+callbacks.unload()
 io.open = real_open
 print('PASS: Ctrl+drag grid matrix, per-font 15-row calibration/profile matrix, proxy failure/cancellation, and fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
 

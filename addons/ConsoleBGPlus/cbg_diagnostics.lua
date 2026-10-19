@@ -60,6 +60,8 @@ local function header(context, version)
     lines[#lines + 1] = '[Layout measurements]'
     lines[#lines + 1] = 'native_position_written=' .. (p and (p.x .. ',' .. p.y) or 'none')
     lines[#lines + 1] = 'position_setter=' .. clean(context.position_setter)
+    lines[#lines + 1] = 'parent_anchor_y=' .. clean(context.rectangle.anchor_y or context.rectangle.y)
+    lines[#lines + 1] = 'normal_top_trim=' .. clean(context.rectangle.top_trim or 0)
     lines[#lines + 1] = 'divider_y=' .. clean(context.rectangle.divider_y or 'hidden')
     lines[#lines + 1] = 'divider_visible=' .. clean(context.rectangle.divider_visible or false)
     lines[#lines + 1] = 'activity_log=' .. clean(context.activity.path or 'unresolved')

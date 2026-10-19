@@ -1,5 +1,25 @@
 # Current Development Status
 
+- Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.23 / Windower 4. Starting checkpoint: `faef7844c5691946129375feb54a5bd3514606ed` (v0.1.22). Published head will be in the handoff.
+- Normal/activity views now trim up to 8px of unused top background; edit restores the header upward. Native text, Input/tab/divider and bottom positions remain fixed. Existing font profiles and saved anchor are unchanged.
+- Entire visible frame drags, with the edit-mode lower-right resize corner taking precedence. Ctrl floors the existing saved parent anchor to the shared screen-origin grid. The visible top rail is a child at parent_y + top_trim, so its edge can differ from a grid multiple while the saved anchor remains on-grid.
+- Verification: complete mocked Windower suite through liblua 5.4; Lua 5.1 syntax/scope inspection. Tests include body/corner dragging, hidden and retracted-header hit rejection, both Ctrl keys and four-resolution/extreme-font matrix from earlier batches, native text/Input/bottom invariance across edit toggles, restored dimensions after edit off, and custom offsets 0/7/10/15. No FFXI test of this new patch performed here.
+- Latest live materials: diagnostics(6).txt and diagnostics(7).txt, plus image(20261019-034213).png. v0.1.22 at 1280x720, Arial Rounded MT Bold 8; proxy spacing 13px, saved full height 237px, Input 13px. Screenshot demonstrates restored font/profile and Input view, but is not a blanket acceptance of dragging or other fonts.
+- Correction: earlier ~~15 output rows plus Input~~ is **16 output rows plus Input (17 total)**, confirmed by screenshot and user recount. Historical proxy formulas/tests below used 15; existing fitted heights are deliberately preserved by this patch. Native line spacing versus addon proxy still needs refinement before replacing those profiles automatically.
+- Next live check: install keeping data, toggle edit, confirm stationary text/Input/bottom and tighter normal top, drag from the center with/without Ctrl, resize in edit, then provide a screenshot/diagnostic if the fit needs adjustment.
+
+## 2026-10-18 — v0.1.23 acceptance steps
+
+1. Preserve data/settings.xml. Reload; normal top should retract by 8px with the usual 15px native-text offset (less for smaller custom offsets).
+2. Toggle edit on/off repeatedly. Only the upper boundary/header and Console title should change; native text, Input/divider/tab and bottom must not jump. Extra edit space must not appear during normal log activity.
+3. Drag from the body, Input strip, normal lower-right corner, and top. With edit on, lower-right remains resize. With edit off, that corner moves the whole frame. Release saves once.
+4. Ctrl+body drag must snap the single saved parent anchor, keep children together, and retain existing screen-boundary safeguards. Hidden frame and retracted top area must not claim new presses; outside/blocked events remain unclaimed.
+5. Original 237px size-8 layout should render 229px tall with its visible top 8px lower, restoring 237px in edit. Saved/native content positions stay fixed. Use diagnose to compare parent_anchor_y and normal_top_trim.
+
+The prior records remain below. Their top-strip-only and body-click-pass-through descriptions are superseded by v0.1.23.
+
+# Previous Development Status — v0.1.22
+
 - Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.22, Windower 4. Starting checkpoint: `b54b5f688f1bb0d7b118cb341dd6363c183df892` (v0.1.21). No live acceptance of v0.1.21 calibration has been reported yet; v0.1.20 remains the most recent user-confirmed behavior.
 - Visible upper edge now drags with edit off. Edit mode retains guides and lower-right resizing. Both Ctrl keys and existing grid/bounds/saved positions are preserved. A grabbed activity frame stays compact and visible until release, then resumes normal timing.
 - Verification: complete mocked Windower regression suite passes through liblua 5.4; Lua 5.1 syntax checks pass. New simulated checks cover manual and activity dragging with edit off, Ctrl snapping, blocked release, release-only saving, expired activity after release, body/resize clicks passing through outside edit, and hidden-input rejection. No live FFXI test performed.

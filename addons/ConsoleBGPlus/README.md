@@ -8,13 +8,13 @@ Development status and live checklist: [TESTING.md](https://github.com/rerorriM-
 
 Extract the ConsoleBGPlus folder into Windower/addons. When updating, replace the addon files and **keep your data folder**; the ZIP contains no settings file. In FFXI chat, run **//lua load ConsoleBGPlus** for a first install or **//lua reload ConsoleBGPlus** after updating. Unload the original ConsoleBG addon if it is running.
 
-Fresh settings start at **16,48** with equal left and right margins, a 344-pixel full height, Verdana 12 native console text, a 15-pixel Input strip, the native grey Input tab, and label sizes 8/7 for Console/Input. Automatic output shows a 322-pixel frame without the Input area: the 15-pixel strip plus 7 extra pixels are removed. Existing saved positions, label sizes, tab style, input heights, colors, and activity choices stay as they are. **//cbg reset** applies the new defaults if you want to start over.
+Fresh settings start at **16,48** with equal left and right margins, a saved 344-pixel full height (336 visible outside edit mode), Verdana 12 native console text, a 15-pixel Input strip, the native grey Input tab, and label sizes 8/7 for Console/Input. Automatic output shows a 314-pixel frame outside edit mode (322 with the header restored) without the Input area: the 15-pixel strip plus 7 extra pixels are removed. Existing saved positions, label sizes, tab style, input heights, colors, and activity choices stay as they are. **//cbg reset** applies the new defaults if you want to start over.
 
 ## Move and resize
 
-The visible frame is always draggable from its upper 18-pixel edge; hold either Ctrl for grid snapping. Body clicks pass through. During an activity-frame drag, the compact frame stays visible until release, then normal activity timing resumes.
+Drag anywhere inside the visible frame; hold either Ctrl for grid snapping. The lower-right corner resizes in edit mode and otherwise drags. Hidden frames do not capture input. During an activity-frame drag, the compact frame stays visible until release, then normal activity timing resumes.
 
-Run **//cbg edit** to toggle the guides and enable resizing. A band of pale diagonal lines marks the draggable top edge; drag anywhere along it to move the frame. The matching mark at the lower-right corner resizes it. Each grip gains a soft pink wash on hover; while pressed, the wash goes away and its lines turn pale pink. Release the mouse to save. Run **//cbg edit** again when you finish. Closing the native console with Insert also ends edit and preview modes.
+Run **//cbg edit** to toggle the guides and enable resizing. A band of pale diagonal lines marks the top grip; the entire frame remains draggable. The normal view trims up to eight pixels from unused top space, leaving at least seven pixels before the saved native-text origin. Edit mode restores that space upward without shifting native text, Input, or the bottom rail. Custom offsets with less spare space get a smaller trim. The matching mark at the lower-right corner resizes it. Each grip gains a soft pink wash on hover; while pressed, the wash goes away and its lines turn pale pink. Release the mouse to save. Run **//cbg edit** again when you finish. Closing the native console with Insert also ends edit and preview modes.
 
 Hold **either Ctrl key** while dragging to floor the parent anchor to a shared screen-origin grid, initially **10 UI pixels**. **//cbg grid 7** saves a different spacing; bare **//cbg grid** reports it. Free dragging remains pixel-precise. The grid does not resize the widget or snap its individual children. Screen edges take precedence; Ctrl+resize keeps its existing behavior.
 
@@ -84,6 +84,9 @@ The bundled open and close cues play once at each native console visibility tran
 
 ## Linked font calibration
 
+The latest screenshot/user recount confirms **16 output rows plus one Input row**. Existing v0.1.21/v0.1.22 fitted heights are retained in this header/drag patch; the older 15-row proxy formula described below remains pending a separate native-spacing correction. Do not reset a good manual fit solely to change that count.
+
+
 Start with the installed Arial Rounded face:
 
 ```text
@@ -118,6 +121,12 @@ Derived from [ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/a
 
 
 ## Changelog
+
+### 0.1.23 — compact header and whole-frame dragging
+
+- Normal and activity views retract up to 8px of unused top background; edit mode restores the header upward while native text/Input/bottom remain fixed.
+- Entire visible frame drags; edit mode reserves the lower-right corner for resize. Existing parent-anchor grid and saved font profiles are retained.
+- Diagnostics report the parent anchor and visible top trim.
 
 ### 0.1.22 — always-draggable frame
 

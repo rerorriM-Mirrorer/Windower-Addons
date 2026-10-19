@@ -1,5 +1,12 @@
 # ConsoleBG+ changes
 
+## 0.1.23 — compact header and whole-frame drag
+
+- Drag the entire visible frame; lower-right resize stays in edit mode.
+- Up to eight pixels of normal top space retract; edit restores the header without moving text, Input or the bottom edge.
+- Existing saved calibration/geometry remains. Diagnostics distinguish saved parent anchor from visible top.
+
+
 ## 0.1.22 — always-draggable frame
 
 - Visible top edge can be dragged with edit mode off. Ctrl snapping and release-only saves remain.
