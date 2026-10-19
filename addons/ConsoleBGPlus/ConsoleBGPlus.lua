@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.25'
+_addon.version = '0.1.26'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -1067,7 +1067,8 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
         local rect = actual_rectangle
         drag = {kind = target == 'resize' and 'resize' or 'drag', x = x, y = y,
             rectangle = {x = rect.x, y = rect.anchor_y or rect.y, width = rect.width,
-                height = rect.height + (rect.top_trim or 0) + (rect.bottom_trim or 0)}, changed = false}
+                height = rect.height + (rect.top_trim or 0) + (rect.bottom_trim or 0),
+                top_trim = rect.top_trim or 0}, changed = false}
         hover_target = nil
         refresh()
         update_visibility()
@@ -1094,11 +1095,18 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
             settings.pos.x = clamp(rect.x + dx, 0, maximum_x)
             settings.pos.y = clamp(rect.y + dy, 0, math.max(0, screen.height - rect.height))
             if ctrl[29] or ctrl[157] then
-                -- Floor after clamping: bounds and the screen-origin lattice
-                -- both hold, including when the far edge is not a grid multiple.
+                -- Snap the visible top-left, then translate back to the saved
+                -- parent. All text/rails still move together through layout.
                 local grid = integer(settings.grid.spacing, 1, 32768) or 10
+                local trim = rect.top_trim
+                local maximum_y = math.max(0, screen.height - rect.height)
+                local visible_y = math.floor((settings.pos.y + trim) / grid) * grid
+                if visible_y < trim then
+                    local first = math.ceil(trim / grid) * grid
+                    visible_y = first <= maximum_y + trim and first or trim
+                end
                 settings.pos.x = math.floor(settings.pos.x / grid) * grid
-                settings.pos.y = math.floor(settings.pos.y / grid) * grid
+                settings.pos.y = visible_y - trim
             end
         end
         drag.changed = true

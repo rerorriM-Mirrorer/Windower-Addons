@@ -1,5 +1,11 @@
 # ConsoleBG+ changes
 
+## 0.1.26 — visible-edge Ctrl snapping
+
+- Normal mode snaps the trimmed top edge; edit mode snaps the expanded header. Saved parent and child offsets remain unified.
+- Added the font calibration sequence from the accepted Arial Rounded MT Bold 8 / trim 5 3 reference.
+
+
 ## 0.1.25 — per-font trim
 
 - `//cbg trim 5 2` tests five extra pixels off the top and two off the Input bottom while keeping the divider/native text stationary.

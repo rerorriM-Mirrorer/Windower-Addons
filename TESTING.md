@@ -1,5 +1,24 @@
 # Current Development Status
 
+- Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.26 / Windower 4. Starting source: `1628743ccdad3901eb0d01d4063ea15450d92134` (v0.1.25). Published final head is in the handoff.
+- Ctrl+drag now floors the visible top-left edge to the shared UI grid in the current mode: trimmed normal edge or expanded edit header. Saved parent coordinates are translated by the current top trim; native text and all child primitives move together. Bounds remain authoritative if a very small viewport offers no grid point.
+- Latest live acceptance: user reports trim 5 3 looks good at Arial Rounded MT Bold 8; prior saved height 234, manual spacing 12.4, Input height 13, native top offset 15. User observed that visible-edge alignment appeared to work only in edit mode; prior snapping used the parent above the trimmed border, now corrected. No v0.1.26 FFXI test performed here.
+- Verification: complete mocked Windower regression suite via liblua 5.4 and Lua 5.1 syntax checks. New tests cover visible normal/edit edges at grid multiples, extreme mouse coordinates at both bounds, and persistence across settings reload. Existing tests cover both Ctrl keys, free drag, native text linkage, viewport clipping, trim/profile isolation, calibration, activity behavior and cleanup.
+- Next: live Ctrl+body drag with edit off/on; keep trim 5 3/current calibration. Then begin Arial Rounded MT Bold 10, followed by 12, Tahoma 8/10/12 and Verdana 8/10/12. No automatic font or calibration changes occur in this update.
+
+## v0.1.26 acceptance and font sequence
+
+1. Keep data, update, reload. With edit off, Ctrl+drag from the body: visible top and left should land on grid multiples. Test either Ctrl. Enable edit and repeat for the expanded header. Release Ctrl for free dragging. Toggling edit changes which top edge is visible; grid placement happens during Ctrl+drag.
+2. Check edges and reload. The saved parent may no longer itself be a grid multiple because it is above the trimmed visible top. It must still drive the entire group consistently.
+3. Keep the accepted size-8 profile. Run font "Arial Rounded MT Bold" 10, then calibrate. Capture Input-open showing all 16 output rows and Input, and diagnose. First compare unadjusted results; manually fit only after that capture.
+4. Inspect first-row clearance, last-row descenders/divider clearance, Input glyph bottoms, and bottom rail. Record spacing, full height, Input height, top offset and trims separately. Do not multiply size-8 trims to create other sizes.
+5. Repeat at size 12, then Tahoma and Verdana 8/10/12. Confirm switching back to size 8 and reloading restore its accepted fit. Check smaller/larger UI resolutions afterward. Input-open alone is adequate initially; activity/output-only can follow when the main geometry fits.
+6. Diagnose still overwrites diagnostics.txt; save/rename between captures. Include settings.xml when collecting the final profile set.
+
+Older status/history below remains intact; statements that Ctrl snapping uses the untrimmed parent as its alignment reference are superseded by this batch.
+
+# Previous Development Status — v0.1.25
+
 - Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.25, Windower 4. Starting checkpoint: `d1b8ef22fb366e4442a975aff2e83a70682df742` (v0.1.24). Final published head is in the handoff.
 - New per-font/size trim command independently retracts extra normal top space and raises only the Input bottom border. Native text, Input divider/label, spacing and saved height stay fixed. Existing profiles start with zero extra trims; no automatic application on upgrade.
 - Latest live reference: diagnostics(9)/(10) and matching screenshots. User preferred saved full height 234 over 233 at Arial Rounded MT Bold 8, 1280x720, 12.4px manual spacing and 13px Input. Divider shifted from 254 to 255 with text unchanged. User clarified this clears the `g` descender above the Input upper rail; it was not primarily prompt breathing room. Preserve that divider.

@@ -915,7 +915,7 @@ assert(text_objects.ConsoleBGPlus_label_title.visible and not text_objects.Conso
 assert(rectangle().height == passive_rect.height, 'Dragging activity preserves compact geometry')
 assert(save_calls == before_passive_save, 'Dragging still saves only on release')
 mouse(2, -10, -10, true)
-assert(saved.pos.x % saved.grid.spacing == 0 and saved.pos.y % saved.grid.spacing == 0)
+assert(saved.pos.x % saved.grid.spacing == 0 and (saved.pos.y+8) % saved.grid.spacing == 0)
 assert(save_calls == before_passive_save+1)
 assert(not text_objects.ConsoleBGPlus_label_title.visible, 'Expired activity hides after release')
 assert(not mouse(1, saved.pos.x+5, saved.pos.y+3), 'Hidden frame does not capture input')
@@ -1005,7 +1005,7 @@ assert(saved.pos.x == 27 and saved.pos.y == 21, 'Body dragging moves the saved p
 callbacks.keyboard(157, true)
 local body = rectangle()
 assert(mouse(1, body.x+100, body.y+50)); mouse(0, body.x+123, body.y+67); mouse(2, 0, 0)
-assert(saved.pos.x % 10 == 0 and saved.pos.y % 10 == 0, 'Whole-body Ctrl drag snaps one saved parent')
+assert(saved.pos.x % 10 == 0 and rectangle().y % 10 == 0, 'Whole-body Ctrl drag snaps the visible edge')
 callbacks.keyboard(157, false)
 for _, offset in ipairs({'0','7','10','15'}) do
     run('offset', '50', offset)
@@ -1074,6 +1074,26 @@ for _, viewport in ipairs({{width=1,height=1},{width=80,height=30},{width=120,he
         for _, piece in ipairs(pieces) do
             assert(piece.x >= 0 and piece.y >= 0 and piece.x+piece.width <= viewport.width and piece.y+piece.height <= viewport.height)
         end
+    end
+end
+callbacks.unload()
+-- Trimmed and expanded frame edges both align in their current mode.
+console_open = true; screen_width, screen_height = 1280,720
+dofile(addon_path .. 'ConsoleBGPlus.lua')
+run('font','Arial Rounded MT Bold','8'); run('trim','5','3'); run('size','500','234'); run('grid','10')
+for _, edit in ipairs({'off','on'}) do
+    run('edit',edit)
+    for _, point in ipairs({{53,47},{-9999,-9999},{9999,9999}}) do
+        run('pos','23','42'); local r = rectangle()
+        callbacks.keyboard(29,true)
+        assert(mouse(1,r.x+50,r.y+50))
+        mouse(0,point[1],point[2]); mouse(2,point[1],point[2])
+        local moved = rectangle()
+        assert(moved.x%10 == 0 and moved.y%10 == 0)
+        assert(moved.x>=0 and moved.y>=0 and moved.x+moved.width<=1280 and moved.y+moved.height<=720)
+        local px,py=saved.pos.x,saved.pos.y
+        config.callback(); assert(saved.pos.x==px and saved.pos.y==py and rectangle().y==moved.y)
+        callbacks.keyboard(29,false)
     end
 end
 callbacks.unload()

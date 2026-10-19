@@ -16,7 +16,7 @@ Drag anywhere inside the visible frame; hold either Ctrl for grid snapping. The 
 
 Run **//cbg edit** to toggle the guides and enable resizing. A band of pale diagonal lines marks the top grip; the entire frame remains draggable. The normal view trims up to eight pixels from unused top space, leaving at least seven pixels before the saved native-text origin. Edit mode restores that space upward without shifting native text, Input, or the bottom rail. Custom offsets with less spare space get a smaller trim. The matching mark at the lower-right corner resizes it. Each grip gains a soft pink wash on hover; while pressed, the wash goes away and its lines turn pale pink. Release the mouse to save. Run **//cbg edit** again when you finish. Closing the native console with Insert also ends edit and preview modes.
 
-Hold **either Ctrl key** while dragging to floor the parent anchor to a shared screen-origin grid, initially **10 UI pixels**. **//cbg grid 7** saves a different spacing; bare **//cbg grid** reports it. Free dragging remains pixel-precise. The grid does not resize the widget or snap its individual children. Screen edges take precedence; Ctrl+resize keeps its existing behavior.
+Hold **either Ctrl key** while dragging to floor the parent anchor to a shared screen-origin grid, initially **10 UI pixels**. **//cbg grid 7** saves a different spacing; bare **//cbg grid** reports it. Free dragging remains pixel-precise. Normal Ctrl+drag uses the trimmed visible top edge; edit Ctrl+drag uses the expanded header edge. The saved parent is translated to keep all children together. At tight screen bounds with no valid grid point, bounds win. The grid does not resize the widget or snap individual children. Screen edges take precedence; Ctrl+resize keeps its existing behavior.
 
 In screen-width mode, dragging left or right keeps matching side margins. Resizing sets a fixed width; **//cbg width screen** returns to screen-width mode. When console movement is linked, the native text follows the frame.
 
@@ -115,6 +115,14 @@ These values save with the current font/size profile; bare `//cbg trim` reports 
 
 For the user-tested Arial Rounded MT Bold 8 fit (12.4px spacing, 13px Input, saved full height 234), use `//cbg trim 5 2` **without recalibrating**. This preserves the extra pixel of divider clearance for the output line's `g` descender. Other fonts and sizes keep their own trim values, initially zero.
 
+## Font calibration sequence
+
+The current live reference is Arial Rounded MT Bold 8: manual 12.4px spacing, 15px top offset, 13px Input height, saved full height 234px, and trim 5 3. Preserve that profile while testing other sizes.
+
+Next use `//cbg font "Arial Rounded MT Bold" 10`, then `//cbg calibrate`. Capture Input-open with all 16 output rows plus Input and run diagnose. Inspect first-row top clearance, last-row descenders above the divider, and Input glyph bottoms. Adjust each independently; do not transfer size-8 pixel trims proportionally. Repeat at 12, then the installed Tahoma face at 8/10/12, then Verdana. Input-open is sufficient for the first comparison; activity/output-only is a follow-up once the fit works.
+
+Switch back to size 8 to verify the accepted profile returns, then reload. Finally check the same profiles on the smaller and larger UI resolutions, recording those resolutions in each diagnostic. Save/rename diagnostics.txt before another capture overwrites it. A profile is confirmed only at the font/size/resolutions actually inspected in-game.
+
 ## When something looks wrong
 
 For a spacing issue, take a screenshot and run **//cbg diagnose** while the issue is visible. It writes ConsoleBGPlus/data/diagnostics.txt with saved settings, screen and frame size, measured label bounds, log availability, and the last native position **set by the addon**. Each run replaces the prior snapshot.
@@ -130,6 +138,11 @@ Derived from [ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/a
 
 
 ## Changelog
+
+### 0.1.26 — visible-edge grid alignment
+
+- Ctrl+drag aligns the visible top-left in both normal and edit views, translating back to the stable saved parent.
+- Retained the accepted Arial Rounded MT Bold 8 reference and documented the next font/size checks.
 
 ### 0.1.25 — per-font top and Input-bottom trim
 
