@@ -48,6 +48,8 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
     //cbg labelsize [<title> <input>]             Set label sizes (6-16)
     //cbg labeloffset <-12 to 12>              Move Input label vertically
     //cbg font [<font name> <size>]             Linked font/size; no args reports it
+    //cbg preset [8|10]                       Rounded reference settings
+    //cbg test [size]                          Fill 16 native rows; save named diagnostic
     //cbg trim [<extra top> <Input bottom>]     Per-font trims; 0-32 and 0-8 pixels
     //cbg calibrate                            Measure current font; fit 16 rows
     //cbg calibrate status                     Report current font calibration
@@ -115,6 +117,16 @@ These values save with the current font/size profile; bare `//cbg trim` reports 
 
 For the user-tested Arial Rounded MT Bold 8 fit (12.4px spacing, 13px Input, saved full height 234), use `//cbg trim 5 2` **without recalibrating**. This preserves the extra pixel of divider clearance for the output line's `g` descender. Other fonts and sizes keep their own trim values, initially zero.
 
+## Bundled references and simpler testing
+
+The addon includes settings as reference presets; keep your existing data folder. No whole settings.xml replacement is needed. On Arial Rounded MT Bold, `//cbg preset 8` restores the accepted 234px/12.4px/trim 5 3 reference. `//cbg preset 10` restores the latest **working** size-10 reference: 284px height, 15.3px spacing, 16px Input, trim 5 5. Size 10 may still need more divider clearance; it is not declared final. Presets replace that font/size calibration but preserve position, width, colors, timing and activity choices. No preset applies automatically on load.
+
+With the native console open, run `cbg test 12` (or `//cbg test 12` from FFXI chat while console is open). It switches the current font family to that size, keeps existing saved fits, measures a new estimate when needed, waits for label settling, fills **16 numbered native console rows** including `g j p q y`, and saves a uniquely named `data/fonttest-<font>_<size>-<UTC timestamp>-<counter>.txt`. The Input row remains native and ready for inspection. The command stays on that font/size so you can capture it. Bare test samples the current fit after a manual adjustment. Bare preset applies the available reference for the current size.
+
+Use `test 8` to return to the saved size-8 fit. A bundled preset seeds an as-yet unsaved Arial Rounded 8/10 profile during a test; an existing saved profile takes precedence. A known manual/reference fit is never re-probed by test. To deliberately replace it with a new measurement, use calibrate separately.
+
+The test writes sample output into console.log and replaces the visible console buffer's last 16 rows. It does not send FFXI chat, inject keys, type into Input, automatically take screenshots, or judge native appearance. Close the console, change layout, drag, or reload to cancel a pending test. Measurement failure reports an error instead of emitting a completed sample. Named test diagnostics are retained; ordinary diagnose still replaces diagnostics.txt.
+
 ## Font calibration sequence
 
 The current live reference is Arial Rounded MT Bold 8: manual 12.4px spacing, 15px top offset, 13px Input height, saved full height 234px, and trim 5 3. Preserve that profile while testing other sizes.
@@ -138,6 +150,11 @@ Derived from [ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/a
 
 
 ## Changelog
+
+### 0.1.27 — reference settings and native test helper
+
+- Bundled accepted size-8 and working size-10 Rounded settings, applied explicitly.
+- One-command font-size test prints 16 native sample rows and saves a unique diagnostic; existing fits are preserved.
 
 ### 0.1.26 — visible-edge grid alignment
 

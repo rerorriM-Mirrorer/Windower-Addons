@@ -1,5 +1,12 @@
 # ConsoleBG+ changes
 
+## 0.1.27 — reference settings and native sample tests
+
+- preset 8/10 applies bundled Arial Rounded reference settings while preserving unrelated preferences.
+- test [size] preserves known fits, measures new estimates, fills 16 numbered native rows and saves a unique diagnostic.
+- Size 10 is a working reference; divider clearance still needs visual acceptance.
+
+
 ## 0.1.26 — visible-edge Ctrl snapping
 
 - Normal mode snaps the trimmed top edge; edit mode snaps the expanded header. Saved parent and child offsets remain unified.

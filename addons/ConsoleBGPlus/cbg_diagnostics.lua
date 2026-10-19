@@ -101,8 +101,18 @@ function diagnostics.new(root, version)
         return result, err
     end
 
-    function recorder.snapshot(context)
+    local snapshot_id = 0
+    function recorder.snapshot(context, tag)
         local path = directory .. 'diagnostics.txt'
+        if tag then
+            repeat
+                snapshot_id = snapshot_id + 1
+                path = directory .. 'fonttest-' .. tag:gsub('[^%w_%-]', '_') .. '-'
+                    .. os.date('!%Y%m%d-%H%M%S') .. '-' .. snapshot_id .. '.txt'
+                local existing = io.open(path, 'rb')
+                if existing then existing:close() else break end
+            until false
+        end
         local output, err = open(path)
         if not output then return nil, err end
         local written, write_error = output:write(header(context, version))

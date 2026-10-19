@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.26'
+_addon.version = '0.1.27'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -12,6 +12,8 @@ local diagnostics = require('cbg_diagnostics')
 local activity = require('cbg_activity')
 local calibration = require('cbg_calibration')
 local font_probe = calibration.new()
+local presets = require('cbg_presets')
+local pending_test
 local defaults = {
     bg = {alpha = 255, red = 255, green = 255, blue = 255},
     pos = {x = 16, y = 48},
@@ -629,6 +631,52 @@ local function calibrate_command(args)
     accept_calibration(spacing, top, bottom, input, 'manual')
 end
 
+-- Explicit references preserve unrelated layout/activity preferences.
+local function preset_command(args)
+    local size = #args == 0 and settings.native.size or (#args == 1 and integer(args[1], 6, 24))
+    local p = size and presets.get(settings.native.font, size)
+    if not p then return message('Reference presets: Arial Rounded MT Bold 8 (accepted) or 10 (working).', true) end
+    capture_font_profile()
+    settings.native.size = size
+    apply_font_profile(p)
+    capture_font_profile()
+    sync_native_profile()
+    save()
+    message('Applied ' .. p.source .. ': ' .. settings.native.font .. ' ' .. size .. '.')
+end
+
+local function test_command(args)
+    local size = #args == 0 and settings.native.size or (#args == 1 and integer(args[1], 6, 24))
+    if not size then return usage('test [size 6-24]') end
+    if not windower.console.visible() then return message('Open the native console first, then run cbg test [size].', true) end
+    if type(windower.console.write) ~= 'function' then return message('Native console write API unavailable.', true) end
+    local existing = settings.fontprofiles[calibration.key(settings.native.font, size)]
+        or (settings.native.size == size)
+    local reference = not existing and presets.get(settings.native.font, size)
+    font_command({settings.native.font, tostring(size)})
+    if reference then preset_command({tostring(size)}) end
+    editing = false
+    refresh()
+    pending_test = {stage = 'wait', frames = 0}
+    local source = settings.fontmetrics.source
+    if source == 'unmeasured' or source == 'estimate' then
+        pending_test.stage = 'measure'
+        font_probe.start(settings.native.font, settings.native.size)
+    end
+    message('Preparing 16 native sample rows and a named diagnostic. Capture Input-open when ready.')
+end
+
+local function finish_font_test()
+    for row = 1, 16 do
+        windower.console.write(string.format('%02d Agjpqy 0123456789 - g j p q y', row))
+    end
+    local tag = settings.native.font:gsub('[^%w]', '_') .. '_' .. settings.native.size
+    local path, err = recorder.snapshot(context(true), tag)
+    pending_test = nil
+    if path then message('Font test ready. Screenshot now; diagnostic: ' .. path)
+    else message('Font sample ready; diagnostic failed: ' .. tostring(err), true) end
+end
+
 -- Readouts never save or send native commands, so checking a calibration
 -- is safe during testing. Bare width is intentionally a screen-width setter.
 local function report_setting(action)
@@ -661,7 +709,12 @@ local function command(action, ...)
     if #args == 0 and report_setting(action) then return end
     end_drag()
     font_probe.cancel()
-    if action == 'trim' then
+    pending_test = nil
+    if action == 'preset' then
+        preset_command(args)
+    elseif action == 'test' then
+        test_command(args)
+    elseif action == 'trim' then
         if #args == 0 then
             return message(string.format('Font trim: extra top %dpx, Input bottom %dpx.',
                 settings.fontmetrics.top_extra, settings.fontmetrics.bottom_trim))
@@ -929,6 +982,7 @@ local function command(action, ...)
         if #args ~= 0 then return usage('help') end
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] (guides/resize); entire visible frame draggable | console on|off | offset <x> <y>')
+        message('//cbg preset [8|10] (Rounded references) | test [size] (native sample + diagnostic)')
         message('//cbg trim [<extra top 0-32> <Input bottom 0-8>] (per font/size)')
         message('//cbg calibrate [line pixels [top [bottom [input]]]] | calibrate status')
         message('//cbg grid [pixels] | Hold either Ctrl while dragging to snap the frame anchor.')
@@ -952,6 +1006,7 @@ refresh()
 sync_native_profile()
 local registration = config.register(settings, function()
     font_probe.cancel()
+    pending_test = nil
     ctrl[29], ctrl[157] = false, false
     drag, hover_target, position_dirty, opening_stage = nil, nil, true, false
     watcher.restart()
@@ -967,11 +1022,16 @@ windower.register_event('prerender', function()
         ctrl[29], ctrl[157] = false, false
         end_drag()
     end
+    if pending_test and not windower.console.visible() then
+        font_probe.cancel()
+        pending_test = nil
+    end
     local measured, measurement_error = font_probe.poll()
     if measured then
         accept_calibration(measured.spacing, settings.fontmetrics.top, settings.fontmetrics.bottom,
             math.max(6, math.floor(measured.spacing + 0.5)), 'addon-proxy', measured.single, measured.multi)
-    elseif measurement_error then message(measurement_error, true) end
+        if pending_test then pending_test.stage = 'wait' end
+    elseif measurement_error then pending_test = nil; message(measurement_error, true) end
     local console_visible = windower.console.visible()
     if console_visible then startup_since, startup_alpha = nil, 0 end
     if manual_was_open and not console_visible then
@@ -1022,6 +1082,12 @@ windower.register_event('prerender', function()
     update_visibility()
     opening_stage = false
     if wanted then measure_labels() end
+    if pending_test and pending_test.stage == 'wait' then
+        pending_test.frames = pending_test.frames + 1
+        if not console_visible then pending_test = nil
+        elseif (pending_test.frames >= 2 and not labels.title.pending and not labels.input.pending)
+            or pending_test.frames >= 120 then finish_font_test() end
+    end
     if recorder.active then
         local ok, err = recorder.observe(context(console_visible))
         if err then message('Visibility trace: ' .. tostring(err), true) end
@@ -1064,6 +1130,7 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
         local target = hit_grip(x, y)
         if not target then return false end
         font_probe.cancel()
+        pending_test = nil
         local rect = actual_rectangle
         drag = {kind = target == 'resize' and 'resize' or 'drag', x = x, y = y,
             rectangle = {x = rect.x, y = rect.anchor_y or rect.y, width = rect.width,
@@ -1123,6 +1190,7 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
 end)
 windower.register_event('unload', function()
     font_probe.cancel()
+    pending_test = nil
     if drag and drag.changed then config.save(settings) end
     drag = nil
     recorder.stop()

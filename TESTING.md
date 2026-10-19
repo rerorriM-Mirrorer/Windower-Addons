@@ -1,5 +1,25 @@
 # Current Development Status
 
+- Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.27, Windower 4. Starting checkpoint: `cc3503caa43fc9316d1ef61a5084d89608ca1170` (v0.1.26). Published final head is in the handoff.
+- Bundled settings references: accepted Arial Rounded MT Bold 8 (height 234, spacing 12.4, Input 13, trim 5 3); working size 10 (height 284, spacing 15.3, Input 16, trim 5 5). Presets apply explicitly and preserve unrelated preferences. User authorized inclusion of settings and simplified/self-running tests. No full user settings.xml replacement is shipped.
+- Latest material: image(20261019-050805).png and diagnostics(20261019-050814).txt at 1280x720, v0.1.26, Arial Rounded MT Bold 10. Manual spacing 15.3, top/bottom 15/1, full height 284, Input 16, trim 5 5; divider y360, native origin70,115. Screenshot note suggests more space above Input may still be needed. This is a working reference, not final visual approval.
+- New test [size] switches the current family/size, preserves saved manual/reference fits, probes unknown estimates, waits for settling, prints 16 native rows with descenders and writes a unique timestamped diagnostic. It pauses on the chosen size for a user screenshot; it cannot judge native appearance or drive the user's FFXI client from this environment.
+- Verification: complete mocked Windower suite via liblua 5.4; Lua 5.1 syntax. New checks cover both presets, unrelated settings preserved, 16 sample writes, unique diagnostic names for repeated tests, automatic new-size probing, intervening-command and console-close cancellation, probe failure, invalid sizes and cleanup. No live test of v0.1.27 here.
+- Pending live check: keep data, update/reload, open native console, run cbg test 12. Capture the sample and attach its named diagnostic. Use cbg test for a fresh sample/diagnostic after manual adjustment. Then inspect size10's descender clearance and return to size8. Other fonts/resolutions remain unconfirmed.
+
+## 2026-10-19 — v0.1.27 acceptance
+
+1. Keep data/settings.xml. Test retains current manual fits; no reset is needed. Preset 8 or 10 deliberately replaces the current Rounded font-size reference only; position/width and activity/timing/colors remain.
+2. Open console and run cbg test 12. Wait for ready feedback in FFXI chat; 16 numbered native rows should fill the output and leave the native Input line below them. Check descenders on row16 against the divider and typed Input descenders against the lower border.
+3. Attach screenshot plus data/fonttest-...txt from that run. Repeat bare test and confirm a different file is created. Ordinary diagnose still overwrites diagnostics.txt.
+4. Try size8 and size10: existing custom/manual fits should return. If no profile exists, a bundled Rounded reference may seed it. Confirm size8 trim5/3; size10 trim5/5 is still provisional.
+5. For pending test cancellation, start an unknown-size probe and close console or change layout; it should not print a later surprise sample. A failed probe should leave the current layout without emitting a success sample.
+6. Recheck dragging, grid, edit header, saved profile switching/reload and activity. Sample output writes to the shared console.log and can trigger other clients' activity watchers, as any native output can.
+
+The previous cumulative records remain below.
+
+# Previous Development Status — v0.1.26
+
 - Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.26 / Windower 4. Starting source: `1628743ccdad3901eb0d01d4063ea15450d92134` (v0.1.25). Published final head is in the handoff.
 - Ctrl+drag now floors the visible top-left edge to the shared UI grid in the current mode: trimmed normal edge or expanded edit header. Saved parent coordinates are translated by the current top trim; native text and all child primitives move together. Bounds remain authoritative if a very small viewport offers no grid point.
 - Latest live acceptance: user reports trim 5 3 looks good at Arial Rounded MT Bold 8; prior saved height 234, manual spacing 12.4, Input height 13, native top offset 15. User observed that visible-edge alignment appeared to work only in edit mode; prior snapping used the parent above the trimmed border, now corrected. No v0.1.26 FFXI test performed here.

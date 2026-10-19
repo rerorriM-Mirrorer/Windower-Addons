@@ -6,6 +6,7 @@ local callbacks, objects, text_objects, saved, logs = {}, {}, {}, nil, {}
 local console_open, screen_width, screen_height = false, 1920, 1080
 local visibility_calls, geometry_calls = 0, 0
 local save_calls, positions, console_writes = 0, {}, 0
+local console_lines = {}
 local diagnostic_files, fail_diagnostics = {}, false
 local render_frame, style_calls, measurement_calls = 0, 0, 0
 local render_latency = 2
@@ -23,7 +24,12 @@ io.open = function(path, mode)
         return {seek = function(_, whence) assert(whence == 'end'); return fake_log_size end,
             close = function() return true end}
     end
-    if path == addon_path .. 'data/diagnostics.txt' or path == addon_path .. 'data/visibility.log' then
+    if path:find(addon_path .. 'data/fonttest-', 1, true) == 1 and mode == 'rb' then
+        if diagnostic_files[path] then return {close=function() end} end
+        return nil
+    end
+    if path == addon_path .. 'data/diagnostics.txt' or path == addon_path .. 'data/visibility.log'
+        or path:find(addon_path .. 'data/fonttest-', 1, true) == 1 then
         if fail_diagnostics then return nil, 'simulated write failure' end
         assert(mode == 'w')
         local output = {text = '', closed = false, flushes = 0}
@@ -66,7 +72,7 @@ windower = {
     addon_path = addon_path,
     console = {visible = function() return console_open end,
         set_position = function(x, y) positions[#positions + 1] = {x = x, y = y} end,
-        write = function() console_writes = console_writes + 1 end},
+        write = function(line) console_writes = console_writes + 1; console_lines[#console_lines+1] = line end},
     prim = {},
     text = {},
     get_windower_settings = function()
@@ -1097,6 +1103,46 @@ for _, edit in ipairs({'off','on'}) do
     end
 end
 callbacks.unload()
+-- Bundled references and one-command native font tests.
+console_open = true
+dofile(addon_path .. 'ConsoleBGPlus.lua')
+run('font','Arial Rounded MT Bold','8'); run('preset','8')
+assert(saved.extents.y == 234 and saved.fontmetrics.spacing == 12.4
+    and saved.fontmetrics.top_extra == 5 and saved.fontmetrics.bottom_trim == 3)
+local x,y,width = saved.pos.x,saved.pos.y,saved.extents.x
+run('preset','10')
+assert(saved.native.size == 10 and saved.extents.y == 284 and saved.fontmetrics.bottom_trim == 5)
+assert(saved.fontmetrics.source == 'trial-reference')
+assert(saved.pos.x==x and saved.pos.y==y and saved.extents.x==width)
+local before_test = #console_lines
+run('test'); settle()
+assert(#console_lines==before_test+16 and console_lines[#console_lines]:find('16 Agjpqy',1,true))
+local test_files=0
+for name in pairs(diagnostic_files) do if name:find('/fonttest-',1,true) then test_files=test_files+1 end end
+assert(test_files==1)
+run('test'); settle()
+local second_files=0
+for name in pairs(diagnostic_files) do if name:find('/fonttest-',1,true) then second_files=second_files+1 end end
+assert(second_files==2, 'Repeated tests never overwrite the preceding diagnostic')
+run('font','Verdana','6'); run('test','7'); settle()
+assert(saved.native.size==7 and saved.fontmetrics.source=='addon-proxy')
+assert(#console_lines==before_test+48)
+local before_cancel = #console_lines
+run('font','Verdana','6'); run('test','9'); run('pos','20','20'); settle()
+assert(#console_lines==before_cancel, 'An intervening layout command cancels the pending test')
+console_open=false
+local before_closed = save_calls
+run('test','12'); assert(save_calls==before_closed)
+console_open=true
+run('test','12'); console_open=false; settle(); assert(#console_lines==before_cancel)
+console_open=true
+fail_probe=true
+run('test','11'); for _=1,100 do tick() end
+assert(#console_lines==before_cancel, 'A failed probe does not emit a misleading completed test')
+fail_probe=false
+local before_invalid=save_calls
+run('test','nan'); run('preset','12'); assert(save_calls==before_invalid)
+callbacks.unload(); assert(next(text_objects)==nil)
 io.open = real_open
 print('PASS: Ctrl+drag grid matrix, per-font 16-row calibration/profile matrix, proxy failure/cancellation, and fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
 
