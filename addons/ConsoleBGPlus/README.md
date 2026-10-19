@@ -151,7 +151,26 @@ Derived from [ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/a
 
 
 
+### Guided full calibration pass
+
+Keep your data folder and optionally back up settings.xml. Open the native console and enter `cbg test suite`. This explicitly applies the revised Rounded size12 reference first, then visits57 font/size cases. Installed font availability cannot be queried; Windows may substitute a missing face. Existing other saved fits take precedence over proxy measurements. Unknown pairs use the addon-text proxy and still require native visual inspection.
+
+For each ready sample, take a screenshot containing all16 output rows and Input, then enter `cbg test next`. The automatic diagnostic contains the font, size, source, viewport and geometry. Inspect first-row top clearance, uniform row pitch, last-row descenders against the divider, Input baseline and bottom, and label/tab alignment. For Input descenders, type `Agjpqy` without pressing Enter, capture, then clear it before entering the next command. Native input text cannot be filled or measured by the addon. Use `cbg test repeat` after an adjustment or interrupted probe; it samples the adjusted fit without reapplying a reference. A failed measurement/diagnostic does not unlock next. `cbg test status` reports progress.
+
+At representative sizes8/12/24 for each family, also inspect edit on/off (only the header should move), and an output-only activity view after closing the console. `//cbg test capture` from chat records the current mode without reopening the console or replacing the sample. Only call an output capture successful if the frame/native text are actually visible; normal activity/fade settings remain unchanged. Edit/layout commands pause advancement; repeat after returning to the normal view.
+
+Repeat the suite on each available UI resolution (at least960x540,1280x720 and the larger display). Oversized cases warn when the fit exceeds the viewport; record clipping rather than treating it as a measured native fit. A taller UI is required to inspect all rows at extreme sizes. The addon cannot resize the game window, take screenshots, verify installed fonts, or judge glyph bounds. All fonts ever installed cannot be exhaustively validated by this suite; use `test suite current` for additional families.
+
+At the end, next restores the starting font, as does stop. Completed font profiles remain saved; the suite cannot resume its queue across reload. Check font round trips and reload persistence, free/both-Ctrl dragging at screen edges, edit resizing, and ordinary activity afterward. These input checks are automated in the mock suite but still require live acceptance. Collect screenshots and all matching fonttest logs together; native visual corrections may require another pass.
+
 ## Changelog
+
+### 0.1.29 — complete guided calibration pass
+
+- `test suite` covers Arial Rounded MT Bold, Tahoma and Verdana at every integer size6–24. `test suite current` covers only the current family. Cases begin12/8/10, then the remaining sizes in ascending order.
+- Each case prints16 rows and saves a unique diagnostic, then waits for `test next`. `test repeat` retries the current fit after adjustments/interruption; `test status` reports progress; `test stop` restores the starting font. Completion also restores it. Session progress is transient; completed fit profiles and diagnostics persist.
+- `test capture` saves a unique diagnostic of the current Input/edit/output mode without writing sample rows or changing layout. Useful when comparing modes or resolutions.
+- Rounded size12 trial adds3px clearance before Input (bottom allowance4, full height333). Existing saved size12 fits change only on explicit preset or suite reference application. Sizes8/10 remain unchanged.
 
 ### 0.1.28 — explicit reference test
 

@@ -1,3 +1,9 @@
+## v0.1.29
+
+- Guided57-case suite for three families, all sizes6–24; current-family option, explicit advance/repeat/status/stop and starting-font restoration.
+- Unique current-mode captures without native output writes. Failures/interruption require a retry; no automatic advancement.
+- Rounded12 trial increases divider clearance3px (height333, bottom allowance4). Other references unchanged. Full live checklist is in README/TESTING.
+
 ## v0.1.28
 
 - Add explicit test preset [size] to apply a bundled fit and run its sample/diagnostic together. Ordinary tests preserve saved fits.

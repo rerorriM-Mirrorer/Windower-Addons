@@ -1148,7 +1148,7 @@ run('test'); settle()
 assert(saved.fontmetrics.spacing==19, 'Ordinary test preserves a saved proxy/manual fit')
 local before_reference = #console_lines
 run('test','preset','12'); settle()
-assert(saved.native.size==12 and saved.fontmetrics.spacing==18 and saved.extents.y==330)
+assert(saved.native.size==12 and saved.fontmetrics.spacing==18 and saved.extents.y==333)
 assert(saved.input.height==19 and saved.fontmetrics.source=='trial-reference')
 assert(saved.fontmetrics.top_extra==0 and saved.fontmetrics.bottom_trim==0)
 assert(#console_lines==before_reference+16)
@@ -1157,11 +1157,55 @@ run('test','preset','8'); settle()
 assert(saved.extents.y==234 and saved.fontmetrics.top_extra==5 and saved.fontmetrics.bottom_trim==3)
 assert(saved.pos.x==reference_x and saved.pos.y==reference_y)
 run('test','12'); settle()
-assert(saved.extents.y==330 and saved.fontmetrics.spacing==18)
+assert(saved.extents.y==333 and saved.fontmetrics.spacing==18)
 console_open=false
 local closed_reference=save_calls
 run('test','preset','8'); assert(save_calls==closed_reference)
 console_open=true
+-- Guided all-font/all-size suite: every case waits for explicit advancement.
+run('font','Arial Rounded MT Bold','8')
+local suite_start=#console_lines
+run('test','suite')
+local suite_saves=save_calls
+run('test','next'); assert(save_calls==suite_saves, 'Premature next leaves the pending case intact')
+settle()
+assert(saved.native.size==12 and saved.extents.y==333 and saved.fontmetrics.bottom==4)
+local capture_lines=#console_lines
+run('test','capture')
+assert(#console_lines==capture_lines, 'Capture does not rewrite native output')
+local input_capture=false
+for name in pairs(diagnostic_files) do if name:find('_12_input-',1,true) then input_capture=true end end
+assert(input_capture)
+console_open=false; tick(); run('test','capture')
+local output_capture=false
+for name in pairs(diagnostic_files) do if name:find('_12_output-',1,true) then output_capture=true end end
+assert(output_capture)
+console_open=true; tick()
+local first_ready=#console_lines
+settle(); assert(#console_lines==first_ready, 'Suite never advances on a timer')
+run('test','repeat'); settle(); assert(#console_lines==first_ready+16)
+for i=2,57 do run('test','next'); settle() end
+assert(saved.native.font=='Verdana' and saved.native.size==24)
+assert(#console_lines==suite_start+58*16)
+run('test','next'); assert(saved.native.font=='Arial Rounded MT Bold' and saved.native.size==8)
+assert(saved.extents.y==234 and saved.fontmetrics.bottom_trim==3)
+run('test','suite','current'); settle()
+console_open=false; run('test','next')
+console_open=true; run('test','next'); settle(); assert(saved.native.size==8)
+run('test','stop'); assert(saved.native.size==8)
+local no_suite_saves=save_calls
+run('test','suite','invalid'); run('test','next'); assert(save_calls==no_suite_saves)
+for _, screen in ipairs({{960,540},{1280,720},{1366,768},{3840,2160}}) do
+    screen_width,screen_height=screen[1],screen[2]; tick()
+    run('test','suite'); settle()
+    for case=1,57 do
+        local rect=rectangle()
+        assert(rect.x>=0 and rect.y>=0 and rect.x+rect.width<=screen_width and rect.y+rect.height<=screen_height,
+            'Every suite font/size stays bounded at each simulated resolution')
+        run('test','next'); settle()
+    end
+    assert(saved.native.font=='Arial Rounded MT Bold' and saved.native.size==8)
+end
 callbacks.unload(); assert(next(text_objects)==nil)
 io.open = real_open
 print('PASS: Ctrl+drag grid matrix, per-font 16-row calibration/profile matrix, proxy failure/cancellation, and fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')

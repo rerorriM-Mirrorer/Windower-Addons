@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.28'
+_addon.version = '0.1.29'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -14,6 +14,7 @@ local calibration = require('cbg_calibration')
 local font_probe = calibration.new()
 local presets = require('cbg_presets')
 local pending_test
+local test_suite
 local defaults = {
     bg = {alpha = 255, red = 255, green = 255, blue = 255},
     pos = {x = 16, y = 48},
@@ -679,8 +680,94 @@ local function finish_font_test()
     local tag = settings.native.font:gsub('[^%w]', '_') .. '_' .. settings.native.size
     local path, err = recorder.snapshot(context(true), tag)
     pending_test = nil
+    if test_suite then test_suite.ready = path ~= nil end
+    if test_suite and path then
+        message(string.format('Suite %d/%d: %s %d. Screenshot; cbg test next continues; repeat retries; stop restores starting font.',
+            test_suite.index, #test_suite.cases, settings.native.font, settings.native.size))
+        if settings.extents.y + settings.pos.y > viewport().height then
+            message('This fit exceeds the viewport: record clipping, then repeat on a taller UI resolution.', true)
+        end
+    end
     if path then message('Font test ready. Screenshot now; diagnostic: ' .. path)
     else message('Font sample ready; diagnostic failed: ' .. tostring(err), true) end
+end
+
+-- Advance only on an explicit command: native appearance needs a screenshot.
+-- Session state is transient; completed per-font measurements remain saved.
+local function suite_case()
+    local c = test_suite.cases[test_suite.index]
+    test_suite.ready = false
+    font_probe.cancel()
+    pending_test = nil
+    font_command({c.font, tostring(c.size)})
+    test_command(c.reference and {'preset', tostring(c.size)} or {tostring(c.size)})
+end
+
+local function suite_command(args)
+    local op = args[1]:lower()
+    if op == 'capture' then
+        if #args ~= 1 then return usage('test capture') end
+        if pending_test then return message('Wait for the sample to finish before capturing.', true) end
+        local visible = windower.console.visible()
+        local mode = editing and 'edit' or (visible and 'input' or 'output')
+        local tag = settings.native.font:gsub('[^%w]', '_') .. '_' .. settings.native.size .. '_' .. mode
+        local path, err = recorder.snapshot(context(visible), tag)
+        if path then message('Capture diagnostic: ' .. path)
+        else message('Capture diagnostic failed: ' .. tostring(err), true) end
+    elseif op == 'suite' then
+        if #args > 2 or (args[2] and args[2]:lower() ~= 'current') then
+            return usage('test suite [current]')
+        end
+        if test_suite then return message('A suite is active; use test next, repeat, status, or stop.', true) end
+        if not windower.console.visible() or type(windower.console.write) ~= 'function' then
+            return message('Open the native console before starting the suite.', true)
+        end
+        if not settings.input.enabled then return message('Enable Input before the calibration suite: cbg input on.', true) end
+        local fonts = args[2] and {settings.native.font} or {'Arial Rounded MT Bold', 'Tahoma', 'Verdana'}
+        local sizes = {12, 8, 10}
+        for size = 6, 24 do if size ~= 8 and size ~= 10 and size ~= 12 then sizes[#sizes + 1] = size end end
+        local cases = {}
+        for _, font in ipairs(fonts) do
+            for _, size in ipairs(sizes) do
+                cases[#cases + 1] = {font = font, size = size,
+                    reference = font:lower() == 'arial rounded mt bold' and size == 12}
+            end
+        end
+        test_suite = {cases = cases, index = 1, font = settings.native.font, size = settings.native.size}
+        message('Suite: Input-open capture each step; inspect first/last glyphs, divider and Input bottom. Native fonts require visual verification.')
+        suite_case()
+    elseif #args ~= 1 then
+        return usage('test next|repeat|status|stop')
+    elseif not test_suite then
+        return message('No active suite. Start with cbg test suite [current].', true)
+    elseif op == 'status' then
+        local c = test_suite.cases[test_suite.index]
+        message(string.format('Suite %d/%d: %s %d; %s.', test_suite.index, #test_suite.cases,
+            c.font, c.size, test_suite.ready and 'ready for capture/next' or 'pending or interrupted; repeat retries'))
+    elseif op == 'stop' or (op == 'next' and test_suite.ready and test_suite.index == #test_suite.cases) then
+        local original = test_suite
+        test_suite = nil
+        font_probe.cancel()
+        pending_test = nil
+        font_command({original.font, tostring(original.size)})
+        message('Suite ended; starting font restored. Completed measurements and diagnostics retained.')
+    elseif op == 'repeat' then
+        if not windower.console.visible() then return message('Reopen console, then cbg test repeat.', true) end
+        -- Repeats sample the current case/adjusted fit; do not reapply its preset.
+        local c = test_suite.cases[test_suite.index]
+        if settings.native.font ~= c.font or settings.native.size ~= c.size then
+            return message('Return to the suite font/size before repeating, or stop the suite.', true)
+        end
+        test_suite.ready = false
+        font_probe.cancel()
+        pending_test = nil
+        test_command({})
+    elseif op == 'next' then
+        if not test_suite.ready or pending_test then return message('Wait for ready, or use cbg test repeat after an interruption.', true) end
+        if not windower.console.visible() then return message('Reopen console before cbg test next.', true) end
+        test_suite.index = test_suite.index + 1
+        suite_case()
+    end
 end
 
 -- Readouts never save or send native commands, so checking a calibration
@@ -712,6 +799,17 @@ local function command(action, ...)
     action = (action or 'help'):lower()
     action = aliases[action] or action
     local args = {...}
+    if action == 'test' and args[1] then
+        local op = args[1]:lower()
+        if op == 'capture' or op == 'suite' or op == 'next' or op == 'repeat' or op == 'status' or op == 'stop' then
+            end_drag()
+            return suite_command(args)
+        end
+    end
+    if test_suite and action == 'test' then
+        return message('Use test next, repeat, status or stop while the suite is active.', true)
+    end
+    if test_suite and action ~= 'help' and action ~= 'status' then test_suite.ready = false end
     if #args == 0 and report_setting(action) then return end
     end_drag()
     font_probe.cancel()
@@ -989,6 +1087,7 @@ local function command(action, ...)
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] (guides/resize); entire visible frame draggable | console on|off | offset <x> <y>')
         message('//cbg preset [8|10|12] (Rounded references) | test [preset] [size] (native sample + diagnostic)')
+        message('//cbg test suite [current] | test next|repeat|status|stop | test capture (guided font calibration)')
         message('//cbg trim [<extra top 0-32> <Input bottom 0-8>] (per font/size)')
         message('//cbg calibrate [line pixels [top [bottom [input]]]] | calibrate status')
         message('//cbg grid [pixels] | Hold either Ctrl while dragging to snap the frame anchor.')

@@ -8,7 +8,7 @@ function presets.get(font, size)
         -- Keep trims neutral until this inferred native fit is visually checked.
         return {
             source = 'trial-reference', rows = 16, spacing = 18, single = 0, multi = 0,
-            top = 15, bottom = 1, height = 330, input = 19,
+            top = 15, bottom = 4, height = 333, input = 19,
             title = 8, label = 7, label_y = 2,
             offset_x = 50, offset_y = 15, labelfont = 'Arial Rounded MT Bold',
             top_extra = 0, bottom_trim = 0,
