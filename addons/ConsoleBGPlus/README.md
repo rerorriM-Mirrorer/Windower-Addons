@@ -151,6 +151,16 @@ Derived from [ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/a
 
 
 
+### Automatic screenshot trial
+
+Open the native console and run `cbg test auto tahoma`. It runs the existing19-case family suite with the current spacing estimates. After the first sample settles (at least3 further rendered frames and0.5s), it sends Windower `screenshot png` without hide. It watches the default `windower.windower_path/screenshots/` folder for exactly one new PNG with PNG signature and IEND trailer, then copies that file beside its diagnostic as the same fonttest basename with `.png` instead of `.txt`. Original screenshots remain in Windower's folder. No screenshot directory, format default, keybind, or plugin setting is changed.
+
+The first completed file pauses. Inspect the matching PNG in data: it must include the console, ConsoleBGPlus and the complete16-row sample. If usable, reopen/focus the game and run `cbg test go` to capture the remaining18 automatically. Each subsequent case waits for its PNG, then an extra second before advancing. Completion restores the starting font. Use `test auto verdana` for the next19-case batch. Send a ZIP of data containing both screenshots and diagnostics. File markers confirm completion only, not correct/visible image content; first-frame visual acceptance is required. This remains untested with native Windower capture.
+
+For a custom screenshot folder, use `cbg test auto tahoma "C:/path/to/screenshots"`. Supply the folder where Windower already writes; this command does not redirect it. Organized/nested screenshot folders (e.g. plugins) must point to the actual leaf folder. No recursive scanning, moving, deleting, or renaming of existing screenshots occurs. Keep other clients/manual screenshot producers idle during the batch; multiple new PNGs cause a pause, but a single unrelated PNG cannot be distinguished from this client's capture.
+
+Missing/incomplete PNG, unreadable directory, ambiguous files, command/copy error or20-second timeout pauses without advancing. Conversion that produces only BMP is not accepted. Use test repeat after the failure is reported to retry the same case; this pauses again for inspection. Next/repeat cannot replace an in-flight file capture; stop may cancel the session. Closing console, losing focus, changing resolution, layout commands, settings reload or grabbing the frame cancels queued capture/automatic advancement. Already issued native screenshot commands cannot be withdrawn; let them finish before restarting. Test status reports the suite; stop restores the starting font. For manual fallback, stop and use test suite tahoma/verdana as before.
+
 ### Updated estimates and upload batches
 
 The v0.1.29 screenshots at1280x720 show native row pitch near95% of addon proxy pitch: Rounded16 about23.75 versus25, Rounded20 about29.45 versus31, Rounded24 about36.1 versus38; Tahoma12 about19 versus20. This is an inference from supplied images, not a native font getter or a guarantee for other systems.
@@ -174,6 +184,11 @@ Repeat the suite on each available UI resolution (at least960x540,1280x720 and t
 At the end, next restores the starting font, as does stop. Completed font profiles remain saved; the suite cannot resume its queue across reload. Check font round trips and reload persistence, free/both-Ctrl dragging at screen edges, edit resizing, and ordinary activity afterward. These input checks are automated in the mock suite but still require live acceptance. Collect screenshots and all matching fonttest logs together; native visual corrections may require another pass.
 
 ## Changelog
+
+### 0.1.31 — opt-in PNG capture trial
+
+- Automatic single-family screenshot tests, first-file inspection pause and explicit go continuation. Wait for completed PNG, match/copy to diagnostic basename, restore starting font after19 cases.
+- Capture failures/timeouts/ambiguity and user interruptions pause; ordinary/manual tests stay available. Native screenshot support still needs live verification.
 
 ### 0.1.30 — evidence-based trial estimates
 

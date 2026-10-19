@@ -1,3 +1,8 @@
+## v0.1.31
+
+- Add test auto <family> [existing screenshot directory] and test go for opt-in Windower PNG captures. First completed file pauses for inspection; subsequent cases advance only after a matched PNG is copied beside its diagnostic.
+- Observe file signature/end marker,20s timeout and ambiguity/write failures. Focus/console/resolution/layout interruptions cancel queued captures. No screenshot settings changes; manual suites retained. Native capture unverified here.
+
 ## v0.1.30
 
 - Derive opt-in trial native spacing estimates from95% of fresh addon probe pitch, with4px bottom allowance and ceiling pitch for Input. Raw extents retained; manual/reference fits preserved.

@@ -1,4 +1,4 @@
-# Current Development Status
+# Previous Development Status — v0.1.30
 
 - Repository/branch: rerorriM-Mirrorer/Windower-Addons, consolebg-plus; ConsoleBGPlus v0.1.30 / Windower4. Tested starting checkpoint:45aa50b175118c8f3237e2a162c2c9c8fcd61beb (v0.1.29). Final published hash is in the handoff. Baseline branches unchanged.
 - Received data.zip and Screenshots85–104: all19 Rounded size logs,18 matching Rounded screenshots (14 missing), Tahoma12/8 logs+screenshots. Native pitch inferred near95% of raw addon probe (e.g. Rounded16~23.75/25,20~29.45/31,24~36.1/38; Tahoma12~19/20). This evidence is from1280x720 and does not verify other systems/fonts. Revised Rounded12 divider clears row16 in Screenshot85; not blanket acceptance of all margins. Sizes23/24 are clipped by existing viewport height.

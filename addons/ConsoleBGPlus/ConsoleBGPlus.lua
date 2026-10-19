@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.30'
+_addon.version = '0.1.31'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -13,6 +13,7 @@ local activity = require('cbg_activity')
 local calibration = require('cbg_calibration')
 local font_probe = calibration.new()
 local presets = require('cbg_presets')
+local capture = require('cbg_capture')
 local pending_test
 local test_suite
 local defaults = {
@@ -686,7 +687,13 @@ local function finish_font_test()
     local tag = settings.native.font:gsub('[^%w]', '_') .. '_' .. settings.native.size
     local path, err = recorder.snapshot(context(true), tag)
     pending_test = nil
-    if test_suite then test_suite.ready = path ~= nil end
+    if test_suite then
+        test_suite.ready = path ~= nil
+        if test_suite.auto and path then
+            test_suite.shot = {phase = 'settle', since = watcher.now(), frames = 0,
+                target = path:gsub('%.txt$', '.png'), width = viewport().width, height = viewport().height}
+        end
+    end
     if test_suite and path then
         message(string.format('Suite %d/%d: %s %d. Screenshot; cbg test next continues; repeat retries; stop restores starting font.',
             test_suite.index, #test_suite.cases, settings.native.font, settings.native.size))
@@ -698,7 +705,7 @@ local function finish_font_test()
     else message('Font sample ready; diagnostic failed: ' .. tostring(err), true) end
 end
 
--- Advance only on an explicit command: native appearance needs a screenshot.
+-- Manual suites wait for next; opt-in auto suites verify a PNG before advancing.
 -- Session state is transient; completed per-font measurements remain saved.
 local function suite_case()
     local c = test_suite.cases[test_suite.index]
@@ -720,11 +727,18 @@ local function suite_command(args)
         local path, err = recorder.snapshot(context(visible), tag)
         if path then message('Capture diagnostic: ' .. path)
         else message('Capture diagnostic failed: ' .. tostring(err), true) end
-    elseif op == 'suite' then
+    elseif op == 'suite' or op == 'auto' then
+        local automatic = op == 'auto'
         local family = args[2] and args[2]:lower()
-        if #args > 2 or (family and family ~= 'current' and family ~= 'rounded'
+        if #args > (automatic and 3 or 2) or (family and family ~= 'current' and family ~= 'rounded'
             and family ~= 'tahoma' and family ~= 'verdana') then
-            return usage('test suite [current|rounded|tahoma|verdana]')
+            return usage('test suite [family] | test auto <current|rounded|tahoma|verdana> [screenshot directory]')
+        end
+        if automatic and not family then return usage('test auto <family> [screenshot directory]') end
+        local directory = args[3] or (windower.windower_path and windower.windower_path .. 'screenshots/')
+        if automatic and (not directory or type(windower.send_command) ~= 'function'
+            or type(windower.get_dir) ~= 'function') then
+            return message('Automatic capture needs screenshot directory and Windower command/directory APIs.', true)
         end
         if test_suite then return message('A suite is active; use test next, repeat, status, or stop.', true) end
         if not windower.console.visible() or type(windower.console.write) ~= 'function' then
@@ -743,13 +757,22 @@ local function suite_command(args)
                     reference = font:lower() == 'arial rounded mt bold' and size == 12}
             end
         end
-        test_suite = {cases = cases, index = 1, font = settings.native.font, size = settings.native.size}
+        test_suite = {cases = cases, index = 1, font = settings.native.font, size = settings.native.size,
+            auto = automatic and {directory = directory, running = false} or nil}
+        if automatic then message('First screenshot will pause for inspection. If usable, cbg test go captures the rest. No screenshot settings are changed.') end
         message('Suite: upload one family at a time (19 screenshots + data ZIP). Input-open capture each step; inspect first/last glyphs, divider and Input bottom. Native fonts require visual verification.')
         suite_case()
     elseif #args ~= 1 then
         return usage('test next|repeat|status|stop')
     elseif not test_suite then
         return message('No active suite. Start with cbg test suite [current].', true)
+    elseif op == 'go' then
+        if not test_suite.auto or not test_suite.shot or test_suite.shot.phase ~= 'done' then
+            return message('Wait for a completed automatic screenshot before test go.', true)
+        end
+        if not windower.console.visible() then return message('Reopen console before test go.', true) end
+        test_suite.auto.running = true
+        test_suite.shot.since = watcher.now()
     elseif op == 'status' then
         local c = test_suite.cases[test_suite.index]
         message(string.format('Suite %d/%d: %s %d; %s.', test_suite.index, #test_suite.cases,
@@ -762,6 +785,8 @@ local function suite_command(args)
         font_command({original.font, tostring(original.size)})
         message('Suite ended; starting font restored. Completed measurements and diagnostics retained.')
     elseif op == 'repeat' then
+        if test_suite.shot and test_suite.shot.phase == 'file' then return message('Screenshot pending; wait for completion/timeout, or stop.', true) end
+        if test_suite.auto then test_suite.auto.running = false; test_suite.shot = nil end
         if not windower.console.visible() then return message('Reopen console, then cbg test repeat.', true) end
         -- Repeats sample the current case/adjusted fit; do not reapply its preset.
         local c = test_suite.cases[test_suite.index]
@@ -773,9 +798,55 @@ local function suite_command(args)
         pending_test = nil
         test_command({'estimate'})
     elseif op == 'next' then
+        if test_suite.shot and test_suite.shot.phase == 'file' then return message('Screenshot pending; wait for completion/timeout, or stop.', true) end
+        if test_suite.auto then test_suite.auto.running = false; test_suite.shot = nil end
         if not test_suite.ready or pending_test then return message('Wait for ready, or use cbg test repeat after an interruption.', true) end
         if not windower.console.visible() then return message('Reopen console before cbg test next.', true) end
         test_suite.index = test_suite.index + 1
+        suite_case()
+    end
+end
+
+local function pause_capture(reason)
+    if not test_suite or not test_suite.auto then return end
+    test_suite.auto.running, test_suite.shot = false, nil
+    if reason then message(reason .. ' Use test repeat to retry or test stop to finish.', true) end
+end
+
+local function poll_capture()
+    if not test_suite or not test_suite.auto or not test_suite.shot then return end
+    local shot = test_suite.shot
+    -- A completed first capture survives alt-tab so the user can inspect it.
+    if shot.phase == 'done' and not test_suite.auto.running then return end
+    if not windower.console.visible() or (windower.has_focus and not windower.has_focus())
+        or viewport().width ~= shot.width or viewport().height ~= shot.height then
+        return pause_capture('Capture interrupted by console close, focus or resolution change.')
+    end
+    local now = watcher.now()
+    if shot.phase == 'settle' then
+        shot.frames = shot.frames + 1
+        if shot.frames < 3 or now - shot.since < 0.5 then return end
+        local job, err = capture.start(test_suite.auto.directory, shot.target, now)
+        if not job then return pause_capture(err) end
+        shot.job, shot.phase = job, 'file'
+        local ok, result = pcall(windower.send_command, 'screenshot png')
+        if not ok or result == false then return pause_capture('Windower screenshot command failed.') end
+    elseif shot.phase == 'file' then
+        local path, err = capture.poll(shot.job, now)
+        if err then return pause_capture(err) end
+        if path then
+            shot.phase, shot.since = 'done', now
+            message('Matched screenshot saved: ' .. path)
+            if not test_suite.auto.running then
+                message('Inspect the PNG. If usable, cbg test go continues automatically; repeat retries; stop restores font.')
+            end
+        end
+    elseif shot.phase == 'done' and test_suite.auto.running and now - shot.since >= 1 then
+        -- PNG completion was observed; the extra second avoids timestamp-name
+        -- collisions between screenshots on builds that use second precision.
+        if test_suite.index == #test_suite.cases then return suite_command({'stop'}) end
+        test_suite.index = test_suite.index + 1
+        test_suite.shot = nil
         suite_case()
     end
 end
@@ -811,7 +882,7 @@ local function command(action, ...)
     local args = {...}
     if action == 'test' and args[1] then
         local op = args[1]:lower()
-        if op == 'capture' or op == 'suite' or op == 'next' or op == 'repeat' or op == 'status' or op == 'stop' then
+        if op == 'go' or op == 'auto' or op == 'capture' or op == 'suite' or op == 'next' or op == 'repeat' or op == 'status' or op == 'stop' then
             end_drag()
             return suite_command(args)
         end
@@ -819,6 +890,7 @@ local function command(action, ...)
     if test_suite and action == 'test' then
         return message('Use test next, repeat, status or stop while the suite is active.', true)
     end
+    pause_capture()
     if test_suite and action ~= 'help' and action ~= 'status' then test_suite.ready = false end
     if #args == 0 and report_setting(action) then return end
     end_drag()
@@ -1097,6 +1169,7 @@ local function command(action, ...)
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] (guides/resize); entire visible frame draggable | console on|off | offset <x> <y>')
         message('//cbg preset [8|10|12] (Rounded references) | test [preset|estimate] [size] (native sample + diagnostic)')
+        message('//cbg test auto <family> [screenshot directory] | test go (PNG capture trial)')
         message('//cbg test suite [current|rounded|tahoma|verdana] | test next|repeat|status|stop | test capture (guided font calibration)')
         message('//cbg trim [<extra top 0-32> <Input bottom 0-8>] (per font/size)')
         message('//cbg calibrate [line pixels [top [bottom [input]]]] | calibrate status')
@@ -1120,6 +1193,7 @@ end
 refresh()
 sync_native_profile()
 local registration = config.register(settings, function()
+    pause_capture()
     font_probe.cancel()
     pending_test = nil
     ctrl[29], ctrl[157] = false, false
@@ -1211,6 +1285,7 @@ windower.register_event('prerender', function()
         elseif (pending_test.frames >= 2 and not labels.title.pending and not labels.input.pending)
             or pending_test.frames >= 120 then finish_font_test() end
     end
+    poll_capture()
     if recorder.active then
         local ok, err = recorder.observe(context(console_visible))
         if err then message('Visibility trace: ' .. tostring(err), true) end
@@ -1254,6 +1329,7 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
         if not target then return false end
         font_probe.cancel()
         pending_test = nil
+        pause_capture()
         local rect = actual_rectangle
         drag = {kind = target == 'resize' and 'resize' or 'drag', x = x, y = y,
             rectangle = {x = rect.x, y = rect.anchor_y or rect.y, width = rect.width,

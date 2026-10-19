@@ -14,10 +14,27 @@ local fail_probe = false
 local test_seconds, fake_log_size, log_polls = 1791050000, nil, 0
 local played_sounds, focused = {}, true
 package.preload.socket = function() return {gettime = function() return test_seconds end} end
+local capture_files, capture_fail_write = {}, false
 local real_open = io.open
 -- Keep diagnostic I/O deterministic, including open failures. PNG files
 -- still use the real filesystem and must contain valid image bytes.
 io.open = function(path, mode)
+    if path:find('capture-test/',1,true)==1 or (path:find(addon_path..'data/fonttest-',1,true)==1 and path:match('%.png$')) then
+        if mode=='wb' then
+            if capture_fail_write then return nil,'simulated PNG write failure' end
+            local bytes=''
+            return {write=function(_,value) bytes=bytes..value; return true end,
+                close=function() capture_files[path]=bytes; return true end}
+        end
+        local bytes=capture_files[path]
+        if not bytes then return nil end
+        local offset=0
+        return {seek=function(_,whence,value)
+                offset=(whence=='end' and #bytes or whence=='cur' and offset or 0)+(value or 0)
+                return offset end,
+            read=function(_,length) local value=bytes:sub(offset+1,offset+length); offset=offset+#value; return value end,
+            close=function() return true end}
+    end
     if path == './console.log' and mode == 'rb' then
         log_polls = log_polls + 1
         if not fake_log_size then return nil, 'no console log' end
@@ -1224,6 +1241,78 @@ for _, family in ipairs({'tahoma','verdana'}) do
     for case=1,19 do run('test','next'); settle() end
     assert(#console_lines==first+19*16, 'Each named family fits one 19-screenshot upload batch')
 end
+-- Native capture orchestration is mocked; real screenshot compatibility is live-only.
+local screenshot_count,make_png,ambiguous=0,true,false
+local png='\137PNG\13\10\26\10payload\0\0\0\0IEND\174\66\96\130'
+local original_send=windower.send_command
+windower.get_dir=function(directory)
+    assert(directory=='capture-test/' or directory=='capture-test')
+    local names={}
+    for path in pairs(capture_files) do
+        if path:find('capture-test/',1,true)==1 then names[#names+1]=path:sub(14) end
+    end
+    return names
+end
+windower.send_command=function(value)
+    original_send(value)
+    if value=='screenshot png' then
+        screenshot_count=screenshot_count+1
+        if make_png then capture_files['capture-test/shot'..screenshot_count..'.png']=png end
+        if ambiguous then capture_files['capture-test/other'..screenshot_count..'.png']=png end
+    end
+end
+run('test','auto','tahoma','capture-test/')
+for _=1,90 do tick() end
+assert(screenshot_count==1 and saved.native.size==12, 'First screenshot pauses for inspection')
+local copied=0
+for path in pairs(capture_files) do if path:find(addon_path,1,true)==1 then copied=copied+1 end end
+assert(copied==1, 'Completed screenshot is copied beside its diagnostic')
+focused=false; tick(2); focused=true; tick()
+run('test','go')
+for _=1,3000 do tick() end
+assert(screenshot_count==19, 'Opt-in continuation captures exactly one family')
+make_png=false
+run('test','auto','verdana','capture-test/')
+for _=1,750 do tick() end
+assert(screenshot_count==20 and saved.native.size==12, 'No PNG times out without advancement')
+run('test','go'); tick(2); assert(screenshot_count==20)
+make_png=true
+run('test','repeat'); for _=1,90 do tick() end
+assert(screenshot_count==21)
+run('test','stop')
+capture_fail_write=true
+run('test','auto','verdana','capture-test/'); for _=1,90 do tick() end
+run('test','go'); tick(2); assert(screenshot_count==22, 'Copy failure blocks automatic advancement')
+run('test','stop'); capture_fail_write=false
+ambiguous=true
+run('test','auto','verdana','capture-test/'); for _=1,90 do tick() end
+run('test','go'); tick(2); assert(screenshot_count==23, 'Ambiguous new PNGs block advancement')
+run('test','stop'); ambiguous=false
+run('test','auto','verdana','capture-test/'); settle(); focused=false
+for _=1,90 do tick() end
+assert(screenshot_count==23, 'Focus loss cancels queued capture')
+focused=true; run('test','stop')
+run('test','auto','verdana','capture-test/'); settle(); console_open=false
+for _=1,90 do tick() end
+assert(screenshot_count==23, 'Console close cancels queued capture')
+console_open=true; run('test','stop')
+run('test','auto','verdana','capture-test/'); settle(); screen_width=1366
+for _=1,90 do tick() end
+assert(screenshot_count==23, 'Resolution change cancels queued capture')
+run('test','stop')
+run('test','auto','verdana','capture-test/'); settle()
+local grab=rectangle(); assert(mouse(1,grab.x+30,grab.y+30)); mouse(2,grab.x+30,grab.y+30)
+for _=1,90 do tick() end
+assert(screenshot_count==23, 'Dragging cancels queued capture')
+run('test','stop')
+-- Partial PNG must not count as conversion completion.
+local capture_module=require('cbg_capture')
+local job=assert(capture_module.start('capture-test/','capture-test/destination.png',test_seconds))
+capture_files['capture-test/partial.png']='\137PNG\13\10\26\10unfinished'
+assert(not capture_module.poll(job,test_seconds+1))
+local result,timeout=capture_module.poll(job,test_seconds+21)
+assert(not result and timeout)
+windower.send_command=original_send
 callbacks.unload(); assert(next(text_objects)==nil)
 io.open = real_open
 print('PASS: Ctrl+drag grid matrix, per-font 16-row calibration/profile matrix, proxy failure/cancellation, and fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
