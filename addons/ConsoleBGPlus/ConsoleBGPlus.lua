@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.27'
+_addon.version = '0.1.28'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -635,7 +635,7 @@ end
 local function preset_command(args)
     local size = #args == 0 and settings.native.size or (#args == 1 and integer(args[1], 6, 24))
     local p = size and presets.get(settings.native.font, size)
-    if not p then return message('Reference presets: Arial Rounded MT Bold 8 (accepted) or 10 (working).', true) end
+    if not p then return message('Reference presets: Arial Rounded MT Bold 8 (accepted), 10 (working), or 12 (trial).', true) end
     capture_font_profile()
     settings.native.size = size
     apply_font_profile(p)
@@ -646,13 +646,19 @@ local function preset_command(args)
 end
 
 local function test_command(args)
-    local size = #args == 0 and settings.native.size or (#args == 1 and integer(args[1], 6, 24))
-    if not size then return usage('test [size 6-24]') end
+    local use_preset = args[1] and args[1]:lower() == 'preset'
+    local count = #args - (use_preset and 1 or 0)
+    local size = count == 0 and settings.native.size
+        or (count == 1 and integer(args[use_preset and 2 or 1], 6, 24))
+    if not size then return usage('test [preset] [size 6-24]') end
+    if use_preset and not presets.get(settings.native.font, size) then
+        return message('No bundled reference for this font/size; current fit unchanged.', true)
+    end
     if not windower.console.visible() then return message('Open the native console first, then run cbg test [size].', true) end
     if type(windower.console.write) ~= 'function' then return message('Native console write API unavailable.', true) end
     local existing = settings.fontprofiles[calibration.key(settings.native.font, size)]
         or (settings.native.size == size)
-    local reference = not existing and presets.get(settings.native.font, size)
+    local reference = (use_preset or not existing) and presets.get(settings.native.font, size)
     font_command({settings.native.font, tostring(size)})
     if reference then preset_command({tostring(size)}) end
     editing = false
@@ -982,7 +988,7 @@ local function command(action, ...)
         if #args ~= 0 then return usage('help') end
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] (guides/resize); entire visible frame draggable | console on|off | offset <x> <y>')
-        message('//cbg preset [8|10] (Rounded references) | test [size] (native sample + diagnostic)')
+        message('//cbg preset [8|10|12] (Rounded references) | test [preset] [size] (native sample + diagnostic)')
         message('//cbg trim [<extra top 0-32> <Input bottom 0-8>] (per font/size)')
         message('//cbg calibrate [line pixels [top [bottom [input]]]] | calibrate status')
         message('//cbg grid [pixels] | Hold either Ctrl while dragging to snap the frame anchor.')

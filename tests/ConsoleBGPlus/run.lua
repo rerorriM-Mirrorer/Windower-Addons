@@ -1141,7 +1141,27 @@ run('test','11'); for _=1,100 do tick() end
 assert(#console_lines==before_cancel, 'A failed probe does not emit a misleading completed test')
 fail_probe=false
 local before_invalid=save_calls
-run('test','nan'); run('preset','12'); assert(save_calls==before_invalid)
+run('test','nan'); run('preset','13'); run('test','preset','12'); assert(save_calls==before_invalid)
+run('font','Arial Rounded MT Bold','12')
+run('calibrate','19','15','7','19')
+run('test'); settle()
+assert(saved.fontmetrics.spacing==19, 'Ordinary test preserves a saved proxy/manual fit')
+local before_reference = #console_lines
+run('test','preset','12'); settle()
+assert(saved.native.size==12 and saved.fontmetrics.spacing==18 and saved.extents.y==330)
+assert(saved.input.height==19 and saved.fontmetrics.source=='trial-reference')
+assert(saved.fontmetrics.top_extra==0 and saved.fontmetrics.bottom_trim==0)
+assert(#console_lines==before_reference+16)
+local reference_x,reference_y = saved.pos.x,saved.pos.y
+run('test','preset','8'); settle()
+assert(saved.extents.y==234 and saved.fontmetrics.top_extra==5 and saved.fontmetrics.bottom_trim==3)
+assert(saved.pos.x==reference_x and saved.pos.y==reference_y)
+run('test','12'); settle()
+assert(saved.extents.y==330 and saved.fontmetrics.spacing==18)
+console_open=false
+local closed_reference=save_calls
+run('test','preset','8'); assert(save_calls==closed_reference)
+console_open=true
 callbacks.unload(); assert(next(text_objects)==nil)
 io.open = real_open
 print('PASS: Ctrl+drag grid matrix, per-font 16-row calibration/profile matrix, proxy failure/cancellation, and fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')

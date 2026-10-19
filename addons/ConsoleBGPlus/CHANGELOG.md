@@ -1,3 +1,8 @@
+## v0.1.28
+
+- Add explicit test preset [size] to apply a bundled fit and run its sample/diagnostic together. Ordinary tests preserve saved fits.
+- Add provisional Rounded Bold 12 reference inferred from native screenshot: spacing18, full height330, Input19, neutral trims. Pending live verification.
+
 # ConsoleBG+ changes
 
 ## 0.1.27 — reference settings and native sample tests

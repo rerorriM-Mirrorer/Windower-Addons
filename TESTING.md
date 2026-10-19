@@ -1,5 +1,20 @@
 # Current Development Status
 
+- Repository/branch: rerorriM-Mirrorer/Windower-Addons, consolebg-plus; ConsoleBGPlus v0.1.28 / Windower 4. Tested starting checkpoint: 0ffe1303e6c4c90fb65d2acd02078640ab596424 (v0.1.27). Final published head is in the handoff. No baseline branch promotion.
+- User successfully ran the v0.1.27 size-12 sample: image(20261019-053620).png and fonttest-Arial_Rounded_MT_Bold_12-20261019-053529-1.txt. Diagnostic reports proxy spacing19, height352, Input19, top/bottom15/7, no extra trims, 1280x720. Screenshot indicates native pitch approximately18 and Input above the intended strip. Native pitch is inferred, not an API measurement.
+- New explicit test preset [size] applies the bundled reference then completes the existing sample and unique diagnostic sequence. Ordinary test preserves existing fits. Rounded size12 trial uses spacing18, height330, Input19, margins15/1, neutral trims. Accepted size8 and provisional size10 references unchanged. Position/width/activity preferences remain intact.
+- Verification: full mocked Windower suite passes through liblua5.4; Lua5.1 syntax checks pass. Added checks cover replacement of existing fit only on explicit reference test, sixteen writes, profile round trips, accepted size8 preservation, unsupported references and closed-console no-mutation. Existing drag/grid/boundary/resolution/extreme-font checks pass in simulation. No Windows/FFXI execution here.
+- Pending: native size12 divider/descenders/Input bottom, top clearance, output-only fit, other fonts and resolutions. Next step is the single-command live check below.
+
+## 2026-10-19 — v0.1.28 live check
+
+1. Keep data/settings.xml; replace delivered files and reload. Open the native console, with Arial Rounded MT Bold selected, and enter cbg test preset 12.
+2. Wait for ready feedback. Capture all16 output rows and Input. Share the uniquely named data/fonttest-...txt. Check row16 descenders against the divider, Input descenders against the bottom rail, and first-row clearance. Do not trim before this capture.
+3. Bare cbg test repeats the current fit without replacing it. cbg test preset 8 explicitly restores and samples the accepted size8 reference. Switching back with cbg test 12 must restore the saved trial; reload should preserve it.
+4. Confirm free/Ctrl body dragging, edit resize, boundaries, activity and independent client behavior remain unchanged. Other fonts should reject test preset without changing settings; ordinary test still supports them.
+
+# Previous Development Status — v0.1.27
+
 - Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.27, Windower 4. Starting checkpoint: `cc3503caa43fc9316d1ef61a5084d89608ca1170` (v0.1.26). Published final head is in the handoff.
 - Bundled settings references: accepted Arial Rounded MT Bold 8 (height 234, spacing 12.4, Input 13, trim 5 3); working size 10 (height 284, spacing 15.3, Input 16, trim 5 5). Presets apply explicitly and preserve unrelated preferences. User authorized inclusion of settings and simplified/self-running tests. No full user settings.xml replacement is shipped.
 - Latest material: image(20261019-050805).png and diagnostics(20261019-050814).txt at 1280x720, v0.1.26, Arial Rounded MT Bold 10. Manual spacing 15.3, top/bottom 15/1, full height 284, Input 16, trim 5 5; divider y360, native origin70,115. Screenshot note suggests more space above Input may still be needed. This is a working reference, not final visual approval.
