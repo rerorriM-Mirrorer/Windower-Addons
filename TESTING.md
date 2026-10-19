@@ -1,3 +1,26 @@
+# Current Development Status
+
+- Repository/branch: rerorriM-Mirrorer/Windower-Addons, consolebg-plus; ConsoleBGPlus v0.1.32 / Windower4. Tested starting checkpoint:e760c282aedb1710308d4e8a28b0455a41b5ab00 (v0.1.31). Final published head is in the handoff. Baseline branches unchanged.
+- Live materials reviewed: data(1).zip contains20 readable Tahoma PNG/TXT pairs covering sizes6–24 plus repeated11. data(2).zip contains19 readable Verdana PNG/TXT pairs covering6–24. Automatic native screenshots include ConsoleBGPlus and sample rows. The95% spacing model tracks observed rows; Tahoma23/24 clip at lower anchor, whereas Verdana23/24 fit after the anchor moved higher. This is native evidence at1280x720, not all-resolution certification.
+- Separate issue: repeated Tahoma11 capture at062908 clips the Input label, despite the same24x11 reported label bounds as062816. Code inspection has not established a cause; no speculative label/layout redesign. Input descender clearance and trim preferences still require visual acceptance.
+- New test trim [screenshot directory] captures current saved trims,balanced5/3,tight5/5 at current font/size. Initial16-row sample only; about10s to type Agjpqy without Enter; later variants preserve native input text by issuing no font/input commands or further sample writes. Temporary drawing overrides preserve saved settings, native anchor and divider. Completion/stop/failure/interruption restores saved layout and prior edit mode. Three uniquely paired PNG/TXT files identify variants.
+- Verification: full mocked Windower suite via liblua5.4 and Lua5.1 syntax pass. New checks cover typing window, exactly3 screenshot requests, only16 output writes, no settings saves/font-input commands, explicit trial metadata, identical dividers, geometry restoration on completion/stop/focus loss. Earlier57-case/four-resolution, dragging, profile, capture failure and cleanup checks retained. No live v0.1.32 execution here.
+- Next: one comparison at the user's everyday font/size, inspect typed descenders and choose preferred trim; then representative other sizes/modes if useful. No further full size sweep requested. Default source screenshots folder can be overridden explicitly; actual screenshot settings stay unchanged.
+
+## 2026-10-19 — v0.1.32 short comparison
+
+1. Keep data/settings.xml, update/reload. Choose the font/size normally used and open native console. Run cbg test trim (or test trim "C:/actual/screenshots/folder"). No font/profile reset is needed.
+2. When16 sample rows appear, type Agjpqy WITHOUT Enter. You have about10s before capture. Stay focused with console open. Three variants capture automatically: trim_current,trim_balanced(5/3),trim_tight(5/5). All text and the Input divider should remain stationary; only visible top/bottom padding changes.
+3. After the third capture the original layout/edit mode returns. Clear the unexecuted sample word. ZIP data and identify the preferred variant. The trial does not save trims; explicit existing trim command can save the user's choice later.
+4. Stop, console close, focus loss, resolution/layout change, grabbing the frame, settings reload or capture/diagnostic failure ends the short comparison and restores saved layout. An already-issued native screenshot cannot be withdrawn. Retry with test trim after any outstanding file write completes.
+5. Examine g/j/p/q/y in both row16 and Input, upper gap, rail/tab alignment and label completeness. Keep intermittent clipped labels separate from spacing/trim evaluation. Repeat only representative additional fonts/sizes after this preference check.
+
+## 2026-10-19 — documentation correction and v0.1.31 retained record
+
+The v0.1.31 handoff described a new Current Development Status entry, but its published root TESTING.md began with Previous Development Status—v0.1.30: the intended insertion was overwritten during file preparation. The earlier source history below is preserved. This explicit record supplies the missing delivery status from commit/code/test evidence rather than claiming that entry shipped.
+
+v0.1.31 was published as e760c282aedb1710308d4e8a28b0455a41b5ab00, adding cbg_capture.lua, automatic19-case family captures, first-PNG inspection pause/test go, matching PNG copies,20s timeout and interruption handling. Mock regressions/Lua5.1 parsing passed before delivery; native execution was not performed by Codex. Subsequent user-provided Tahoma/Verdana ZIPs above supply native capture evidence. Original v0.1.31 README/CHANGELOG entries remain intact.
+
 # Previous Development Status — v0.1.30
 
 - Repository/branch: rerorriM-Mirrorer/Windower-Addons, consolebg-plus; ConsoleBGPlus v0.1.30 / Windower4. Tested starting checkpoint:45aa50b175118c8f3237e2a162c2c9c8fcd61beb (v0.1.29). Final published hash is in the handoff. Baseline branches unchanged.

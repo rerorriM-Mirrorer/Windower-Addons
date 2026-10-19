@@ -56,6 +56,11 @@ local function header(context, version)
             lines[#lines + 1] = group .. '.' .. clean(key) .. '=' .. clean(values[key])
         end
     end
+    if context.trim_trial then
+        local trial = context.trim_trial
+        lines[#lines + 1] = 'trim_trial=' .. clean(trial.name) .. ' top_extra=' .. trial.top .. ' bottom_trim=' .. trial.bottom
+        lines[#lines + 1] = 'Trial trims are drawing overrides; saved settings above remain unchanged.'
+    end
     local p = context.native_position
     lines[#lines + 1] = ''
     lines[#lines + 1] = '[Layout measurements]'

@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.31'
+_addon.version = '0.1.32'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -239,13 +239,16 @@ refresh = function(screen)
     style_labels()
     local title_width, title_height = labels.title.width, labels.title.height
     local input_width, input_height = labels.input.width, labels.input.height
+    local trial = test_suite and test_suite.trim and test_suite.cases[test_suite.index]
+    local top_extra = trial and trial.top or settings.fontmetrics.top_extra
+    local bottom_trim = trial and trial.bottom or settings.fontmetrics.bottom_trim
     local pieces
     pieces, actual_rectangle = layout.build(settings, screen, title_width, input_width,
         editing, input_height, output_only,
         drag and (drag.kind .. '_pressed') or (hover_target and (hover_target .. '_hover')),
         editing and 0 or math.max(0, math.min(settings.console.offset_y - 2,
-            math.max(0, math.min(8, settings.console.offset_y - 7)) + settings.fontmetrics.top_extra)),
-        settings.fontmetrics.bottom_trim)
+            math.max(0, math.min(8, settings.console.offset_y - 7)) + top_extra)),
+        bottom_trim)
     -- The output fill keeps its original primitives when Input appears;
     -- the added opaque panel and lower rail are drawn after it. The fixed
     -- top rail has its own primitives, so it cannot be rebound or hidden.
@@ -452,6 +455,7 @@ local function context(console_visible)
         position_setter = windower.console.set_position and 'console.set_position'
             or (windower.send_command and 'console_position command' or 'unavailable'),
         label_measurements = measurements,
+        trim_trial = test_suite and test_suite.trim and test_suite.cases[test_suite.index],
     }
 end
 
@@ -681,16 +685,25 @@ local function test_command(args)
 end
 
 local function finish_font_test()
-    for row = 1, 16 do
-        windower.console.write(string.format('%02d Agjpqy 0123456789 - g j p q y', row))
+    if not pending_test.no_sample then
+        for row = 1, 16 do
+            windower.console.write(string.format('%02d Agjpqy 0123456789 - g j p q y', row))
+        end
     end
     local tag = settings.native.font:gsub('[^%w]', '_') .. '_' .. settings.native.size
+    if test_suite and test_suite.trim then tag = tag .. '_trim_' .. test_suite.cases[test_suite.index].name end
     local path, err = recorder.snapshot(context(true), tag)
     pending_test = nil
+    if test_suite and test_suite.trim and not path then
+        editing = test_suite.edit_before
+        test_suite = nil
+        refresh()
+    end
     if test_suite then
         test_suite.ready = path ~= nil
         if test_suite.auto and path then
             test_suite.shot = {phase = 'settle', since = watcher.now(), frames = 0,
+                delay = test_suite.trim and test_suite.index == 1 and 10 or 0.5,
                 target = path:gsub('%.txt$', '.png'), width = viewport().width, height = viewport().height}
         end
     end
@@ -712,13 +725,40 @@ local function suite_case()
     test_suite.ready = false
     font_probe.cancel()
     pending_test = nil
+    if test_suite.trim then
+        editing = false
+        refresh()
+        pending_test = {stage = 'wait', frames = 0, no_sample = test_suite.index > 1}
+        return
+    end
     font_command({c.font, tostring(c.size)})
     test_command(c.reference and {'preset', tostring(c.size)} or {'estimate', tostring(c.size)})
 end
 
 local function suite_command(args)
     local op = args[1]:lower()
-    if op == 'capture' then
+    if op == 'trim' then
+        if #args > 2 then return usage('test trim [screenshot directory]') end
+        if test_suite then return message('Stop the active suite before starting trim comparison.', true) end
+        local directory = args[2] or (windower.windower_path and windower.windower_path .. 'screenshots/')
+        if not directory or type(windower.get_dir) ~= 'function' or type(windower.send_command) ~= 'function' then
+            return message('Trim comparison needs the screenshot directory and command/directory APIs.', true)
+        end
+        if not windower.console.visible() or not settings.input.enabled
+            or type(windower.console.write) ~= 'function' then
+            return message('Open the native console with Input enabled and console-write API before test trim.', true)
+        end
+        local function variant(name, top, bottom)
+            return {name = name, top = top, bottom = bottom, font = settings.native.font, size = settings.native.size}
+        end
+        test_suite = {trim = true, width = viewport().width, height = viewport().height,
+            edit_before = editing, index = 1, font = settings.native.font, size = settings.native.size,
+            auto = {directory = directory, running = true}, cases = {
+                variant('current', settings.fontmetrics.top_extra, settings.fontmetrics.bottom_trim),
+                variant('balanced', 5, 3), variant('tight', 5, 5)}}
+        suite_case()
+        message('Type Agjpqy in the native console now, WITHOUT Enter. First capture in about10s; three variants follow automatically. Saved trims restore afterward.')
+    elseif op == 'capture' then
         if #args ~= 1 then return usage('test capture') end
         if pending_test then return message('Wait for the sample to finish before capturing.', true) end
         local visible = windower.console.visible()
@@ -782,6 +822,11 @@ local function suite_command(args)
         test_suite = nil
         font_probe.cancel()
         pending_test = nil
+        if original.trim then
+            editing = original.edit_before
+            refresh()
+            return message('Trim comparison ended; saved layout restored. Compare current/balanced/tight PNGs in data.')
+        end
         font_command({original.font, tostring(original.size)})
         message('Suite ended; starting font restored. Completed measurements and diagnostics retained.')
     elseif op == 'repeat' then
@@ -796,7 +841,7 @@ local function suite_command(args)
         test_suite.ready = false
         font_probe.cancel()
         pending_test = nil
-        test_command({'estimate'})
+        if test_suite.trim then suite_case() else test_command({'estimate'}) end
     elseif op == 'next' then
         if test_suite.shot and test_suite.shot.phase == 'file' then return message('Screenshot pending; wait for completion/timeout, or stop.', true) end
         if test_suite.auto then test_suite.auto.running = false; test_suite.shot = nil end
@@ -809,11 +854,25 @@ end
 
 local function pause_capture(reason)
     if not test_suite or not test_suite.auto then return end
+    if test_suite.trim then
+        font_probe.cancel()
+        pending_test = nil
+        editing = test_suite.edit_before
+        test_suite = nil
+        refresh()
+        if reason then message(reason .. ' Trim comparison ended; saved layout restored.', true) end
+        return
+    end
     test_suite.auto.running, test_suite.shot = false, nil
     if reason then message(reason .. ' Use test repeat to retry or test stop to finish.', true) end
 end
 
 local function poll_capture()
+    if test_suite and test_suite.trim and (not windower.console.visible()
+        or (windower.has_focus and not windower.has_focus())
+        or viewport().width ~= test_suite.width or viewport().height ~= test_suite.height) then
+        return pause_capture('Trim comparison interrupted by console close, focus or resolution change.')
+    end
     if not test_suite or not test_suite.auto or not test_suite.shot then return end
     local shot = test_suite.shot
     -- A completed first capture survives alt-tab so the user can inspect it.
@@ -825,7 +884,7 @@ local function poll_capture()
     local now = watcher.now()
     if shot.phase == 'settle' then
         shot.frames = shot.frames + 1
-        if shot.frames < 3 or now - shot.since < 0.5 then return end
+        if shot.frames < 3 or now - shot.since < (shot.delay or 0.5) then return end
         local job, err = capture.start(test_suite.auto.directory, shot.target, now)
         if not job then return pause_capture(err) end
         shot.job, shot.phase = job, 'file'
@@ -882,7 +941,7 @@ local function command(action, ...)
     local args = {...}
     if action == 'test' and args[1] then
         local op = args[1]:lower()
-        if op == 'go' or op == 'auto' or op == 'capture' or op == 'suite' or op == 'next' or op == 'repeat' or op == 'status' or op == 'stop' then
+        if op == 'trim' or op == 'go' or op == 'auto' or op == 'capture' or op == 'suite' or op == 'next' or op == 'repeat' or op == 'status' or op == 'stop' then
             end_drag()
             return suite_command(args)
         end
@@ -1169,6 +1228,7 @@ local function command(action, ...)
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] (guides/resize); entire visible frame draggable | console on|off | offset <x> <y>')
         message('//cbg preset [8|10|12] (Rounded references) | test [preset|estimate] [size] (native sample + diagnostic)')
+        message('//cbg test trim [screenshot directory] (3 temporary padding comparisons; type Agjpqy without Enter)')
         message('//cbg test auto <family> [screenshot directory] | test go (PNG capture trial)')
         message('//cbg test suite [current|rounded|tahoma|verdana] | test next|repeat|status|stop | test capture (guided font calibration)')
         message('//cbg trim [<extra top 0-32> <Input bottom 0-8>] (per font/size)')

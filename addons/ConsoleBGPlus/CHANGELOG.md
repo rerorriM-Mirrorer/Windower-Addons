@@ -1,3 +1,8 @@
+## v0.1.32
+
+- Short test trim comparison of current/balanced5-3/tight5-5 for the current font/size. Single16-row sample,10s to type native descenders, three matched PNG/TXT pairs, automatic restoration.
+- Trims are transient drawing overrides. No saved-setting writes, text/divider movement or font/input commands between captures. Intermittent label clipping remains separate; no speculative renderer redesign.
+
 ## v0.1.31
 
 - Add test auto <family> [existing screenshot directory] and test go for opt-in Windower PNG captures. First completed file pauses for inspection; subsequent cases advance only after a matched PNG is copied beside its diagnostic.

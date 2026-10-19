@@ -1312,6 +1312,43 @@ capture_files['capture-test/partial.png']='\137PNG\13\10\26\10unfinished'
 assert(not capture_module.poll(job,test_seconds+1))
 local result,timeout=capture_module.poll(job,test_seconds+21)
 assert(not result and timeout)
+-- Short trim trial: no settings writes/font changes and no later sample writes.
+run('font','Verdana','12'); settle()
+local trim_saved=copy(saved)
+local trial_save_calls,trial_lines,trial_commands=save_calls,#console_lines,#queued
+local trial_shots=screenshot_count
+local old_rect=rectangle()
+run('test','trim','capture-test/'); settle()
+assert(#console_lines==trial_lines+16)
+for _=1,200 do tick() end
+assert(screenshot_count==trial_shots, 'Typed Input receives a ten-second window')
+for _=1,600 do tick() end
+assert(screenshot_count==trial_shots+3 and #console_lines==trial_lines+16)
+assert(save_calls==trial_save_calls and saved.native.font==trim_saved.native.font)
+assert(saved.fontmetrics.top_extra==trim_saved.fontmetrics.top_extra and saved.fontmetrics.bottom_trim==trim_saved.fontmetrics.bottom_trim)
+assert(rectangle().y==old_rect.y and rectangle().height==old_rect.height)
+local variants,trial_divider={},nil
+for path,record in pairs(diagnostic_files) do
+    local variant=path:match('_trim_(%a+)%-')
+    if variant then
+        variants[variant]=true
+        assert(record.text:find('trim_trial='..variant,1,true))
+        local divider=record.text:match('divider_y=(%d+)')
+        assert(divider and (not trial_divider or divider==trial_divider))
+        trial_divider=divider
+    end
+end
+assert(variants.current and variants.balanced and variants.tight)
+for i=trial_commands+1,#queued do assert(queued[i]=='screenshot png', 'Trial never sends font/input commands') end
+run('test','trim','capture-test/'); settle(); focused=false; tick(); focused=true
+assert(rectangle().y==old_rect.y and rectangle().height==old_rect.height)
+run('test','trim','capture-test/'); settle(); run('test','stop')
+assert(save_calls==trial_save_calls and rectangle().height==old_rect.height)
+run('test','trim','capture-test/'); console_open=false; tick(); console_open=true; tick()
+local cancelled_shots=screenshot_count
+for _=1,500 do tick() end
+assert(screenshot_count==cancelled_shots and rectangle().height==old_rect.height,
+    'Closing console before the first sample cancels and restores the trial')
 windower.send_command=original_send
 callbacks.unload(); assert(next(text_objects)==nil)
 io.open = real_open
