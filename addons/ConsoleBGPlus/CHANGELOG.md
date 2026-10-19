@@ -1,5 +1,12 @@
 # ConsoleBG+ changes
 
+## 0.1.22 — always-draggable frame
+
+- Visible top edge can be dragged with edit mode off. Ctrl snapping and release-only saves remain.
+- Edit mode still exposes guides and enables lower-right resizing.
+- A grabbed activity frame remains compact and visible until release; hidden frame/body clicks pass through.
+
+
 ## 0.1.21 — test batch
 
 - Ctrl+drag floors one frame anchor to a saved 10px screen-origin grid; free dragging and resize preserved.

@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.21'
+_addon.version = '0.1.22'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -136,7 +136,7 @@ local function update_visibility()
     local console_visible = windower.console.visible()
     local manual = preview or editing or console_visible
     local staged = opening_stage and console_visible and not preview and not editing
-    local passive_alpha = math.max(startup_alpha, auto_alpha, close_alpha)
+    local passive_alpha = math.max(startup_alpha, auto_alpha, close_alpha, drag and 255 or 0)
     local compact = staged or (not manual and passive_alpha > 0)
     if compact ~= output_only then
         output_only = compact
@@ -910,7 +910,7 @@ local function command(action, ...)
     elseif action == 'help' then
         if #args ~= 0 then return usage('help') end
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
-        message('//cbg edit [on|off] | console on|off | offset <x> <y>')
+        message('//cbg edit [on|off] (guides/resize); visible top edge always draggable | console on|off | offset <x> <y>')
         message('//cbg calibrate [line pixels [top [bottom [input]]]] | calibrate status')
         message('//cbg grid [pixels] | Hold either Ctrl while dragging to snap the frame anchor.')
         message('//cbg font [<font> <size>] (linked) | nativefont <font> <size> | nativecolor <alpha> <red> <green> <blue>')
@@ -990,7 +990,7 @@ windower.register_event('prerender', function()
     end
     auto_alpha = watcher.poll(settings.activity)
     local manual = preview or editing or console_visible
-    local wanted = manual or math.max(startup_alpha, close_alpha, auto_alpha) > 0
+    local wanted = manual or drag ~= nil or math.max(startup_alpha, close_alpha, auto_alpha) > 0
     if wanted then
         local screen = viewport()
         if screen.width ~= last_viewport.width or screen.height ~= last_viewport.height then
@@ -1013,7 +1013,7 @@ local function hit_grip(x, y)
     if x < rect.x or y < rect.y or x >= rect.x + rect.width or y >= rect.y + rect.height then
         return nil
     end
-    if x >= rect.x + rect.width - 16 and y >= rect.y + rect.height - 16 then return 'resize' end
+    if editing and x >= rect.x + rect.width - 16 and y >= rect.y + rect.height - 16 then return 'resize' end
     if y < rect.y + 18 then return 'drag' end
 end
 
@@ -1027,9 +1027,10 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
         end_drag()
         hover_target = not blocked and editing and shown and hit_grip(x, y) or nil
         refresh()
+        update_visibility()
         return not blocked
     end
-    if blocked or not editing or not shown then
+    if blocked or not shown then
         if hover_target then hover_target = nil; refresh() end
         return false
     end
@@ -1042,6 +1043,7 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
             rectangle = {x = rect.x, y = rect.y, width = rect.width, height = rect.height}, changed = false}
         hover_target = nil
         refresh()
+        update_visibility()
         return true
     elseif kind == 0 and drag then
         local dx, dy = math.floor(x - drag.x + 0.5), math.floor(y - drag.y + 0.5)

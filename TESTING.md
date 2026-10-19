@@ -1,5 +1,22 @@
 # Current Development Status
 
+- Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.22, Windower 4. Starting checkpoint: `b54b5f688f1bb0d7b118cb341dd6363c183df892` (v0.1.21). No live acceptance of v0.1.21 calibration has been reported yet; v0.1.20 remains the most recent user-confirmed behavior.
+- Visible upper edge now drags with edit off. Edit mode retains guides and lower-right resizing. Both Ctrl keys and existing grid/bounds/saved positions are preserved. A grabbed activity frame stays compact and visible until release, then resumes normal timing.
+- Verification: complete mocked Windower regression suite passes through liblua 5.4; Lua 5.1 syntax checks pass. New simulated checks cover manual and activity dragging with edit off, Ctrl snapping, blocked release, release-only saving, expired activity after release, body/resize clicks passing through outside edit, and hidden-input rejection. No live FFXI test performed.
+- Pending: native manual/activity dragging, reload, edit guides/resizing, and the existing font calibration checklist. Final published commit is in the handoff.
+
+## 2026-10-18 — v0.1.22 live check and calibration handoff
+
+1. Keep data/settings.xml when updating. Drag the visible top edge with edit off, then with Ctrl. Check that text follows and position survives reload.
+2. With edit off, body and lower-right clicks should pass through. Enable edit for guides/resizing; disable it afterward. Hidden frame must never capture a new press.
+3. Grab an automatic activity frame and hold beyond its fade duration. It should remain compact until release, then hide if its timer has expired. Native console text is still controlled by Windower; holding the background does not extend native text timing.
+4. For calibration, first capture the unadjusted result after `//cbg calibrate`: output-only screenshot and Input-open screenshot with 15 output rows, plus `//cbg diagnose` snapshots. Save/rename each diagnostics.txt before the next overwrites it.
+5. If the fit needs manual resizing, take those first captures before changing it. Resize in edit mode, leave edit mode, then capture another screenshot and diagnostic as the manually corrected reference. Include data/settings.xml if practical. Do not recalibrate between the manual adjustment and its diagnostic, since calibration recalculates height.
+
+The v0.1.21 record below is retained. Its statement that edit-off frames reject top-edge presses describes the old behavior and is superseded by this batch; hidden frames still reject presses.
+
+# Previous Development Status — v0.1.21
+
 - Repository: rerorriM-Mirrorer/Windower-Addons; development branch `consolebg-plus`, draft PR #1. Runtime: ConsoleBGPlus v0.1.21, Windower 4. No external companion addon dependency.
 - Starting source: v0.1.20, `45823e35f0c90545323f100c5035a0ef937a6ca1`. Most recent user report: v0.1.20 activity and other behavior work well; Verdana 8 leaves an overly tall body. User confirms 15 output rows plus one Input row.
 - Published code checkpoints: Ctrl+drag `fe83bd0745d9e82626ca7abcaea1223300ed761b`; font profiles and calibration `53f82d4e7252ca13004354174476117cad4dd5bc`. The final delivery commit is given in the handoff; this document cannot name its own commit.

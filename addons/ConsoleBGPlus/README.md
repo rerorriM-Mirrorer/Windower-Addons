@@ -12,7 +12,9 @@ Fresh settings start at **16,48** with equal left and right margins, a 344-pixel
 
 ## Move and resize
 
-Run **//cbg edit** to toggle edit mode. A band of pale diagonal lines marks the draggable top edge; drag anywhere along it to move the frame. The matching mark at the lower-right corner resizes it. Each grip gains a soft pink wash on hover; while pressed, the wash goes away and its lines turn pale pink. Release the mouse to save. Run **//cbg edit** again when you finish. Closing the native console with Insert also ends edit and preview modes.
+The visible frame is always draggable from its upper 18-pixel edge; hold either Ctrl for grid snapping. Body clicks pass through. During an activity-frame drag, the compact frame stays visible until release, then normal activity timing resumes.
+
+Run **//cbg edit** to toggle the guides and enable resizing. A band of pale diagonal lines marks the draggable top edge; drag anywhere along it to move the frame. The matching mark at the lower-right corner resizes it. Each grip gains a soft pink wash on hover; while pressed, the wash goes away and its lines turn pale pink. Release the mouse to save. Run **//cbg edit** again when you finish. Closing the native console with Insert also ends edit and preview modes.
 
 Hold **either Ctrl key** while dragging to floor the parent anchor to a shared screen-origin grid, initially **10 UI pixels**. **//cbg grid 7** saves a different spacing; bare **//cbg grid** reports it. Free dragging remains pixel-precise. The grid does not resize the widget or snap its individual children. Screen edges take precedence; Ctrl+resize keeps its existing behavior.
 
@@ -116,6 +118,11 @@ Derived from [ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/a
 
 
 ## Changelog
+
+### 0.1.22 — always-draggable frame
+
+- Visible top edge drags without edit mode, including activity frames; edit mode retains guides and resizing.
+- Active drag holds the frame visible; release saves and resumes normal timing.
 
 ### 0.1.21 — calibration and Ctrl+drag test
 

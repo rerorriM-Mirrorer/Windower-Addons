@@ -309,7 +309,10 @@ assert(not text_objects.ConsoleBGPlus_label_input.visible)
 -- Mouse ownership: regular play/body clicks/wheel events pass through.
 console_open = true; tick()
 local r = rectangle()
-assert(not mouse(1, r.x + 30, r.y + 2))
+assert(mouse(1, r.x + 30, r.y + 2))
+assert(mouse(2, r.x + 30, r.y + 2))
+assert(not mouse(1, r.x + 100, r.y + 100))
+assert(not mouse(1, r.x + r.width - 8, r.y + r.height - 8))
 run('edit', 'on')
 assert(text_objects.ConsoleBGPlus_label_edit.visible)
 local grip
@@ -894,7 +897,35 @@ run('size', '240', '160'); run('pos', '23', '47')
 callbacks.keyboard(29, true); focused = false; tick(); focused = true
 assert(mouse(1, 25, 50)); mouse(0, 32, 59); mouse(2, 32, 59)
 assert(saved.pos.x == 30 and saved.pos.y == 56, 'Focus loss clears stale Ctrl')
-run('edit', 'off'); assert(mouse(1, 31, 57) == false)
+run('edit', 'off'); assert(mouse(1, 31, 57)); mouse(2, 31, 57)
+callbacks.unload()
+-- Visible activity frames can be dragged without edit mode and do not
+-- disappear or gain an Input strip while the mouse is held.
+console_open = false
+dofile(addon_path .. 'ConsoleBGPlus.lua')
+tick(0.01)
+local passive_rect = rectangle()
+assert(not text_objects.ConsoleBGPlus_label_edit.visible)
+assert(mouse(1, passive_rect.x+5, passive_rect.y+3))
+local before_passive_save = save_calls
+callbacks.keyboard(29, true)
+mouse(0, passive_rect.x+28, passive_rect.y+26)
+tick(10)
+assert(text_objects.ConsoleBGPlus_label_title.visible and not text_objects.ConsoleBGPlus_label_input.visible)
+assert(rectangle().height == passive_rect.height, 'Dragging activity preserves compact geometry')
+assert(save_calls == before_passive_save, 'Dragging still saves only on release')
+mouse(2, -10, -10, true)
+assert(saved.pos.x % saved.grid.spacing == 0 and saved.pos.y % saved.grid.spacing == 0)
+assert(save_calls == before_passive_save+1)
+assert(not text_objects.ConsoleBGPlus_label_title.visible, 'Expired activity hides after release')
+assert(not mouse(1, saved.pos.x+5, saved.pos.y+3), 'Hidden frame does not capture input')
+callbacks.keyboard(29, false)
+console_open = true; tick(); tick()
+local nonedit_rect = rectangle()
+assert(mouse(1, nonedit_rect.x+5, nonedit_rect.y+3))
+mouse(0, nonedit_rect.x+12, nonedit_rect.y+12); mouse(2, -10, -10)
+assert(saved.pos.x == nonedit_rect.x+7 and saved.pos.y == nonedit_rect.y+9)
+assert(not text_objects.ConsoleBGPlus_label_edit.visible)
 callbacks.unload()
 -- Invisible text probes, exact overrides, absolute profiles, and cleanup.
 screen_width, screen_height = 1366, 768
