@@ -1035,6 +1035,48 @@ callbacks.unload(); dofile(addon_path .. 'ConsoleBGPlus.lua'); tick()
 assert(rectangle().height == 242)
 run('calibrate', 'status'); assert(logs[#logs][2]:find('fit 16 output rows', 1, true))
 callbacks.unload()
+-- Independent font trims keep native text, divider and output descenders fixed.
+console_open = true; screen_width, screen_height = 1280, 720
+dofile(addon_path .. 'ConsoleBGPlus.lua')
+run('font', 'Arial Rounded MT Bold', '8'); run('calibrate', '12.4', '15', '0', '13')
+run('size', '1238', '234'); run('pos', '13', '42'); run('trim', '0', '0'); settle()
+local base = rectangle(); local native = positions[#positions]
+local _, lower = rail('bottom_left'); local lower_y = lower.y
+run('diagnose'); local d = diagnostic_files[addon_path .. 'data/diagnostics.txt'].text
+local divider_y = d:match('divider_y=(%d+)')
+local input_y = text_objects.ConsoleBGPlus_label_input.y
+run('trim', '5', '2')
+local tuned = rectangle()
+assert(tuned.y == base.y+5 and tuned.height == base.height-7)
+assert(tuned.y+tuned.height == base.y+base.height-2)
+assert(positions[#positions].x == native.x and positions[#positions].y == native.y)
+assert(text_objects.ConsoleBGPlus_label_input.y == input_y)
+local _, lower_tuned = rail('bottom_left'); assert(lower_tuned.y == lower_y-2)
+run('diagnose'); d = diagnostic_files[addon_path .. 'data/diagnostics.txt'].text
+assert(d:match('divider_y=(%d+)') == divider_y)
+assert(d:find('normal_top_trim=13',1,true) and d:find('input_bottom_trim=2',1,true))
+run('edit','on'); assert(rectangle().y == 42 and rectangle().height == 232)
+assert(text_objects.ConsoleBGPlus_label_input.y == input_y and positions[#positions].y == native.y)
+run('edit','off'); assert(rectangle().height == 219)
+local before_invalid = save_calls
+run('trim','-1','2'); run('trim','5','9'); run('trim','nan','2'); run('trim','5')
+assert(save_calls == before_invalid)
+run('font','Verdana','10'); assert(saved.fontmetrics.top_extra == 0 and saved.fontmetrics.bottom_trim == 0)
+run('font','Arial Rounded MT Bold','8')
+assert(saved.extents.y == 234 and saved.fontmetrics.top_extra == 5 and saved.fontmetrics.bottom_trim == 2)
+callbacks.unload(); dofile(addon_path .. 'ConsoleBGPlus.lua'); tick()
+assert(rectangle().height == 219 and positions[#positions].y == native.y)
+-- Small windows and extreme requests remain clipped, even with both trims.
+local layout_module = require('cbg_layout')
+for _, viewport in ipairs({{width=1,height=1},{width=80,height=30},{width=120,height=40},{width=960,height=540},{width=3840,height=2160}}) do
+    for _, edit in ipairs({false,true}) do
+        local pieces, r = layout_module.build(saved,viewport,35,21,edit,11,false,nil,32,8)
+        for _, piece in ipairs(pieces) do
+            assert(piece.x >= 0 and piece.y >= 0 and piece.x+piece.width <= viewport.width and piece.y+piece.height <= viewport.height)
+        end
+    end
+end
+callbacks.unload()
 io.open = real_open
 print('PASS: Ctrl+drag grid matrix, per-font 16-row calibration/profile matrix, proxy failure/cancellation, and fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
 

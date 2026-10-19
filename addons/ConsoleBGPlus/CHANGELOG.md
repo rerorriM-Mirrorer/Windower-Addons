@@ -1,5 +1,11 @@
 # ConsoleBG+ changes
 
+## 0.1.25 — per-font trim
+
+- `//cbg trim 5 2` tests five extra pixels off the top and two off the Input bottom while keeping the divider/native text stationary.
+- Trim saves per font/size and survives switching/reload. Bare trim reports; trim 0 0 restores prior drawing.
+
+
 ## 0.1.24 — 16 output rows plus Input
 
 - Calibration/new font estimates use 16 output rows and one Input row.

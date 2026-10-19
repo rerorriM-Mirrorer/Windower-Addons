@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.24'
+_addon.version = '0.1.25'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -29,7 +29,7 @@ local defaults = {
     sound = {open = true, close = true},
     grid = {spacing = 10},
     fontprofiles = {},
-    fontmetrics = {rows = 15, source = 'unmeasured', spacing = 0, single = 0, multi = 0, top = 15, bottom = 7},
+    fontmetrics = {top_extra = 0, bottom_trim = 0, rows = 15, source = 'unmeasured', spacing = 0, single = 0, multi = 0, top = 15, bottom = 7},
 }
 local settings = config.load(defaults)
 local primitives, top_primitives, top_by_key, grip_primitives = {}, {}, {}, {}
@@ -239,7 +239,9 @@ refresh = function(screen)
     pieces, actual_rectangle = layout.build(settings, screen, title_width, input_width,
         editing, input_height, output_only,
         drag and (drag.kind .. '_pressed') or (hover_target and (hover_target .. '_hover')),
-        editing and 0 or math.max(0, math.min(8, settings.console.offset_y - 7)))
+        editing and 0 or math.max(0, math.min(settings.console.offset_y - 2,
+            math.max(0, math.min(8, settings.console.offset_y - 7)) + settings.fontmetrics.top_extra)),
+        settings.fontmetrics.bottom_trim)
     -- The output fill keeps its original primitives when Input appears;
     -- the added opaque panel and lower rail are drawn after it. The fixed
     -- top rail has its own primitives, so it cannot be rebound or hidden.
@@ -547,6 +549,7 @@ local function apply_font_profile(p)
     for _, key in ipairs({'source', 'spacing', 'single', 'multi', 'top', 'bottom'}) do
         settings.fontmetrics[key] = p[key]
     end
+    settings.fontmetrics.top_extra, settings.fontmetrics.bottom_trim = p.top_extra or 0, p.bottom_trim or 0
     settings.fontmetrics.rows = p.rows or 15 -- Existing profiles keep their legacy fit until recalibrated.
     position_dirty = true
 end
@@ -658,7 +661,19 @@ local function command(action, ...)
     if #args == 0 and report_setting(action) then return end
     end_drag()
     font_probe.cancel()
-    if action == 'calibrate' then
+    if action == 'trim' then
+        if #args == 0 then
+            return message(string.format('Font trim: extra top %dpx, Input bottom %dpx.',
+                settings.fontmetrics.top_extra, settings.fontmetrics.bottom_trim))
+        end
+        local top = #args == 2 and integer(args[1], 0, 32)
+        local bottom = #args == 2 and integer(args[2], 0, 8)
+        if not top or not bottom then return usage('trim <extra top 0-32> <Input bottom 0-8>') end
+        settings.fontmetrics.top_extra, settings.fontmetrics.bottom_trim = top, bottom
+        capture_font_profile()
+        save()
+        message(string.format('Font trim saved: extra top %dpx, Input bottom %dpx.', top, bottom))
+    elseif action == 'calibrate' then
         calibrate_command(args)
     elseif action == 'grid' then
         if #args == 0 then
@@ -914,6 +929,7 @@ local function command(action, ...)
         if #args ~= 0 then return usage('help') end
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] (guides/resize); entire visible frame draggable | console on|off | offset <x> <y>')
+        message('//cbg trim [<extra top 0-32> <Input bottom 0-8>] (per font/size)')
         message('//cbg calibrate [line pixels [top [bottom [input]]]] | calibrate status')
         message('//cbg grid [pixels] | Hold either Ctrl while dragging to snap the frame anchor.')
         message('//cbg font [<font> <size>] (linked) | nativefont <font> <size> | nativecolor <alpha> <red> <green> <blue>')
@@ -1051,7 +1067,7 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
         local rect = actual_rectangle
         drag = {kind = target == 'resize' and 'resize' or 'drag', x = x, y = y,
             rectangle = {x = rect.x, y = rect.anchor_y or rect.y, width = rect.width,
-                height = rect.height + (rect.top_trim or 0)}, changed = false}
+                height = rect.height + (rect.top_trim or 0) + (rect.bottom_trim or 0)}, changed = false}
         hover_target = nil
         refresh()
         update_visibility()

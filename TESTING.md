@@ -1,5 +1,23 @@
 # Current Development Status
 
+- Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.25, Windower 4. Starting checkpoint: `d1b8ef22fb366e4442a975aff2e83a70682df742` (v0.1.24). Final published head is in the handoff.
+- New per-font/size trim command independently retracts extra normal top space and raises only the Input bottom border. Native text, Input divider/label, spacing and saved height stay fixed. Existing profiles start with zero extra trims; no automatic application on upgrade.
+- Latest live reference: diagnostics(9)/(10) and matching screenshots. User preferred saved full height 234 over 233 at Arial Rounded MT Bold 8, 1280x720, 12.4px manual spacing and 13px Input. Divider shifted from 254 to 255 with text unchanged. User clarified this clears the `g` descender above the Input upper rail; it was not primarily prompt breathing room. Preserve that divider.
+- Verification: complete mocked Windower regression suite through liblua 5.4 and Lua 5.1 syntax checks. Targeted tests verify trim 5/2 moves top +5, bottom -2, divider/native text/Input label stationary, edit restores top only, separate-font isolation, reload, invalid input and tiny/large viewport clipping. No live FFXI test of v0.1.25 performed.
+- Next live check: keep data/settings.xml, update/reload, stay on the saved Arial Rounded MT Bold 8 fit, run `//cbg trim 5 2` without recalibrating. Capture Input-open and diagnose; inspect output descenders and Input glyph bottoms. Other sizes need independent observations.
+
+## 2026-10-18 — v0.1.25 acceptance
+
+1. Keep data and the existing 234px saved fit. Reload and run trim 5 2. No recalibration is required or desired for this comparison.
+2. Top should retract another 5px in normal/activity views. Native text stays fixed. Toggle edit: header restores upward, while text, divider and Input label remain stationary.
+3. Input bottom rises 2px; its upper rail must retain the user's 1px descender clearance. Check `g`, `j`, `p`, `q`, `y` on the last output row and in a typed Input line.
+4. Test trim 0 0 to reverse the drawing adjustment, then trim 5 2 to restore. Repeating either command must not accumulate. Other font/size profiles retain independent values; reload should restore the current pair.
+5. Drag anywhere, Ctrl-drag, and resize in edit. Screen bounds and hidden-frame input behavior should remain as before. Auto output has no Input bottom trim; its output body height should only change by the extra top trim.
+
+The previous records below remain intact. The assistant's earlier explanation of the 1px adjustment as prompt breathing room was superseded by the user's descender-clearance explanation above.
+
+# Previous Development Status — v0.1.24
+
 - Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.24 / Windower 4. Starting source: `239983c864308d4ec6899d4e9687d63028f3b92e` (v0.1.23). Published head is in the handoff.
 - Calibration now uses 16 output rows plus one Input row. New font/size estimates and manual overrides use the same corrected formula. Existing saved fits retain their height until explicitly recalibrated. Legacy profiles without a row field are identified as 15-row fits; new fits save rows=16.
 - Most recent native evidence: the supplied v0.1.22 screenshot and diagnostic at 1280x720, Arial Rounded MT Bold 8, spacing proxy 13, saved height 237. User confirms 16 output rows plus Input. No live acceptance of v0.1.23/v0.1.24 has yet been reported.

@@ -9,7 +9,7 @@ local function bounded(value, fallback, minimum, maximum)
     return math.floor(math.max(minimum, math.min(maximum, number)) + 0.5)
 end
 
-function layout.build(settings, viewport, title_width, input_width, editing, input_text_height, output_only, grip_state, top_trim)
+function layout.build(settings, viewport, title_width, input_width, editing, input_text_height, output_only, grip_state, top_trim, bottom_trim)
     local screen_width = bounded(viewport.width, 1920, 1, 32768)
     local screen_height = bounded(viewport.height, 1080, 1, 32768)
     local minimum_width = math.min(120, screen_width)
@@ -25,7 +25,7 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     -- The saved parent anchor/native text stay fixed. In normal views only
     -- the visible upper boundary contracts; editing restores the header.
     local anchor_y = y
-    top_trim = editing and 0 or bounded(top_trim, 0, 0, math.min(8, full_height - minimum_height))
+    top_trim = editing and 0 or bounded(top_trim, 0, 0, math.min(32, full_height - minimum_height))
     y, full_height = y + top_trim, full_height - top_trim
     local strip_height = settings.input.enabled == true and bounded(settings.input.height, 15, 6, 256) or 0
     -- A little breathing room below the last output row, beyond the Input strip.
@@ -35,6 +35,11 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     -- Keep the output fill unchanged when the Input area opens. The compact
     -- border is replaced by a separate Input panel starting at its top rail.
     local output_height = layered_input and compact_height or height
+    -- Raise only the Input bottom; the output fill and divider keep their
+    -- existing positions so descender clearance is unchanged.
+    bottom_trim = not output_only and layered_input and bounded(bottom_trim, 0, 0,
+        math.max(0, math.min(8, strip_height - 6, height - minimum_height))) or 0
+    height = height - bottom_trim
     local fill_alpha = bounded(settings.bg.alpha, 255, 0, 255)
     local top_alpha = bounded(settings.gradient.top, 100, 0, 255)
     local bottom_alpha = bounded(settings.gradient.bottom, 250, 0, 255)
@@ -46,7 +51,7 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     local blue = bounded(settings.bg.blue, 255, 0, 255)
     local pieces = {}
     local rectangle = {x = x, y = y, width = width, height = height, padding = padding,
-        anchor_y = anchor_y, top_trim = top_trim}
+        anchor_y = anchor_y, top_trim = top_trim, bottom_trim = bottom_trim}
 
     local function rail_alpha(progress)
         if settings.border.linked ~= true then return border_alpha end
@@ -139,7 +144,7 @@ function layout.build(settings, viewport, title_width, input_width, editing, inp
     local input_height = settings.input.enabled == true and not output_only
         and bounded(settings.input.height, 14, 6,
             math.max(6, height - top_height - bottom_height - 4)) or nil
-    local divider_y = input_height and math.max(y + top_height, bottom_y - input_height) or nil
+    local divider_y = input_height and math.max(y + top_height, bottom_y + bottom_trim - input_height) or nil
     if layered_input and not output_only then
         local panel_y = divider_y
         local panel_height = y + height - panel_y

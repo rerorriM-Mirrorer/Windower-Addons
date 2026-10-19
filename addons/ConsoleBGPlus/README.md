@@ -48,6 +48,7 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
     //cbg labelsize [<title> <input>]             Set label sizes (6-16)
     //cbg labeloffset <-12 to 12>              Move Input label vertically
     //cbg font [<font name> <size>]             Linked font/size; no args reports it
+    //cbg trim [<extra top> <Input bottom>]     Per-font trims; 0-32 and 0-8 pixels
     //cbg calibrate                            Measure current font; fit 16 rows
     //cbg calibrate status                     Report current font calibration
     //cbg calibrate <line> [top [bottom [input]]]  Set exact pixel calibration
@@ -106,6 +107,14 @@ Profiles save absolute height, Input height, label calibration, and native text 
 
 Verdana 12 is an initial default, not a forced font. Load/reload reapplies the saved font. **//cbg nativefont** changes native text alone; labelfont and labelsize remain available for individual adjustments. Native text has no documented font/extent getter, so a different typeface may still need **//cbg offset**, **//cbg labeloffset**, or **//cbg input on <height>** after inspecting it with preview. Changing console_font outside the addon is not detected and is overwritten by the saved font on reload.
 
+## Fine trim per font and size
+
+`//cbg trim 5 2` removes five more pixels from the normal top and raises the Input strip's bottom border by two pixels. It leaves native text, the divider/upper Input rail, Input label, saved full height and font spacing unchanged. Edit mode restores the top header; its Input bottom remains trimmed. Automatic output uses the tighter top but has no Input bottom trim.
+
+These values save with the current font/size profile; bare `//cbg trim` reports them. `//cbg trim 0 0` restores the previous drawing. Extra top accepts 0-32 pixels, bounded to leave at least two pixels before the native-text origin; Input bottom accepts 0-8, bounded to retain a usable strip. Small viewports apply additional bounds. No proportional scaling is applied to these corrections.
+
+For the user-tested Arial Rounded MT Bold 8 fit (12.4px spacing, 13px Input, saved full height 234), use `//cbg trim 5 2` **without recalibrating**. This preserves the extra pixel of divider clearance for the output line's `g` descender. Other fonts and sizes keep their own trim values, initially zero.
+
 ## When something looks wrong
 
 For a spacing issue, take a screenshot and run **//cbg diagnose** while the issue is visible. It writes ConsoleBGPlus/data/diagnostics.txt with saved settings, screen and frame size, measured label bounds, log availability, and the last native position **set by the addon**. Each run replaces the prior snapshot.
@@ -121,6 +130,12 @@ Derived from [ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/a
 
 
 ## Changelog
+
+### 0.1.25 — per-font top and Input-bottom trim
+
+- Added saved trim controls that preserve divider/native text positions and the manually fitted full height.
+- Extra top retracts only outside edit mode; Input bottom trim is independent of the upper rail.
+- Diagnostics report both effective trims.
 
 ### 0.1.24 — corrected output-row calibration
 
