@@ -153,9 +153,9 @@ Derived from [ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/a
 
 ### Short padding comparison
 
-Choose the font/size you actually want to use, open the native console, then enter `cbg test trim`. An optional screenshot-directory argument works as in auto capture. The command prints16 sample rows once, then gives about10 seconds to type `Agjpqy` into the native console WITHOUT Enter. Leave it there with the game focused: three PNG/TXT pairs capture automatically, with suffixes trim_current, trim_balanced and trim_tight.
+Choose the font/size you actually want to use, open the native console, then enter `cbg test trim`. An optional screenshot-directory argument works as in auto capture. The command initially prints16 sample rows, then gives about10 seconds to type `Agjpqy` into the native console WITHOUT Enter. Leave it there with the game focused: three PNG/TXT pairs capture automatically, with suffixes trim_current, trim_balanced and trim_tight.
 
-Current uses your saved trims; balanced previews extra-top5/Input-bottom3; tight previews5/5. They use temporary drawing overrides only. Text, parent position, row spacing, Input divider and font stay fixed. Later variants neither reprint sample rows nor send font/input commands, so the typed descenders remain for comparison. The sequence automatically restores the saved layout and prior edit state after the third capture. Stop, failure or interruption also restores them. No trial values are saved or silently applied on load. Diagnostic trim_trial records the variant while its saved-settings section remains unchanged.
+Current uses your saved trims; balanced previews extra-top5/Input-bottom3; tight previews5/5. They use temporary drawing overrides only. Text, parent position, row spacing, Input divider and font stay fixed. Before each capture it refills all16 output rows, then waits at least3 rendered frames and0.15s. This pushes prior screenshot notifications out of view without sending font/input commands or touching the typed descenders. The sequence automatically restores the saved layout and prior edit state after the third capture. Stop, failure or interruption also restores them. No trial values are saved or silently applied on load. Diagnostic trim_trial records the variant while its saved-settings section remains unchanged.
 
 Send the data ZIP and say which version you prefer. We can then save the chosen values using the existing trim command. Start with your everyday font/size; representative small/large fonts can follow if needed, rather than another57-case sweep. Default capture watches Windower's screenshot folder; supply its actual leaf directory if customized. Do not press Enter on the sample word or type another console command during capture. Failed capture ends this short comparison; restart test trim after addressing it. This feature does not populate or read native Input text.
 
@@ -192,6 +192,10 @@ Repeat the suite on each available UI resolution (at least960x540,1280x720 and t
 At the end, next restores the starting font, as does stop. Completed font profiles remain saved; the suite cannot resume its queue across reload. Check font round trips and reload persistence, free/both-Ctrl dragging at screen edges, edit resizing, and ordinary activity afterward. These input checks are automated in the mock suite but still require live acceptance. Collect screenshots and all matching fonttest logs together; native visual corrections may require another pass.
 
 ## Changelog
+
+### 0.1.33 — clean trim captures
+
+- Refill all16 native output rows immediately before each trim screenshot and wait for rendering. Native screenshot notifications no longer carry into the following variant. Typed Input, saved trims and geometry stay unchanged.
 
 ### 0.1.32 — short padding comparison
 

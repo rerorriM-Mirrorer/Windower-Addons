@@ -1312,7 +1312,22 @@ capture_files['capture-test/partial.png']='\137PNG\13\10\26\10unfinished'
 assert(not capture_module.poll(job,test_seconds+1))
 local result,timeout=capture_module.poll(job,test_seconds+21)
 assert(not result and timeout)
--- Short trim trial: no settings writes/font changes and no later sample writes.
+-- Model native screenshot feedback scrolling a finite16-row output buffer.
+local native_buffer,capture_buffers={},{}
+local base_console_write,base_screenshot_send=windower.console.write,windower.send_command
+local function buffer_push(line)
+    native_buffer[#native_buffer+1]=line
+    if #native_buffer>16 then table.remove(native_buffer,1) end
+end
+windower.console.write=function(line) buffer_push(line); base_console_write(line) end
+windower.send_command=function(value)
+    if value=='screenshot png' then
+        capture_buffers[#capture_buffers+1]=copy(native_buffer)
+        buffer_push('Saving Screenshot: simulated native capture feedback')
+    end
+    base_screenshot_send(value)
+end
+-- Short trim trial keeps typed Input independent and refills before every shot.
 run('font','Verdana','12'); settle()
 local trim_saved=copy(saved)
 local trial_save_calls,trial_lines,trial_commands=save_calls,#console_lines,#queued
@@ -1323,7 +1338,15 @@ assert(#console_lines==trial_lines+16)
 for _=1,200 do tick() end
 assert(screenshot_count==trial_shots, 'Typed Input receives a ten-second window')
 for _=1,600 do tick() end
-assert(screenshot_count==trial_shots+3 and #console_lines==trial_lines+16)
+assert(screenshot_count==trial_shots+3 and #console_lines==trial_lines+64)
+assert(#capture_buffers==3)
+for _,buffer in ipairs(capture_buffers) do
+    assert(#buffer==16)
+    for row=1,16 do
+        assert(buffer[row]==string.format('%02d Agjpqy 0123456789 - g j p q y',row),
+            'Every capture has all16 fresh rows despite earlier screenshot feedback')
+    end
+end
 assert(save_calls==trial_save_calls and saved.native.font==trim_saved.native.font)
 assert(saved.fontmetrics.top_extra==trim_saved.fontmetrics.top_extra and saved.fontmetrics.bottom_trim==trim_saved.fontmetrics.bottom_trim)
 assert(rectangle().y==old_rect.y and rectangle().height==old_rect.height)
@@ -1349,6 +1372,7 @@ local cancelled_shots=screenshot_count
 for _=1,500 do tick() end
 assert(screenshot_count==cancelled_shots and rectangle().height==old_rect.height,
     'Closing console before the first sample cancels and restores the trial')
+windower.console.write=base_console_write
 windower.send_command=original_send
 callbacks.unload(); assert(next(text_objects)==nil)
 io.open = real_open

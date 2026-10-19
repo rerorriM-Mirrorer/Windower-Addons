@@ -1,3 +1,7 @@
+## v0.1.33
+
+- Refill16 sample rows before every trim capture, then wait3 frames/0.15s for rendering. This replaces native Saving Screenshot messages in the output buffer without sending font/input commands. Saved trims and capture restoration unchanged.
+
 ## v0.1.32
 
 - Short test trim comparison of current/balanced5-3/tight5-5 for the current font/size. Single16-row sample,10s to type native descenders, three matched PNG/TXT pairs, automatic restoration.

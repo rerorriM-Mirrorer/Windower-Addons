@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.32'
+_addon.version = '0.1.33'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -684,12 +684,14 @@ local function test_command(args)
     message('Preparing 16 native sample rows and a named diagnostic. Capture Input-open when ready.')
 end
 
-local function finish_font_test()
-    if not pending_test.no_sample then
-        for row = 1, 16 do
-            windower.console.write(string.format('%02d Agjpqy 0123456789 - g j p q y', row))
-        end
+local function write_font_sample()
+    for row = 1, 16 do
+        windower.console.write(string.format('%02d Agjpqy 0123456789 - g j p q y', row))
     end
+end
+
+local function finish_font_test()
+    if not pending_test.no_sample then write_font_sample() end
     local tag = settings.native.font:gsub('[^%w]', '_') .. '_' .. settings.native.size
     if test_suite and test_suite.trim then tag = tag .. '_trim_' .. test_suite.cases[test_suite.index].name end
     local path, err = recorder.snapshot(context(true), tag)
@@ -885,6 +887,13 @@ local function poll_capture()
     if shot.phase == 'settle' then
         shot.frames = shot.frames + 1
         if shot.frames < 3 or now - shot.since < (shot.delay or 0.5) then return end
+        if test_suite.trim and not shot.refilled then
+            -- Native screenshot status messages scroll the output buffer. Refill
+            -- all rows without touching typed Input, then let that output render.
+            write_font_sample()
+            shot.refilled, shot.frames, shot.since, shot.delay = true, 0, now, 0.15
+            return
+        end
         local job, err = capture.start(test_suite.auto.directory, shot.target, now)
         if not job then return pause_capture(err) end
         shot.job, shot.phase = job, 'file'

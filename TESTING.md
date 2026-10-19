@@ -1,5 +1,20 @@
 # Current Development Status
 
+- Repository/branch: rerorriM-Mirrorer/Windower-Addons, consolebg-plus; ConsoleBGPlus v0.1.33 / Windower4. Tested starting checkpoint:6310b6c01896ac4c64296da423f110b3daabb0e2 (v0.1.32). Final published head is in handoff. Baseline branches unchanged.
+- Latest material:data(3).zip contains three matched Tahoma8 trim PNG/TXT pairs plus an earlier current diagnostic without PNG. Current0/0,balanced5/3,tight5/5 use identical divider226; typed Agjpqy is visible. Assistant recommends5/5 for this pair based on visible descender clearance, but user has not selected/saved it. Earlier Rounded8 preference5/3 remains separate.
+- Observed runner defect: native Saving Screenshot messages scroll the output between v0.1.32 variants. Input comparison remains usable, but the last native output row changes, preventing a fair row16 clearance comparison. New code refills16 rows before each trim capture and waits at least3 rendered frames/0.15s. First10s typing window retained. Typed Input untouched; no font/input commands or settings saves.
+- Verification: full mocked Windower regression via liblua5.4 and Lua5.1 syntax pass. Added finite16-row native buffer simulation injects Saving Screenshot feedback after every capture and verifies each of all3 captures again contains exactly rows01–16 in order. Existing typing window, no settings saves/font-input commands, unchanged divider/geometry, restoration and57-case/four-resolution checks retained. No native v0.1.33 FFXI execution here.
+- Pending: one clean Tahoma8 trim comparison; user trim preference; intermittent clipped Input label remains separate and unresolved. Other-resolution/output-only/edit live checks remain pending. No new automatic trim defaults or baseline promotion.
+
+## 2026-10-19 — v0.1.33 short rerun
+
+1. Keep data/settings.xml, update/reload and stay on Tahoma8/current saved calibration. Open console and run cbg test trim. Type Agjpqy WITHOUT Enter during the approximately10s window.
+2. Stay focused: three variants capture automatically. Each PNG should contain rows01–16 with no previous Saving Screenshot message in their place. Native screenshot feedback can appear after a capture; it is replaced before the next. Input text must remain intact.
+3. Verify top gap, output row16 descenders/divider and typed Input descenders/lower rail. Original saved trims/edit mode restore afterward. Send data ZIP and preferred current/balanced/tight variant. No trim choice saves until explicitly requested.
+4. First sample plus three refills totals64 output writes. This supersedes v0.1.32's no-later-sample-write behavior; older records below remain intact. Interruption/capture error behavior and custom screenshot-directory option are unchanged.
+
+# Previous Development Status — v0.1.32
+
 - Repository/branch: rerorriM-Mirrorer/Windower-Addons, consolebg-plus; ConsoleBGPlus v0.1.32 / Windower4. Tested starting checkpoint:e760c282aedb1710308d4e8a28b0455a41b5ab00 (v0.1.31). Final published head is in the handoff. Baseline branches unchanged.
 - Live materials reviewed: data(1).zip contains20 readable Tahoma PNG/TXT pairs covering sizes6–24 plus repeated11. data(2).zip contains19 readable Verdana PNG/TXT pairs covering6–24. Automatic native screenshots include ConsoleBGPlus and sample rows. The95% spacing model tracks observed rows; Tahoma23/24 clip at lower anchor, whereas Verdana23/24 fit after the anchor moved higher. This is native evidence at1280x720, not all-resolution certification.
 - Separate issue: repeated Tahoma11 capture at062908 clips the Input label, despite the same24x11 reported label bounds as062816. Code inspection has not established a cause; no speculative label/layout redesign. Input descender clearance and trim preferences still require visual acceptance.
