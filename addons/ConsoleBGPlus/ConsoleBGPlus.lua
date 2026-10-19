@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.23'
+_addon.version = '0.1.24'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -29,7 +29,7 @@ local defaults = {
     sound = {open = true, close = true},
     grid = {spacing = 10},
     fontprofiles = {},
-    fontmetrics = {source = 'unmeasured', spacing = 0, single = 0, multi = 0, top = 15, bottom = 7},
+    fontmetrics = {rows = 15, source = 'unmeasured', spacing = 0, single = 0, multi = 0, top = 15, bottom = 7},
 }
 local settings = config.load(defaults)
 local primitives, top_primitives, top_by_key, grip_primitives = {}, {}, {}, {}
@@ -547,13 +547,15 @@ local function apply_font_profile(p)
     for _, key in ipairs({'source', 'spacing', 'single', 'multi', 'top', 'bottom'}) do
         settings.fontmetrics[key] = p[key]
     end
+    settings.fontmetrics.rows = p.rows or 15 -- Existing profiles keep their legacy fit until recalibrated.
     position_dirty = true
 end
 
 local function fitted_height(p)
-    -- 15 output rows, one separate Input row, and the existing seven-pixel
+    -- 16 output rows, one separate Input row, and the existing seven-pixel
     -- compact/full-frame allowance. Rails keep their native pixel dimensions.
-    return math.max(40, math.floor(p.top + 15 * p.spacing + p.bottom
+    p.rows = 16
+    return math.max(40, math.floor(p.top + p.rows * p.spacing + p.bottom
         + (settings.input.enabled and p.input or 0) + 7 - settings.input.padding + 0.5))
 end
 
@@ -581,13 +583,13 @@ local function font_command(args)
     apply_font_profile(p)
     sync_native_profile()
     save()
-    message('Linked font saved: ' .. font .. ' ' .. size .. '. Use //cbg calibrate to measure 15-row spacing.')
+    message('Linked font saved: ' .. font .. ' ' .. size .. '. Use //cbg calibrate to measure 16-row spacing.')
 end
 
 local function report_calibration()
     local p = settings.fontmetrics
-    message(string.format('%s %d: %s, line %.2fpx, 15 rows, top/bottom %d/%d, Input %d, full height %d.',
-        settings.native.font, settings.native.size, p.source, p.spacing,
+    message(string.format('%s %d: %s, line %.2fpx, fit %d output rows (target 16 + Input), top/bottom %d/%d, Input %d, full height %d.',
+        settings.native.font, settings.native.size, p.source, p.spacing, p.rows or 15,
         p.top, p.bottom, settings.input.height, settings.extents.y + settings.input.padding))
 end
 
@@ -609,7 +611,7 @@ local function calibrate_command(args)
     if #args == 0 then
         font_probe.start(settings.native.font, settings.native.size)
         return message('Measuring ' .. settings.native.font .. ' ' .. settings.native.size
-            .. '. Addon text is a proxy; compare 15 filled native lines in-game.')
+            .. '. Addon text is a proxy; compare 16 filled native lines in-game.')
     end
     local spacing = tonumber(args[1])
     local top = args[2] and integer(args[2], 0, 128) or settings.fontmetrics.top

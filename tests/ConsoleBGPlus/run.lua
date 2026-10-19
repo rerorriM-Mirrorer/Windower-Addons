@@ -630,7 +630,7 @@ run('font', 'Trebuchet', 'MS', '18')
 assert(saved.native.font == 'Trebuchet MS' and saved.native.size == 18
     and saved.labels.font == 'Trebuchet MS' and saved.labels.title_size == 12
     and saved.labels.input_size == 11 and saved.input.height == 23
-    and saved.console.offset_y == 15 and saved.extents.y == 502)
+    and saved.console.offset_y == 15 and saved.extents.y == 532)
 local font_save_count = save_calls
 run('font')
 assert(save_calls == font_save_count and logs[#logs][2]:find('Trebuchet MS 18', 1, true))
@@ -937,9 +937,10 @@ for _, font in ipairs({'Arial Rounded MT Bold', 'Tahoma', 'Verdana'}) do
         run('font', font, size)
         run('calibrate'); settle()
         local spacing = math.ceil(tonumber(size) * 1.4)
-        assert(saved.fontmetrics.source == 'addon-proxy' and saved.fontmetrics.spacing == spacing)
+        assert(saved.fontmetrics.source == 'addon-proxy' and saved.fontmetrics.spacing == spacing
+            and saved.fontmetrics.rows == 16)
         assert(saved.fontmetrics.single == spacing and saved.fontmetrics.multi == 3*spacing)
-        assert(saved.extents.y == 15 + 15*spacing + 7 + spacing + 7)
+        assert(saved.extents.y == 15 + 16*spacing + 7 + spacing + 7)
         assert(not text_objects.ConsoleBGPlus_probe_single and not text_objects.ConsoleBGPlus_probe_multi)
         local current_height = saved.extents.y
         run('font', font, size); assert(saved.extents.y == current_height)
@@ -947,9 +948,9 @@ for _, font in ipairs({'Arial Rounded MT Bold', 'Tahoma', 'Verdana'}) do
 end
 run('font', 'Arial Rounded MT Bold', '8')
 run('calibrate', '12.5', '10', '6', '13')
-assert(saved.extents.y == 224 and saved.console.offset_y == 10 and saved.fontmetrics.source == 'manual')
+assert(saved.extents.y == 236 and saved.console.offset_y == 10 and saved.fontmetrics.source == 'manual')
 run('font', 'Tahoma', '10'); run('font', 'Arial Rounded MT Bold', '8')
-assert(saved.extents.y == 224 and saved.console.offset_y == 10)
+assert(saved.extents.y == 236 and saved.console.offset_y == 10)
 local before_report = save_calls
 run('calibrate', 'status'); run('calibrate', '0'); run('calibrate', 'nan')
 run('calibrate', '12', '-1'); run('calibrate', '12', '10', '6', '0')
@@ -976,7 +977,7 @@ for _, screen in ipairs({{960,540},{1280,720},{1366,768},{3840,2160}}) do
 end
 run('font', 'Arial Rounded MT Bold', '8')
 callbacks.unload(); dofile(addon_path .. 'ConsoleBGPlus.lua'); tick()
-assert(queued[#queued-4] == 'console_font "Arial Rounded MT Bold" 8' and rectangle().height == 221)
+assert(queued[#queued-4] == 'console_font "Arial Rounded MT Bold" 8' and rectangle().height == 233)
 run('calibrate'); callbacks.unload()
 assert(next(text_objects) == nil and count() == 0, 'Unload deletes pending probes and all frame objects')
 -- Compact normal header grows upward in edit mode without moving content.
@@ -1015,7 +1016,26 @@ for _, offset in ipairs({'0','7','10','15'}) do
     assert(positions[#positions].y == native_y, 'Custom text offsets remain fixed across edit toggles')
 end
 callbacks.unload()
+-- Upgrade keeps a legacy height; explicit calibration adds exactly one row.
+saved.extents.y, saved.input.height = 237, 13
+saved.fontmetrics = {source='addon-proxy', spacing=13, single=14, multi=40, top=15, bottom=7}
+saved.console.offset_y = 15
+saved.native.font, saved.native.size = 'Arial Rounded MT Bold', 8
+for _, profile in pairs(saved.fontprofiles) do profile.rows = nil end
+dofile(addon_path .. 'ConsoleBGPlus.lua'); tick()
+assert(rectangle().height == 229, 'Legacy height is preserved on upgrade')
+run('calibrate', 'status')
+assert(logs[#logs][2]:find('fit 15 output rows', 1, true))
+run('calibrate', '13', '15', '7', '13')
+assert(saved.extents.y == 250 and saved.fontmetrics.rows == 16)
+assert(rectangle().height == 242)
+run('calibrate', '13', '15', '7', '13')
+assert(saved.extents.y == 250, 'Recalibration does not add another row repeatedly')
+callbacks.unload(); dofile(addon_path .. 'ConsoleBGPlus.lua'); tick()
+assert(rectangle().height == 242)
+run('calibrate', 'status'); assert(logs[#logs][2]:find('fit 16 output rows', 1, true))
+callbacks.unload()
 io.open = real_open
-print('PASS: Ctrl+drag grid matrix, per-font 15-row calibration/profile matrix, proxy failure/cancellation, and fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
+print('PASS: Ctrl+drag grid matrix, per-font 16-row calibration/profile matrix, proxy failure/cancellation, and fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')
 
 

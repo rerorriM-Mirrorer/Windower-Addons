@@ -1,5 +1,11 @@
 # ConsoleBG+ changes
 
+## 0.1.24 — 16 output rows plus Input
+
+- Calibration/new font estimates use 16 output rows and one Input row.
+- Saved legacy height stays until explicit recalibration; status/diagnostics identify the saved row count.
+
+
 ## 0.1.23 — compact header and whole-frame drag
 
 - Drag the entire visible frame; lower-right resize stays in edit mode.

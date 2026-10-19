@@ -1,5 +1,23 @@
 # Current Development Status
 
+- Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.24 / Windower 4. Starting source: `239983c864308d4ec6899d4e9687d63028f3b92e` (v0.1.23). Published head is in the handoff.
+- Calibration now uses 16 output rows plus one Input row. New font/size estimates and manual overrides use the same corrected formula. Existing saved fits retain their height until explicitly recalibrated. Legacy profiles without a row field are identified as 15-row fits; new fits save rows=16.
+- Most recent native evidence: the supplied v0.1.22 screenshot and diagnostic at 1280x720, Arial Rounded MT Bold 8, spacing proxy 13, saved height 237. User confirms 16 output rows plus Input. No live acceptance of v0.1.23/v0.1.24 has yet been reported.
+- Verification: complete mocked Windower suite through liblua 5.4 and Lua 5.1 syntax checks. Updated three-font 8/10/12 matrix, profile switching/reload, exact fractional overrides and extreme font/resolution checks pass. Explicit upgrade test preserves 237px, then calibrating with 13px spacing changes it to 250px once, preserves 250px on repeated calibration, and restores the 16-row result after reload.
+- Pending live check: keep data, reload, choose Arial Rounded MT Bold 8, run calibrate. With the same 13px spacing and margins, saved height should become 250px, drawing 242px with the normal 8px top trim. Input-open screenshot plus diagnose will show whether the addon-text proxy needs a native-spacing correction.
+
+## 2026-10-18 — v0.1.24 calibration acceptance
+
+1. Keep data/settings.xml and optionally back it up before recalibrating. Install and reload; the current saved height should remain intact.
+2. Run `//cbg font "Arial Rounded MT Bold" 8`, then `//cbg calibrate`. Wait for the summary showing fit 16 output rows.
+3. Capture Input-open with 16 output rows and one Input row. Run diagnose and save that diagnostic before another overwrites it. No manual resizing before this first comparison.
+4. Repeat calibration: height should not accumulate. Toggle edit on/off to check the header; drag anywhere and test Ctrl as before.
+5. Native font fit remains a live test. This patch intentionally changes only the row-count multiplier and fit metadata, retaining margins, probe measurement method, header trim, drag behavior and Input construction.
+
+The older records below retain their original formulas and observations. Their statements about a pending correction are superseded by v0.1.24.
+
+# Previous Development Status — v0.1.23
+
 - Repository/branch: rerorriM-Mirrorer/Windower-Addons, `consolebg-plus`; ConsoleBGPlus v0.1.23 / Windower 4. Starting checkpoint: `faef7844c5691946129375feb54a5bd3514606ed` (v0.1.22). Published head will be in the handoff.
 - Normal/activity views now trim up to 8px of unused top background; edit restores the header upward. Native text, Input/tab/divider and bottom positions remain fixed. Existing font profiles and saved anchor are unchanged.
 - Entire visible frame drags, with the edit-mode lower-right resize corner taking precedence. Ctrl floors the existing saved parent anchor to the shared screen-origin grid. The visible top rail is a child at parent_y + top_trim, so its edge can differ from a grid multiple while the saved anchor remains on-grid.

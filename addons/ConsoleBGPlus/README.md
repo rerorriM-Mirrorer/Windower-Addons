@@ -48,7 +48,7 @@ Type these in FFXI chat. Angle brackets mark required arguments, square brackets
     //cbg labelsize [<title> <input>]             Set label sizes (6-16)
     //cbg labeloffset <-12 to 12>              Move Input label vertically
     //cbg font [<font name> <size>]             Linked font/size; no args reports it
-    //cbg calibrate                            Measure current font; fit 15 rows
+    //cbg calibrate                            Measure current font; fit 16 rows
     //cbg calibrate status                     Report current font calibration
     //cbg calibrate <line> [top [bottom [input]]]  Set exact pixel calibration
     //cbg nativefont [<font name> <size>]         Set native console font (size 6-24)
@@ -84,7 +84,7 @@ The bundled open and close cues play once at each native console visibility tran
 
 ## Linked font calibration
 
-The latest screenshot/user recount confirms **16 output rows plus one Input row**. Existing v0.1.21/v0.1.22 fitted heights are retained in this header/drag patch; the older 15-row proxy formula described below remains pending a separate native-spacing correction. Do not reset a good manual fit solely to change that count.
+Calibration now fits **16 output rows plus one Input row (17 total)**. Existing saved layouts keep their previous height on upgrade/load/font switching. Run **//cbg calibrate** to replace the active fit with the corrected count. **//cbg calibrate status** and diagnostics distinguish legacy 15-row fits from new 16-row fits.
 
 
 Start with the installed Arial Rounded face:
@@ -94,13 +94,13 @@ Start with the installed Arial Rounded face:
 //cbg calibrate
 ```
 
-The linked font command sets native console text and frame labels, restoring a saved layout for that exact font/size. A new pair gets an estimate derived from the original size-12 design: 15 output rows with fixed top/bottom margins and a separate Input row. It no longer keeps the output background at size-12 height. Font sizes remain 6-24; label sizes remain 6-16. Rails retain their native pixel dimensions. Existing layouts are not automatically recalibrated on upgrade or reload.
+The linked font command sets native console text and frame labels, restoring a saved layout for that exact font/size. A new pair gets an estimate derived from the original size-12 design: 16 output rows with fixed top/bottom margins and a separate Input row. It no longer keeps the output background at size-12 height. Font sizes remain 6-24; label sizes remain 6-16. Rails retain their native pixel dimensions. Existing layouts are not automatically recalibrated on upgrade or reload.
 
-**//cbg calibrate** renders two invisible addon text probes (one and three lines), waits for stable positive extents, and estimates line spacing as `(three-line height - single-line height) / 2`. It fits 15 output rows, uses one line of that spacing for Input, and saves the result by font/size. Failure to settle within 90 render frames leaves the layout intact. Another layout command, a drag, settings reload, or unloading cancels a pending probe. No probe text is written to console.log.
+**//cbg calibrate** renders two invisible addon text probes (one and three lines), waits for stable positive extents, and estimates line spacing as `(three-line height - single-line height) / 2`. It fits 16 output rows, uses one line of that spacing for Input, and saves the result by font/size. Failure to settle within 90 render frames leaves the layout intact. Another layout command, a drag, settings reload, or unloading cancels a pending probe. No probe text is written to console.log.
 
-**These are addon-text measurements, not measurements of the native console.** Windows font substitution and different renderer metrics can still affect the result. We cannot detect whether the requested face is installed. Compare all 15 native output rows, then open Input and check its extra row. Begin with Arial Rounded MT Bold at 8, 10, and 12; repeat for Tahoma and Verdana after the first face fits.
+**These are addon-text measurements, not measurements of the native console.** Windows font substitution and different renderer metrics can still affect the result. We cannot detect whether the requested face is installed. Compare all 16 native output rows, then open Input and check its extra row. Begin with Arial Rounded MT Bold at 8, 10, and 12; repeat for Tahoma and Verdana after the first face fits.
 
-**//cbg calibrate status** reports spacing, source, margins, and height. **//cbg diagnose** also records single/three-line measurements, the requested font, and the viewport. To correct a native-renderer mismatch, use **//cbg calibrate 12.5 10 6 13**: this example means 12.5px line spacing, 10px top margin/native text offset, 6px bottom allowance, and 13px Input height. These are example values, not a verified preset. Omitted margins/Input keep current values. Spacing accepts 4-128 pixels; top/bottom accept 0-128 and Input 6-256. The frame is still clipped to the viewport if all 15 rows cannot fit.
+**//cbg calibrate status** reports spacing, source, margins, and height. **//cbg diagnose** also records single/three-line measurements, the requested font, and the viewport. To correct a native-renderer mismatch, use **//cbg calibrate 12.5 10 6 13**: this example means 12.5px line spacing, 10px top margin/native text offset, 6px bottom allowance, and 13px Input height. These are example values, not a verified preset. Omitted margins/Input keep current values. Spacing accepts 4-128 pixels; top/bottom accept 0-128 and Input 6-256. The frame is still clipped to the viewport if all 16 rows cannot fit.
 
 Profiles save absolute height, Input height, label calibration, and native text offsets. Switching repeatedly does not compound rounding. Manual layout adjustments are retained when leaving a profile. Position, width, colors, fade, and activity controls remain shared settings. Reload reapplies the active saved font/layout. **//cbg reset** clears the profiles as well as restoring defaults.
 
@@ -121,6 +121,11 @@ Derived from [ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/a
 
 
 ## Changelog
+
+### 0.1.24 — corrected output-row calibration
+
+- New estimates and explicit calibration use 16 output rows plus one separate Input row.
+- Existing profiles keep their saved height until recalibrated; status/diagnostics report fit row count.
 
 ### 0.1.23 — compact header and whole-frame dragging
 
