@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.33'
+_addon.version = '0.1.34'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -15,6 +15,7 @@ local font_probe = calibration.new()
 local presets = require('cbg_presets')
 local capture = require('cbg_capture')
 local pending_test
+local automatic_fit
 local test_suite
 local defaults = {
     bg = {alpha = 255, red = 255, green = 255, blue = 255},
@@ -570,7 +571,7 @@ local function fitted_height(p)
         + (settings.input.enabled and p.input or 0) + 7 - settings.input.padding + 0.5))
 end
 
-local function font_command(args)
+local function font_command(args, no_measure)
     if #args == 0 then
         return message(string.format('Font: %s %d; labels %s %d/%d; input height %d; console offset %d,%d.',
             settings.native.font, settings.native.size, settings.labels.font,
@@ -594,7 +595,16 @@ local function font_command(args)
     apply_font_profile(p)
     sync_native_profile()
     save()
-    message('Linked font saved: ' .. font .. ' ' .. size .. '. Use //cbg calibrate to measure 16-row spacing.')
+    -- Only an explicit font selection starts automatic fitting. Test suites and
+    -- restoration own their probes; established estimates/manual fits stay saved.
+    local source = settings.fontmetrics.source
+    if not no_measure and (source == 'estimate' or source == 'unmeasured' or source == 'addon-proxy') then
+        automatic_fit = true
+        font_probe.start(font, size)
+        message('Linked font saved: ' .. font .. ' ' .. size .. '; estimating fit automatically.')
+    else
+        message('Linked font saved: ' .. font .. ' ' .. size .. '; saved fit restored.')
+    end
 end
 
 local function report_calibration()
@@ -667,7 +677,7 @@ local function test_command(args)
     local existing = settings.fontprofiles[calibration.key(settings.native.font, size)]
         or (settings.native.size == size)
     local reference = (use_preset or not existing) and presets.get(settings.native.font, size)
-    font_command({settings.native.font, tostring(size)})
+    font_command({settings.native.font, tostring(size)}, true)
     if reference then preset_command({tostring(size)}) end
     editing = false
     refresh()
@@ -725,7 +735,7 @@ end
 local function suite_case()
     local c = test_suite.cases[test_suite.index]
     test_suite.ready = false
-    font_probe.cancel()
+    font_probe.cancel(); automatic_fit = nil
     pending_test = nil
     if test_suite.trim then
         editing = false
@@ -733,7 +743,7 @@ local function suite_case()
         pending_test = {stage = 'wait', frames = 0, no_sample = test_suite.index > 1}
         return
     end
-    font_command({c.font, tostring(c.size)})
+    font_command({c.font, tostring(c.size)}, true)
     test_command(c.reference and {'preset', tostring(c.size)} or {'estimate', tostring(c.size)})
 end
 
@@ -822,14 +832,14 @@ local function suite_command(args)
     elseif op == 'stop' or (op == 'next' and test_suite.ready and test_suite.index == #test_suite.cases) then
         local original = test_suite
         test_suite = nil
-        font_probe.cancel()
+        font_probe.cancel(); automatic_fit = nil
         pending_test = nil
         if original.trim then
             editing = original.edit_before
             refresh()
             return message('Trim comparison ended; saved layout restored. Compare current/balanced/tight PNGs in data.')
         end
-        font_command({original.font, tostring(original.size)})
+        font_command({original.font, tostring(original.size)}, true)
         message('Suite ended; starting font restored. Completed measurements and diagnostics retained.')
     elseif op == 'repeat' then
         if test_suite.shot and test_suite.shot.phase == 'file' then return message('Screenshot pending; wait for completion/timeout, or stop.', true) end
@@ -841,7 +851,7 @@ local function suite_command(args)
             return message('Return to the suite font/size before repeating, or stop the suite.', true)
         end
         test_suite.ready = false
-        font_probe.cancel()
+        font_probe.cancel(); automatic_fit = nil
         pending_test = nil
         if test_suite.trim then suite_case() else test_command({'estimate'}) end
     elseif op == 'next' then
@@ -857,7 +867,7 @@ end
 local function pause_capture(reason)
     if not test_suite or not test_suite.auto then return end
     if test_suite.trim then
-        font_probe.cancel()
+        font_probe.cancel(); automatic_fit = nil
         pending_test = nil
         editing = test_suite.edit_before
         test_suite = nil
@@ -962,7 +972,7 @@ local function command(action, ...)
     if test_suite and action ~= 'help' and action ~= 'status' then test_suite.ready = false end
     if #args == 0 and report_setting(action) then return end
     end_drag()
-    font_probe.cancel()
+    font_probe.cancel(); automatic_fit = nil
     pending_test = nil
     if action == 'preset' then
         preset_command(args)
@@ -1243,7 +1253,7 @@ local function command(action, ...)
         message('//cbg trim [<extra top 0-32> <Input bottom 0-8>] (per font/size)')
         message('//cbg calibrate [line pixels [top [bottom [input]]]] | calibrate status')
         message('//cbg grid [pixels] | Hold either Ctrl while dragging to snap the frame anchor.')
-        message('//cbg font [<font> <size>] (linked) | nativefont <font> <size> | nativecolor <alpha> <red> <green> <blue>')
+        message('//cbg font [<font> <size>] (linked; estimates new fits automatically) | nativefont <font> <size> | nativecolor <alpha> <red> <green> <blue>')
         message('//cbg width [screen|<pixels>] | glow <alpha> [height]')
         message('//cbg gradient <top> <bottom> | alpha <0-255> | border <0-255>|link|free')
         message('//cbg color <alpha> <red> <green> <blue> | input on|off [height] | tab left|right')
@@ -1263,7 +1273,7 @@ refresh()
 sync_native_profile()
 local registration = config.register(settings, function()
     pause_capture()
-    font_probe.cancel()
+    font_probe.cancel(); automatic_fit = nil
     pending_test = nil
     ctrl[29], ctrl[157] = false, false
     drag, hover_target, position_dirty, opening_stage = nil, nil, true, false
@@ -1281,12 +1291,12 @@ windower.register_event('prerender', function()
         end_drag()
     end
     if pending_test and not windower.console.visible() then
-        font_probe.cancel()
+        font_probe.cancel(); automatic_fit = nil
         pending_test = nil
     end
     local measured, measurement_error = font_probe.poll()
     if measured then
-        if pending_test and pending_test.estimate then
+        if automatic_fit or (pending_test and pending_test.estimate) then
             -- Inference from native screenshots at 1280x720: native row pitch
             -- tracks 95% of addon probe spacing. Other environments need review.
             local spacing = measured.spacing * 0.95
@@ -1296,8 +1306,9 @@ windower.register_event('prerender', function()
             accept_calibration(measured.spacing, settings.fontmetrics.top, settings.fontmetrics.bottom,
                 math.max(6, math.floor(measured.spacing + 0.5)), 'addon-proxy', measured.single, measured.multi)
         end
+        automatic_fit = nil
         if pending_test then pending_test.stage = 'wait' end
-    elseif measurement_error then pending_test = nil; message(measurement_error, true) end
+    elseif measurement_error then automatic_fit = nil; pending_test = nil; message(measurement_error, true) end
     local console_visible = windower.console.visible()
     if console_visible then startup_since, startup_alpha = nil, 0 end
     if manual_was_open and not console_visible then
@@ -1396,7 +1407,7 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
     if kind == 1 then
         local target = hit_grip(x, y)
         if not target then return false end
-        font_probe.cancel()
+        font_probe.cancel(); automatic_fit = nil
         pending_test = nil
         pause_capture()
         local rect = actual_rectangle
@@ -1457,7 +1468,7 @@ windower.register_event('mouse', function(kind, x, y, delta, blocked)
     return false
 end)
 windower.register_event('unload', function()
-    font_probe.cancel()
+    font_probe.cancel(); automatic_fit = nil
     pending_test = nil
     if drag and drag.changed then config.save(settings) end
     drag = nil

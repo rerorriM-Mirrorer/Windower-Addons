@@ -950,6 +950,46 @@ mouse(0, nonedit_rect.x+12, nonedit_rect.y+12); mouse(2, -10, -10)
 assert(saved.pos.x == nonedit_rect.x+7 and saved.pos.y == nonedit_rect.y+1)
 assert(not text_objects.ConsoleBGPlus_label_edit.visible)
 callbacks.unload()
+-- Explicit linked-font selection estimates silently, even with console closed.
+console_open = false
+screen_width, screen_height = 1280, 720
+dofile(addon_path .. 'ConsoleBGPlus.lua')
+run('reset')
+local auto_writes = console_writes
+run('font', 'Auto Fit Test', '8')
+assert(text_objects.ConsoleBGPlus_probe_single, 'New pair starts a probe automatically')
+settle()
+local auto_spacing = math.ceil(8 * 1.4) * 0.95
+assert(saved.fontmetrics.source == 'native-estimate' and saved.fontmetrics.spacing == auto_spacing)
+assert(console_writes == auto_writes, 'Normal font changes do not print console test rows')
+run('trim', '5', '3')
+local auto_height = saved.extents.y
+run('font', 'Auto Fit Test', '24'); settle()
+assert(saved.fontmetrics.spacing == math.ceil(24 * 1.4) * 0.95)
+run('font', 'AUTO FIT TEST', '8')
+assert(not text_objects.ConsoleBGPlus_probe_single and saved.extents.y == auto_height
+    and saved.fontmetrics.top_extra == 5 and saved.fontmetrics.bottom_trim == 3,
+    'Case-insensitive saved fits and trims restore without remeasurement')
+run('calibrate', '12.4', '15', '0', '13')
+run('font', 'Auto Fit Test', '24'); run('font', 'Auto Fit Test', '8'); settle()
+assert(saved.fontmetrics.source == 'manual' and saved.fontmetrics.spacing == 12.4)
+run('font', 'Auto Fit Failure', '6'); fail_probe = true
+local failed_height = saved.extents.y
+for _ = 1, 100 do tick() end
+assert(saved.extents.y == failed_height and saved.fontmetrics.source == 'estimate'
+    and not text_objects.ConsoleBGPlus_probe_single, 'Failed probe preserves provisional layout')
+fail_probe = false
+run('font', 'Auto Fit Cancel', '8'); run('pos', '31', '41'); settle()
+assert(saved.fontmetrics.source == 'estimate', 'Layout command cancels automatic fitting')
+run('font', 'Auto Fit Reload', '8'); config.callback(); settle()
+assert(saved.fontmetrics.source == 'estimate', 'Settings callback cancels automatic fitting')
+run('font', 'Auto Fit Test', '24')
+callbacks.unload(); dofile(addon_path .. 'ConsoleBGPlus.lua'); settle()
+assert(saved.fontmetrics.source == 'native-estimate'
+    and saved.fontmetrics.spacing == math.ceil(24 * 1.4) * 0.95,
+    'Automatic fit persists on reload without accumulated scaling')
+callbacks.unload()
+
 -- Invisible text probes, exact overrides, absolute profiles, and cleanup.
 screen_width, screen_height = 1366, 768
 console_open = true

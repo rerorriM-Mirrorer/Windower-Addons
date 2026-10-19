@@ -1,3 +1,7 @@
+## v0.1.34
+
+- Linked font selection automatically measures new/unmeasured/rough proxy fits using the screenshot-derived 95% estimate; established estimated/manual/reference fits restore without remeasurement. Per-pair trims persist; no native sample/input/screenshot commands during normal fitting. Existing cancellation, failure and reload behavior retained.
+
 ## v0.1.33
 
 - Refill16 sample rows before every trim capture, then wait3 frames/0.15s for rendering. This replaces native Saving Screenshot messages in the output buffer without sending font/input commands. Saved trims and capture restoration unchanged.
