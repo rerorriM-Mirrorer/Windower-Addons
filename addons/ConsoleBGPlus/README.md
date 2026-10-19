@@ -151,6 +151,16 @@ Derived from [ConsoleBG by StarHawk](https://github.com/Windower/Lua/tree/live/a
 
 
 
+### Updated estimates and upload batches
+
+The v0.1.29 screenshots at1280x720 show native row pitch near95% of addon proxy pitch: Rounded16 about23.75 versus25, Rounded20 about29.45 versus31, Rounded24 about36.1 versus38; Tahoma12 about19 versus20. This is an inference from supplied images, not a native font getter or a guarantee for other systems.
+
+`cbg test suite tahoma` runs19 cases, one per size6–24; upload19 screenshots plus the data ZIP together. Then `cbg test suite verdana` runs the next19. `rounded` and `current` are also accepted. Next/repeat/status/stop retain their existing behavior. A single-family suite restores the starting font after its final next; reload starts a new session rather than resuming the prior queue.
+
+Suites now use updated estimates for unknown or previously proxy-measured pairs. `cbg test estimate [size]` applies this deliberately to a single pair. It derives spacing from95% of a fresh raw probe, retains raw single/multi heights, uses a provisional4px allowance before Input and an Input height equal to rounded-up estimated pitch. Manual/reference fits remain authoritative. Repeating the command never scales an already scaled result. No estimates change on load. Ordinary test and raw calibrate retain their behavior; explicit numeric calibration is unchanged. Known size8/10 references and revised size12 trial remain intact.
+
+Tahoma8/12 already captured with the old proxy are intentionally included again to check the new model. Top and bottom trim choices remain separate from this spacing estimate. Sizes23/24 previously clipped at the720px viewport; document clipping independently, and inspect on a taller UI when needed. Collect first; visually correct any remaining mismatch afterward.
+
 ### Guided full calibration pass
 
 Keep your data folder and optionally back up settings.xml. Open the native console and enter `cbg test suite`. This explicitly applies the revised Rounded size12 reference first, then visits57 font/size cases. Installed font availability cannot be queried; Windows may substitute a missing face. Existing other saved fits take precedence over proxy measurements. Unknown pairs use the addon-text proxy and still require native visual inspection.
@@ -164,6 +174,11 @@ Repeat the suite on each available UI resolution (at least960x540,1280x720 and t
 At the end, next restores the starting font, as does stop. Completed font profiles remain saved; the suite cannot resume its queue across reload. Check font round trips and reload persistence, free/both-Ctrl dragging at screen edges, edit resizing, and ordinary activity afterward. These input checks are automated in the mock suite but still require live acceptance. Collect screenshots and all matching fonttest logs together; native visual corrections may require another pass.
 
 ## Changelog
+
+### 0.1.30 — evidence-based trial estimates
+
+- Estimate tests use0.95 of fresh raw probe pitch with provisional4px pre-Input allowance; source native-estimate and raw extents recorded. Manual/reference profiles preserved, no automatic load migration, no repeated scaling.
+- Family-specific19-case suites fit19 screenshots plus one data ZIP. Start with suite tahoma, then suite verdana. Full suite still covers57 cases.
 
 ### 0.1.29 — complete guided calibration pass
 

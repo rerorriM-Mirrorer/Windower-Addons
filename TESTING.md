@@ -1,5 +1,22 @@
 # Current Development Status
 
+- Repository/branch: rerorriM-Mirrorer/Windower-Addons, consolebg-plus; ConsoleBGPlus v0.1.30 / Windower4. Tested starting checkpoint:45aa50b175118c8f3237e2a162c2c9c8fcd61beb (v0.1.29). Final published hash is in the handoff. Baseline branches unchanged.
+- Received data.zip and Screenshots85–104: all19 Rounded size logs,18 matching Rounded screenshots (14 missing), Tahoma12/8 logs+screenshots. Native pitch inferred near95% of raw addon probe (e.g. Rounded16~23.75/25,20~29.45/31,24~36.1/38; Tahoma12~19/20). This evidence is from1280x720 and does not verify other systems/fonts. Revised Rounded12 divider clears row16 in Screenshot85; not blanket acceptance of all margins. Sizes23/24 are clipped by existing viewport height.
+- New estimate tests/suite cases use a fresh raw probe times0.95, provisional4px pre-Input allowance, Input ceil(estimated pitch), source native-estimate and retained raw single/multi extents. Existing source manual/reference/trial-reference fits stay authoritative. Previously proxy-derived fits update only on explicit estimate tests or suite cases; no load migration or compounding. Raw calibrate and ordinary test unchanged.
+- Named19-case suites support rounded/tahoma/verdana/current; default57-case suite retained. User can upload19 screenshots plus data ZIP. Next pass: suite tahoma, then suite verdana. Old Tahoma8/12 proxy samples are deliberately recaptured to validate updated estimates. Font substitution/native glyph bounds still need visual review.
+- Verification: complete mocked Windower suite via liblua5.4 passes, including all57 cases at four simulated resolutions, existing grid/drag/save/profile/extreme-size tests, new raw-to95% derivation, repeated estimate idempotence, manual-fit preservation and exact19-sample named batches. All addon/test Lua parses as Lua5.1. No native Windows/FFXI run here.
+- Pending: Tahoma/Verdana visual acceptance, Input descenders, trims, output/edit modes, other resolutions and clipping. Future correction may be required; inferred estimates are not certified native measurements.
+
+## 2026-10-19 — v0.1.30 next collection
+
+1. Keep data/settings.xml, update/reload. The old transient suite queue resets; saved fits remain. Open native console and enter cbg test suite tahoma.
+2. For each ready sample take one screenshot, then cbg test next. There are19 font sizes; send19 screenshots plus a fresh ZIP of data together. This intentionally retests Tahoma12/8 using updated estimates. Capture name/log font and size identify the case.
+3. After final next ends/restores starting font, run cbg test suite verdana for the next19-case batch. Additional families can use suite current. Next/repeat/status/stop/capture remain available; repeat remeasures an estimate from raw rather than scaling the previous estimate.
+4. Inspect first/last glyph clearance and Input seam/bottom; type Agjpqy without Enter for Input descenders, clear before the next command. Keep top/bottom trims separate from spacing. Source native-estimate records inference; single/multi are raw. Manual/reference fits are preserved.
+5. Record viewport clipping independently; use a taller UI to inspect complete extreme-size fits. Existing edit/output-mode, profile reload and dragging checklists remain applicable. The uploaded material contains no Verdana results yet.
+
+# Previous Development Status — v0.1.29
+
 - Repository/branch: rerorriM-Mirrorer/Windower-Addons, consolebg-plus; ConsoleBGPlus v0.1.29 / Windower4. Tested starting checkpoint: bb02119cdff122c5105409805f38d5eacb63f420 (v0.1.28). Final published hash is in the handoff; baseline branches unchanged.
 - Latest live material: Screenshot (83).png and fonttest-Arial_Rounded_MT_Bold_12-20261019-055610-1.txt, v0.1.28,1280x720. Trial spacing18/height330 places Input in its strip, but row16 descenders nearly touch divider. New trial changes only bottom allowance1->4/full height330->333. Neutral extra trims remain. This is not final visual acceptance.
 - Guided suite covers three fonts (Arial Rounded MT Bold/Tahoma/Verdana), all integer sizes6–24,57 cases; current-family option covers19. Native samples/unique diagnostics are automatic; each case waits for next. Explicit suite start applies revised Rounded12 reference; other saved fits retained. Stop/completion restores starting font; completed measurements remain. Session queue does not survive reload.

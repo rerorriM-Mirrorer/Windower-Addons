@@ -2,7 +2,7 @@
 -- Redistribution terms and the XIVParty texture notice are in LICENSE.txt.
 _addon.name = 'ConsoleBGPlus'
 _addon.author = 'StarHawk; A'
-_addon.version = '0.1.29'
+_addon.version = '0.1.30'
 _addon.commands = {'consolebgplus', 'cbgplus', 'cbg'}
 
 local config = require('config')
@@ -648,10 +648,12 @@ end
 
 local function test_command(args)
     local use_preset = args[1] and args[1]:lower() == 'preset'
-    local count = #args - (use_preset and 1 or 0)
+    local estimate = args[1] and args[1]:lower() == 'estimate'
+    local option = use_preset or estimate
+    local count = #args - (option and 1 or 0)
     local size = count == 0 and settings.native.size
-        or (count == 1 and integer(args[use_preset and 2 or 1], 6, 24))
-    if not size then return usage('test [preset] [size 6-24]') end
+        or (count == 1 and integer(args[option and 2 or 1], 6, 24))
+    if not size then return usage('test [preset|estimate] [size 6-24]') end
     if use_preset and not presets.get(settings.native.font, size) then
         return message('No bundled reference for this font/size; current fit unchanged.', true)
     end
@@ -666,7 +668,11 @@ local function test_command(args)
     refresh()
     pending_test = {stage = 'wait', frames = 0}
     local source = settings.fontmetrics.source
-    if source == 'unmeasured' or source == 'estimate' then
+    -- Only opt-in estimate tests replace proxy/estimate fits; manual and live
+    -- references remain authoritative. Always derive from a fresh raw probe.
+    pending_test.estimate = estimate and (source == 'addon-proxy' or source == 'native-estimate'
+        or source == 'unmeasured' or source == 'estimate')
+    if source == 'unmeasured' or source == 'estimate' or pending_test.estimate then
         pending_test.stage = 'measure'
         font_probe.start(settings.native.font, settings.native.size)
     end
@@ -700,7 +706,7 @@ local function suite_case()
     font_probe.cancel()
     pending_test = nil
     font_command({c.font, tostring(c.size)})
-    test_command(c.reference and {'preset', tostring(c.size)} or {tostring(c.size)})
+    test_command(c.reference and {'preset', tostring(c.size)} or {'estimate', tostring(c.size)})
 end
 
 local function suite_command(args)
@@ -715,15 +721,19 @@ local function suite_command(args)
         if path then message('Capture diagnostic: ' .. path)
         else message('Capture diagnostic failed: ' .. tostring(err), true) end
     elseif op == 'suite' then
-        if #args > 2 or (args[2] and args[2]:lower() ~= 'current') then
-            return usage('test suite [current]')
+        local family = args[2] and args[2]:lower()
+        if #args > 2 or (family and family ~= 'current' and family ~= 'rounded'
+            and family ~= 'tahoma' and family ~= 'verdana') then
+            return usage('test suite [current|rounded|tahoma|verdana]')
         end
         if test_suite then return message('A suite is active; use test next, repeat, status, or stop.', true) end
         if not windower.console.visible() or type(windower.console.write) ~= 'function' then
             return message('Open the native console before starting the suite.', true)
         end
         if not settings.input.enabled then return message('Enable Input before the calibration suite: cbg input on.', true) end
-        local fonts = args[2] and {settings.native.font} or {'Arial Rounded MT Bold', 'Tahoma', 'Verdana'}
+        local chosen = {current = settings.native.font, rounded = 'Arial Rounded MT Bold',
+            tahoma = 'Tahoma', verdana = 'Verdana'}
+        local fonts = family and {chosen[family]} or {'Arial Rounded MT Bold', 'Tahoma', 'Verdana'}
         local sizes = {12, 8, 10}
         for size = 6, 24 do if size ~= 8 and size ~= 10 and size ~= 12 then sizes[#sizes + 1] = size end end
         local cases = {}
@@ -734,7 +744,7 @@ local function suite_command(args)
             end
         end
         test_suite = {cases = cases, index = 1, font = settings.native.font, size = settings.native.size}
-        message('Suite: Input-open capture each step; inspect first/last glyphs, divider and Input bottom. Native fonts require visual verification.')
+        message('Suite: upload one family at a time (19 screenshots + data ZIP). Input-open capture each step; inspect first/last glyphs, divider and Input bottom. Native fonts require visual verification.')
         suite_case()
     elseif #args ~= 1 then
         return usage('test next|repeat|status|stop')
@@ -761,7 +771,7 @@ local function suite_command(args)
         test_suite.ready = false
         font_probe.cancel()
         pending_test = nil
-        test_command({})
+        test_command({'estimate'})
     elseif op == 'next' then
         if not test_suite.ready or pending_test then return message('Wait for ready, or use cbg test repeat after an interruption.', true) end
         if not windower.console.visible() then return message('Reopen console before cbg test next.', true) end
@@ -1086,8 +1096,8 @@ local function command(action, ...)
         if #args ~= 0 then return usage('help') end
         message('v' .. _addon.version .. ' | //cbg position <x> <y> | size <width> <height>')
         message('//cbg edit [on|off] (guides/resize); entire visible frame draggable | console on|off | offset <x> <y>')
-        message('//cbg preset [8|10|12] (Rounded references) | test [preset] [size] (native sample + diagnostic)')
-        message('//cbg test suite [current] | test next|repeat|status|stop | test capture (guided font calibration)')
+        message('//cbg preset [8|10|12] (Rounded references) | test [preset|estimate] [size] (native sample + diagnostic)')
+        message('//cbg test suite [current|rounded|tahoma|verdana] | test next|repeat|status|stop | test capture (guided font calibration)')
         message('//cbg trim [<extra top 0-32> <Input bottom 0-8>] (per font/size)')
         message('//cbg calibrate [line pixels [top [bottom [input]]]] | calibrate status')
         message('//cbg grid [pixels] | Hold either Ctrl while dragging to snap the frame anchor.')
@@ -1133,8 +1143,16 @@ windower.register_event('prerender', function()
     end
     local measured, measurement_error = font_probe.poll()
     if measured then
-        accept_calibration(measured.spacing, settings.fontmetrics.top, settings.fontmetrics.bottom,
-            math.max(6, math.floor(measured.spacing + 0.5)), 'addon-proxy', measured.single, measured.multi)
+        if pending_test and pending_test.estimate then
+            -- Inference from native screenshots at 1280x720: native row pitch
+            -- tracks 95% of addon probe spacing. Other environments need review.
+            local spacing = measured.spacing * 0.95
+            accept_calibration(spacing, settings.fontmetrics.top, 4,
+                math.max(6, math.ceil(spacing)), 'native-estimate', measured.single, measured.multi)
+        else
+            accept_calibration(measured.spacing, settings.fontmetrics.top, settings.fontmetrics.bottom,
+                math.max(6, math.floor(measured.spacing + 0.5)), 'addon-proxy', measured.single, measured.multi)
+        end
         if pending_test then pending_test.stage = 'wait' end
     elseif measurement_error then pending_test = nil; message(measurement_error, true) end
     local console_visible = windower.console.visible()

@@ -1,3 +1,8 @@
+## v0.1.30
+
+- Derive opt-in trial native spacing estimates from95% of fresh addon probe pitch, with4px bottom allowance and ceiling pitch for Input. Raw extents retained; manual/reference fits preserved.
+- Add named single-family suites (rounded/tahoma/verdana/current),19 cases each, for screenshot+ZIP upload batches. Full57-case suite uses updated estimates too. No load-time migration.
+
 ## v0.1.29
 
 - Guided57-case suite for three families, all sizes6–24; current-family option, explicit advance/repeat/status/stop and starting-font restoration.

@@ -1206,6 +1206,24 @@ for _, screen in ipairs({{960,540},{1280,720},{1366,768},{3840,2160}}) do
     end
     assert(saved.native.font=='Arial Rounded MT Bold' and saved.native.size==8)
 end
+-- Evidence-based estimates are explicit, raw-derived, and never compound.
+run('font','Tahoma','12'); run('calibrate'); settle()
+local raw_spacing=saved.fontmetrics.spacing
+run('test','estimate'); settle()
+assert(saved.fontmetrics.source=='native-estimate')
+assert(math.abs(saved.fontmetrics.spacing-raw_spacing*0.95)<0.00001)
+assert(saved.fontmetrics.bottom==4 and saved.input.height==math.ceil(raw_spacing*0.95))
+local estimated_height=saved.extents.y
+run('test','estimate'); settle(); assert(saved.extents.y==estimated_height)
+run('calibrate','17.2','15','2','18')
+run('test','estimate'); settle()
+assert(saved.fontmetrics.source=='manual' and saved.fontmetrics.spacing==17.2)
+for _, family in ipairs({'tahoma','verdana'}) do
+    local first=#console_lines
+    run('test','suite',family); settle()
+    for case=1,19 do run('test','next'); settle() end
+    assert(#console_lines==first+19*16, 'Each named family fits one 19-screenshot upload batch')
+end
 callbacks.unload(); assert(next(text_objects)==nil)
 io.open = real_open
 print('PASS: Ctrl+drag grid matrix, per-font 16-row calibration/profile matrix, proxy failure/cancellation, and fixed top rail and visible bottom border, native default and tabstyle toggle, startup hold/fade, native profile/load/reload, delayed label bounds, tab resizing, optional divider, log growth, fades and sound, mouse ownership, linked dragging, release-only saves, resize bounds, diagnostics/trace, legacy settings, idle rendering, API fallback, and unload cleanup.')

@@ -26,6 +26,7 @@ local function header(context, version)
         'UTC: ' .. os.date('!%Y-%m-%dT%H:%M:%SZ'), sample(context),
         'The full frame includes input.padding; output-only mode removes the saved input height plus 7 pixels.',
         'fontmetrics uses invisible addon-text probes, not native console measurements. Target: 16 output rows plus one Input row; fontmetrics.rows identifies the saved fit.',
+        'native-estimate is a trial: spacing = 0.95 * raw probe pitch, bottom allowance 4px; single/multi retain raw extents. Manual/reference fits are not changed by estimate tests.',
         'Native position below is the last position written by this addon, not a queried position.',
         'Native console font, input text, output buffer, fade delay, and fade opacity: no documented getters.',
         'Input styling follows manual console opening; log growth only controls the output frame.',
