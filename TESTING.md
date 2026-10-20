@@ -1,5 +1,16 @@
 # TESTING.md
 
+## Current Development Status — 2026-10-20 (colored help/status)
+
+- **Repository / branch:** `rerorriM-Mirrorer/Windower-Addons` / `feature/switch-focus-party-leader` (working test branch, `dev` unchanged).
+- **Working test baseline:** Prior test revision `6f74b13`, `//switch p1` and plain `//switch status`; new formatting revision is not yet tested in FFXI.
+- **Confirmed live success:** On Clairvaux, after he joined Cioara's party, `//switch p1` successfully focused leader Cioara. User reports `//switch status` displaying status data.
+- **Load sequence:** `all lr switch_focus` froze rendering and input on all clients with no `p1` invocation. Later, the user unloaded the addon individually on each client and ran `all ll switch_focus` successfully with no freeze. These observations narrow the trigger but do not establish the root cause.
+- **Current code change:** Help and status now use `require('chat')`, `string.color()` and `windower.add_to_chat(0,...)`. Color palette: separators 140, headings 167, `//switch` prefix and arrows 200, syntax/labels 207, neutral values/descriptions 0. Invalid/bare commands display help. Updated testing version to `1.1.1-test`. Party-leader switching, IPC handlers, and load/unload callbacks are unchanged.
+- **Static verification:** Source checks compare the formatting revision to the earlier published version and confirm retained IPC and leader switch paths. No Lua 5.1 execution or Windower runtime verification of this latest revision.
+- **Acceptance:** Replace only the Lua on a chosen client, reload that client individually, run `//switch status`, `//switch help`, bare `//switch`, then `//switch p1` with Clairvaux in Cioara's party. Confirm the color, label order, and unchanged focus behavior. Avoid `all lr switch_focus` until the simultaneous reload freeze is diagnosed.
+- **Next:** Collect results for chat formatting, then investigate simultaneous reload discovery in isolation rather than treating the safe `all ll` run as proof it is fixed.
+
 ## Latest observations and diagnostic revision — 2026-10-20
 
 - **User-confirmed live:** Running `all lr switch_focus` froze rendering and input across clients *before* `//switch p1` was invoked. Cioara subsequently loaded the modified Lua individually and ran `//switch p1` while alone without a freeze.
@@ -9,7 +20,7 @@
 - **Verification:** Code reviewed by source comparison. Previous locally run Lua 5.4 parsing/mock tests were reported for an equivalent draft; the published source has not been retested inside the game. Lua 5.1/Windower behavior remains unverified.
 - **Publication:** Testing branch only; `dev` unchanged. Existing historical observations remain below.
 
-## Current Development Status — 2026-10-20
+## Previous Development Status — 2026-10-20 (before live follow-up)
 
 - **Scope:** `switch_focus` dynamic party-leader command.
 - **Repository / branch:** `rerorriM-Mirrorer/Windower-Addons` / `feature/switch-focus-party-leader` (testing; not merged into `dev`).
