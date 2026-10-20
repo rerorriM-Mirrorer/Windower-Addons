@@ -1,5 +1,14 @@
 # TESTING.md
 
+## Latest observations and diagnostic revision — 2026-10-20
+
+- **User-confirmed live:** Running `all lr switch_focus` froze rendering and input across clients *before* `//switch p1` was invoked. Cioara subsequently loaded the modified Lua individually and ran `//switch p1` while alone without a freeze.
+- **Interpretation:** The revised `p1` handler is not called on load. Simultaneous reload contention and the unchanged original join/clear discovery messaging are hypotheses, not proven causes. The successful single-client test does not yet demonstrate cross-client focus switching.
+- **New diagnostic:** `//switch status` prints local character/focus, party leader ID/name, known addon clients, and back target. This command sends no IPC; the existing load/reload discovery path is deliberately unchanged.
+- **Safe next test:** Reload only one client at a time; inspect `//switch status` and confirm clients discovered, then try `//switch p1` with two clients already stably loaded. **Do not repeat `all lr switch_focus`** pending further investigation.
+- **Verification:** Code reviewed by source comparison. Previous locally run Lua 5.4 parsing/mock tests were reported for an equivalent draft; the published source has not been retested inside the game. Lua 5.1/Windower behavior remains unverified.
+- **Publication:** Testing branch only; `dev` unchanged. Existing historical observations remain below.
+
 ## Current Development Status — 2026-10-20
 
 - **Scope:** `switch_focus` dynamic party-leader command.
@@ -8,7 +17,7 @@
 - **Current batch:** `//switch p1` resolves the live party-leader ID to a character name, then issues the established exact-name focus IPC without the usual lobby fallback.
 - **Known-good live baseline:** Not established for this feature; existing `switch_focus` behavior is unchanged by intent, but regression testing is pending.
 - **Verification:** Source inspection and deterministic edit assertions; Lua 5.1 interpreter and live FFXI client are unavailable in this session.
-- **Live finding (2026-10-20):** User reported all game clients freezing after installing the modified Lua and reloading it on all clients. The timing, reload method, and whether `//switch p1` was invoked are not yet confirmed; no acceptance test has passed.
+- **Live finding (2026-10-20):** User reported all game clients freezing after installing the modified Lua and reloading it on all clients. Reload method was `all lr switch_focus` across all clients; `//switch p1` was not invoked before the freeze; no acceptance test has passed.
 - **Unresolved/live checks:** Determine the freeze trigger and review the addon's existing reload-time IPC discovery before any further gameplay test. Once safe, verify ID-to-name resolution, role changes, solo use, unavailable clients, and existing commands.
 - **Next:** ~~Load this test build on each participating Windower client, run the acceptance scenarios below, and report any console errors or failed focus transitions.~~ **Paused after the reported freeze:** restore the original Lua first, gather the precise sequence and any console log, then isolate single-client load/reload behavior before a multibox test.
 
