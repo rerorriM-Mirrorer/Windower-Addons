@@ -1,11 +1,12 @@
 _addon = {}
 _addon.name = 'switch_focus'
-_addon.version = '1.1.0'
+_addon.version = '1.1.1-test'
 _addon.author = 'WindowerDevTeam'
 _addon.commands = {'swf', 'switch', 'switch_focus'}
 
 require('tables')
 require('strings')
+require('chat')
 local box_list = require('box_list')
 
 local help_text = 'switch_focus addon commands:\n'
@@ -13,21 +14,54 @@ local back_name
 local switch = {cmd = {}}
 local switch_ack = false
 
+-- Shared chat-only formatting, following WORKFLOW.md's BattleStations palette.
+local function chat_line(value)
+    windower.add_to_chat(0, value)
+end
+
+local function separator()
+    chat_line(string.color(string.rep('-', 42), 140))
+end
+
+local function heading(section)
+    chat_line(string.color('Switch Focus v' .. _addon.version .. ' - ' .. section, 167))
+end
+
+local function field(label, value)
+    chat_line('  ' .. string.color(label, 207) .. string.color(' -> ', 200)
+        .. string.color(tostring(value), 0))
+end
+
+local function help_command(syntax, description)
+    chat_line('  ' .. string.color('//switch', 200) .. string.color(syntax, 207)
+        .. string.color(' -> ', 200) .. string.color(description, 0))
+end
+
 function switch.command(cmd, ...)
     local args = T{...}:map(string.lower)
     local command = switch.cmd[cmd and cmd:lower() or 'help']
     if command then
         command(args)
+    else
+        switch.cmd.help()
     end
 end
 windower.register_event('addon command', switch.command)
 
-help_text = help_text .. "  help      - prints this menu :D\n"
 function switch.cmd.help()
-    print(help_text)
+    separator()
+    heading('Commands')
+    separator()
+    help_command(' help', 'Show this command list')
+    help_command(' status', 'Show the current client, leader and focus state')
+    help_command(' p1', 'Focus the current party leader')
+    help_command(' to <name>', 'Focus a named client (partial names accepted)')
+    help_command(' back', 'Return focus to the last sender')
+    help_command(' next', 'Focus the next client alphabetically (alias: n)')
+    help_command(' prev', 'Focus the previous client alphabetically (alias: p)')
+    separator()
 end
 
-help_text = help_text .. "  status    - show current client, party leader, and known clients.\n"
 function switch.cmd.status()
     local player = windower.ffxi.get_player()
     local party = windower.ffxi.get_party()
@@ -58,16 +92,19 @@ function switch.cmd.status()
         leader_name = player.name .. ' (solo)'
     end
 
-    windower.add_to_chat(0, string.format('[switch_focus] Client: %s | Focused: %s',
-        name, windower.has_focus() and 'yes' or 'no'))
-    windower.add_to_chat(0, string.format('[switch_focus] Party leader: %s | ID: %s',
-        leader_name or 'unavailable', leader_id and tostring(leader_id) or 'none'))
-    windower.add_to_chat(0, string.format('[switch_focus] Known clients (%d): %s',
-        #known, #known > 0 and table.concat(known, ', ') or 'none'))
-    windower.add_to_chat(0, string.format('[switch_focus] Back target: %s', back_name or 'none'))
+    separator()
+    heading('Status')
+    separator()
+    field('Client', name)
+    field('Focused', windower.has_focus() and 'yes' or 'no')
+    field('Party leader', leader_name or 'unavailable')
+    field('Leader ID', leader_id and tostring(leader_id) or 'none')
+    field(string.format('Known clients (%d)', #known),
+        #known > 0 and table.concat(known, ', ') or 'none')
+    field('Back target', back_name or 'none')
+    separator()
 end
 
-help_text = help_text .. "  to <name> - switch focus to specified character, name can be a partial.\n"
 function switch.cmd.to(args, exact_only)
     local name = args[1]
 
@@ -90,7 +127,6 @@ function switch.cmd.to(args, exact_only)
     end
 end
 
-help_text = help_text .. "  p1        - switch focus to the current party leader.\n"
 function switch.cmd.p1()
     local player = windower.ffxi.get_player()
     local party = windower.ffxi.get_party()
@@ -141,14 +177,12 @@ function switch.cmd.p1()
     switch.cmd.to({leader_name:lower()}, true)
 end
 
-help_text = help_text .. "  back      - switch focus back to character that last sent you focus.\n"
 function switch.cmd.back()
     if back_name then
         windower.send_ipc_message(string.format('to,%s,%s', windower.ffxi.get_player().name:lower(), back_name:lower()))
     end
 end
 
-help_text = help_text .. "  (n)ext    - switch focus to next character in alphabetical order.\n              if switch fails checks for any box in lobby to give focus to.\n"
 function switch.cmd.next()
     local player_name = windower.ffxi.get_player().name:lower()
     local index = box_list:get_index_of(player_name)
@@ -173,7 +207,6 @@ function switch.cmd.next()
 end
 switch.cmd.n = switch.cmd.next
 
-help_text = help_text .. "  (p)rev    - switch focus to previous character in alphabetical order.\n"
 function switch.cmd.prev()
     local name = windower.ffxi.get_player().name:lower()
     local index = box_list:get_index_of(name)
