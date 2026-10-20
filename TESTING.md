@@ -1,5 +1,32 @@
 # TESTING.md
 
+## Current Development Status — 2026-10-20
+
+- **Scope:** `switch_focus` dynamic party-leader command.
+- **Repository / branch:** `rerorriM-Mirrorer/Windower-Addons` / `feature/switch-focus-party-leader` (testing; not merged into `dev`).
+- **Starting source:** `dev`, `addons/switch_focus/switch_focus.lua` blob `62f8700a8cd65693f694a75f9f19027080dcdb9e` (matches Windower/Lua `dev`).
+- **Current batch:** `//switch p1` resolves the live party-leader ID to a character name, then issues the established exact-name focus IPC without the usual lobby fallback.
+- **Known-good live baseline:** Not established for this feature; existing `switch_focus` behavior is unchanged by intent, but regression testing is pending.
+- **Verification:** Source inspection and deterministic edit assertions; Lua 5.1 interpreter and live FFXI client are unavailable in this session.
+- **Unresolved/live checks:** Confirm ID-to-name resolution when the leader is in the same zone and when separated by a zone; confirm leader changes, solo use, missing destination addon, and `prev`/`next`/`back`/`to` regressions.
+- **Next:** Load this test build on each participating Windower client, run the acceptance scenarios below, and report any console errors or failed focus transitions.
+
+## Current testing batch — switch_focus party leader (2026-10-20)
+
+**Installation:** Preserve the existing `switch_focus` folder as a known-good copy; place the testing version of `switch_focus.lua` in `Windower4/addons/switch_focus/` on every client and run `//lua r switch_focus` on each.
+
+| Test | Action | Expected result | Observed |
+| --- | --- | --- | --- |
+| Different leader | With Clairvaux leading, issue `//switch p1` from Cioara | Clairvaux receives focus | Pending live |
+| Leadership changes | Transfer lead to Myrr; issue `//switch p1` from Cioara | Myrr receives focus | Pending live |
+| Already leading | Issue `//switch p1` from the currently focused leader | Focus remains; no lobby switch | Pending live |
+| Solo client | Leave party and run `//switch p1` | Focus remains | Pending live |
+| Client missing | Party leader's other client lacks `switch_focus`; run `//switch p1` | Focus remains; no lobby switch | Pending live |
+| Separated zones | Have party leader in a different zone; run `//switch p1` | Follows leader if party roster exposes ID/name, otherwise prints clear warning | Pending live |
+| Regression | Use `//switch p`, `//switch next`, `//switch back`, `//switch to <name>` | Prior commands still work | Pending live |
+
+**Limitation:** No game or Lua interpreter execution was possible in this development session. No outcomes above are claimed as passed.
+
 ## Agent entry-point adoption — 2026-10-16
 
 - Added [`AGENTS.md`](AGENTS.md) to direct repository-aware coding agents to read the current `WORKFLOW.md` and `TESTING.md` before making changes.
