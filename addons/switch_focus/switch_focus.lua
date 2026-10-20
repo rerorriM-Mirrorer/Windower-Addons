@@ -9,7 +9,6 @@ require('strings')
 require('chat')
 local box_list = require('box_list')
 
-local help_text = 'switch_focus addon commands:\n'
 local back_name
 local switch = {cmd = {}}
 local switch_ack = false
