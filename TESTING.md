@@ -1,5 +1,16 @@
 # TESTING.md
 
+## Latest confirmed live baseline and future ideas — 2026-10-20
+
+- **Live startup verified (v1.1.2-test):** Following the earlier all-client freeze, the user restarted the game clients. `switch_focus` loaded automatically during each client's individual startup, without reported freezing.
+- **Live discovery verified:** `//switch status` showed both Cioara and Clairvaux as discovered/available on the current revision.
+- **Live focus verified (v1.1.2-test):** `//switch p1` worked with the current revision after individual client startup. Exact source/destination for this repeat was not specified; an earlier observed example switched Clairvaux to leader Cioara.
+- **Live UI feedback:** User likes the current colored help and status output; no further formatting changes requested.
+- **Not verified:** No successful test of `all lr switch_focus` has been reported since the deferred discovery patch. The two earlier freeze reproductions remain open. Loading automatically as each game client starts is **not** proof simultaneous reload works.
+- **User ideas (not implementation requests):** Optionally make bare `//switch` behave as `next`; optionally notify participating clients with a `Switched from X to Y` message; explore expert-level improvements.
+- **Code-review follow-ups (not changed):** Legacy `prev` compares `next ~= name` instead of the local `prev`. Both cycling commands assume a valid local box index and nonempty list, and may repeatedly remove candidates under failure; these deserve bounded failure handling. The existing focus IPC acknowledges a request before calling `windower.take_focus()`; a future protocol can distinguish receipt from confirmed focus. Other candidates: configurable bare action, opt-in local/all notifications, presence freshness/rescan, and protection against focus races from broadcast commands.
+- **Development action for this note:** Documentation-only TESTING.md update, no executable Lua changes. Keep the current tested code available as rollback while developing any of the ideas separately.
+
 ## Live follow-up — 2026-10-20 (v1.1.2-test)
 
 - **User-observed success:** After loading/reloading the clients with the new `switch_focus` revision, `//switch status` reported **both Cioara and Clairvaux available**. This verifies two-client discovery visibility during this live session.
