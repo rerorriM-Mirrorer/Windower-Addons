@@ -8,10 +8,15 @@
 - **Current batch:** `//switch p1` resolves the live party-leader ID to a character name, then issues the established exact-name focus IPC without the usual lobby fallback.
 - **Known-good live baseline:** Not established for this feature; existing `switch_focus` behavior is unchanged by intent, but regression testing is pending.
 - **Verification:** Source inspection and deterministic edit assertions; Lua 5.1 interpreter and live FFXI client are unavailable in this session.
-- **Unresolved/live checks:** Confirm ID-to-name resolution when the leader is in the same zone and when separated by a zone; confirm leader changes, solo use, missing destination addon, and `prev`/`next`/`back`/`to` regressions.
-- **Next:** Load this test build on each participating Windower client, run the acceptance scenarios below, and report any console errors or failed focus transitions.
+- **Live finding (2026-10-20):** User reported all game clients freezing after installing the modified Lua and reloading it on all clients. The timing, reload method, and whether `//switch p1` was invoked are not yet confirmed; no acceptance test has passed.
+- **Unresolved/live checks:** Determine the freeze trigger and review the addon's existing reload-time IPC discovery before any further gameplay test. Once safe, verify ID-to-name resolution, role changes, solo use, unavailable clients, and existing commands.
+- **Next:** ~~Load this test build on each participating Windower client, run the acceptance scenarios below, and report any console errors or failed focus transitions.~~ **Paused after the reported freeze:** restore the original Lua first, gather the precise sequence and any console log, then isolate single-client load/reload behavior before a multibox test.
 
 ## Current testing batch — switch_focus party leader (2026-10-20)
+
+**STOP TEST — user-reported freeze (2026-10-20):** After replacing `switch_focus.lua` and reloading the addon on all clients, the user reported that the games froze. Exact reload order, whether rendering or only input stopped, and whether the new command was invoked are not yet known. This is a failed live load/smoke report, not a successful test of `p1`. Restore the previously working Lua and **do not retry this build on all clients** until the cause is isolated. Source inspection indicates the `p1` handler is not invoked by the load event; the original addon does send `clear`/`join` IPC messages during load, which is a possible but unconfirmed contributing factor. No new executable changes have been made in response to this report.
+
+**Historical plan below is suspended pending investigation.**
 
 **Installation:** Preserve the existing `switch_focus` folder as a known-good copy; place the testing version of `switch_focus.lua` in `Windower4/addons/switch_focus/` on every client and run `//lua r switch_focus` on each.
 
