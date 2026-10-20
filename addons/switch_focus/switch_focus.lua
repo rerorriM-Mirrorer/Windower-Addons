@@ -28,7 +28,7 @@ function switch.cmd.help()
 end
 
 help_text = help_text .. "  to <name> - switch focus to specified character, name can be a partial.\n"
-function switch.cmd.to(args)
+function switch.cmd.to(args, skip_lobby_fallback)
     local name = args[1]
 
     if not box_list:get_index_of(name) then
@@ -44,9 +44,60 @@ function switch.cmd.to(args)
     windower.send_ipc_message(string.format('to,%s,%s', player_name, name:lower()))
     coroutine.sleep(0.1)
 
-    if (windower.has_focus()) then
+    if (windower.has_focus() and not skip_lobby_fallback) then
         windower.send_ipc_message(string.format('to,%s,@lobby', player_name, name:lower()))
     end
+end
+
+help_text = help_text .. "  p1        - switch focus to the current party leader.\n"
+function switch.cmd.p1()
+    local player = windower.ffxi.get_player()
+    local party = windower.ffxi.get_party()
+    if not player or not party then
+        windower.add_to_chat(123, 'switch_focus: Cannot identify the party leader while logged out.')
+        return
+    end
+
+    -- party1_leader holds a character ID, not a position in the party list.
+    -- It can change independently of the p0-p5 slot order.
+    local leader_id = party.party1_leader
+    if not leader_id then
+        if party.party1_count == 1 then
+            return -- Solo: the current character already has focus.
+        end
+        windower.add_to_chat(123, 'switch_focus: Party leader ID is not available yet.')
+        return
+    end
+    if leader_id == player.id then
+        return -- Do not trigger the normal lobby fallback when already leading.
+    end
+
+    local leader_name
+    for i = 0, 5 do
+        local member = party['p' .. i]
+        if member and member.name and member.name ~= ''
+            and (member.id == leader_id or (member.mob and member.mob.id == leader_id)) then
+            leader_name = member.name
+            break
+        end
+    end
+
+    -- Nearby leaders can be found even if their party slot omits an ID.
+    if not leader_name then
+        local mob = windower.ffxi.get_mob_by_id(leader_id)
+        leader_name = mob and mob.name
+    end
+
+    if not leader_name then
+        windower.add_to_chat(123, 'switch_focus: Leader name is unavailable; keeping the current focus.')
+        return
+    end
+    if leader_name:lower() == player.name:lower() then
+        return
+    end
+
+    -- Reuse name-targeted IPC but never fall back to an unrelated lobby client.
+    switch.cmd.to({leader_name:lower()}, true)
 end
 
 help_text = help_text .. "  back      - switch focus back to character that last sent you focus.\n"
