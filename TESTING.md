@@ -1,5 +1,13 @@
 # TESTING.md
 
+## Live follow-up — 2026-10-20 (v1.1.2-test)
+
+- **User-observed success:** After loading/reloading the clients with the new `switch_focus` revision, `//switch status` reported **both Cioara and Clairvaux available**. This verifies two-client discovery visibility during this live session.
+- **Not yet specified:** The exact load sequence for this observation (`all lr` versus individual reload or unload-then-`all ll`) has not been confirmed. Accordingly, do **not** mark the simultaneous reload freeze resolved.
+- **Previously verified:** `//switch p1` from Clairvaux focused Cioara while she was party leader on the earlier test version. Its operation on v1.1.2-test is pending confirmation.
+- **Recommended next:** Confirm load method and `//switch p1` from the follower while both clients remain stable. Preserve prior two freeze reports in the cumulative record.
+- **Changes in this record:** Documentation only; no Lua changes or additional simulated tests for this follow-up.
+
 ## Current Development Status — 2026-10-20 (reload race investigation)
 
 - **Repository / branch:** `rerorriM-Mirrorer/Windower-Addons` / `feature/switch-focus-party-leader`; no changes to `dev`.
