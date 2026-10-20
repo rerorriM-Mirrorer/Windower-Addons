@@ -28,10 +28,11 @@ function switch.cmd.help()
 end
 
 help_text = help_text .. "  to <name> - switch focus to specified character, name can be a partial.\n"
-function switch.cmd.to(args, skip_lobby_fallback)
+function switch.cmd.to(args, exact_only)
     local name = args[1]
 
-    if not box_list:get_index_of(name) then
+    -- Dynamic-role callers require an exact match; manual 'to' keeps partial matching.
+    if not exact_only and not box_list:get_index_of(name) then
         for i = 1, box_list:len() do
             local value = box_list[i]
             if windower.wc_match(value, name .. '*') then
@@ -44,7 +45,7 @@ function switch.cmd.to(args, skip_lobby_fallback)
     windower.send_ipc_message(string.format('to,%s,%s', player_name, name:lower()))
     coroutine.sleep(0.1)
 
-    if (windower.has_focus() and not skip_lobby_fallback) then
+    if (windower.has_focus() and not exact_only) then
         windower.send_ipc_message(string.format('to,%s,@lobby', player_name, name:lower()))
     end
 end
