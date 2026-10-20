@@ -1,6 +1,6 @@
 _addon = {}
 _addon.name = 'switch_focus'
-_addon.version = '1.1.1-test'
+_addon.version = '1.1.2-test'
 _addon.author = 'WindowerDevTeam'
 _addon.commands = {'swf', 'switch', 'switch_focus'}
 
@@ -12,6 +12,7 @@ local box_list = require('box_list')
 local back_name
 local switch = {cmd = {}}
 local switch_ack = false
+local join_reply_queued = false
 
 -- Shared chat-only formatting, following WORKFLOW.md's BattleStations palette.
 local function chat_line(value)
@@ -259,11 +260,32 @@ function switch.ipc.ack(msg)
     end
 end
 
+-- Original client discovery echoed each new join immediately from inside the IPC
+-- callback. Multiple simultaneous reloads could make those replies bunch together.
+-- Consolidate replies from one event burst, and send after the callback returns.
 function switch.ipc.join(msg)
     local name = msg[2]
+    if not name or name == '' then
+        return
+    end
+
+    local player = windower.ffxi.get_player()
+    if not player then
+        return
+    end
+    local own_name = player.name:lower()
     if not box_list:get_index_of(name) then
         box_list:add(name)
-        windower.send_ipc_message('join,' .. windower.ffxi.get_player().name:lower())
+        if name ~= own_name and not join_reply_queued then
+            join_reply_queued = true
+            coroutine.schedule(function()
+                join_reply_queued = false
+                local current = windower.ffxi.get_player()
+                if current and current.name:lower() == own_name then
+                    windower.send_ipc_message('join,' .. own_name)
+                end
+            end, 0.20)
+        end
     end
 end
 
@@ -273,9 +295,19 @@ function switch.ipc.clear(msg)
 end
 
 local function on_login(name)
-    box_list:add(name:lower())
-    windower.send_ipc_message('clear,' .. name:lower()) --We need to do this to ensure we get everyone to respond.
-    windower.send_ipc_message('join,' .. name:lower())
+    local own_name = name:lower()
+    box_list:add(own_name)
+    windower.send_ipc_message('clear,' .. own_name) -- Retain discovery with previously loaded clients.
+    windower.send_ipc_message('join,' .. own_name)
+
+    -- One late announcement repairs a roster if simultaneous unload/load sends a
+    -- clear after our first join. This is bounded, not a recurring polling loop.
+    coroutine.schedule(function()
+        local player = windower.ffxi.get_player()
+        if player and player.name:lower() == own_name then
+            windower.send_ipc_message('join,' .. own_name)
+        end
+    end, 0.55)
 end
 windower.register_event('login', on_login)
 
