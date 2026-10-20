@@ -27,6 +27,46 @@ function switch.cmd.help()
     print(help_text)
 end
 
+help_text = help_text .. "  status    - show current client, party leader, and known clients.\n"
+function switch.cmd.status()
+    local player = windower.ffxi.get_player()
+    local party = windower.ffxi.get_party()
+    local name = player and player.name or '(not logged in)'
+    local known = {}
+    for i = 1, box_list:len() do
+        known[#known + 1] = box_list[i]
+    end
+
+    local leader_id = party and party.party1_leader
+    local leader_name
+    if leader_id then
+        if player and player.id == leader_id then
+            leader_name = player.name
+        end
+        for i = 0, 5 do
+            local member = party['p' .. i]
+            if not leader_name and member and member.name and member.name ~= ''
+                and (member.id == leader_id or (member.mob and member.mob.id == leader_id)) then
+                leader_name = member.name
+            end
+        end
+        if not leader_name then
+            local mob = windower.ffxi.get_mob_by_id(leader_id)
+            leader_name = mob and mob.name
+        end
+    elseif player and party and party.party1_count == 1 then
+        leader_name = player.name .. ' (solo)'
+    end
+
+    windower.add_to_chat(0, string.format('[switch_focus] Client: %s | Focused: %s',
+        name, windower.has_focus() and 'yes' or 'no'))
+    windower.add_to_chat(0, string.format('[switch_focus] Party leader: %s | ID: %s',
+        leader_name or 'unavailable', leader_id and tostring(leader_id) or 'none'))
+    windower.add_to_chat(0, string.format('[switch_focus] Known clients (%d): %s',
+        #known, #known > 0 and table.concat(known, ', ') or 'none'))
+    windower.add_to_chat(0, string.format('[switch_focus] Back target: %s', back_name or 'none'))
+end
+
 help_text = help_text .. "  to <name> - switch focus to specified character, name can be a partial.\n"
 function switch.cmd.to(args, exact_only)
     local name = args[1]
