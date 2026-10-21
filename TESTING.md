@@ -1,5 +1,16 @@
 # TESTING.md
 
+## Current testing batch — 2026-10-21 (single-line prev loop correction)
+
+- **Repository / branch:** `rerorriM-Mirrorer/Windower-Addons` / `feature/switch-focus-party-leader`, based on tested `1.1.2-test` behavior. `dev` remains unchanged.
+- **Request:** Correct the previously identified wrong-variable comparison in `switch.cmd.prev()` only.
+- **Implementation:** Changed exactly one Lua source line, `while (next ~= name) do` → `while (prev ~= name) do` in `addons/switch_focus/switch_focus.lua`. Commit `f83bc187`. No settings, version, commands, IPC, discovery, startup, `next`, or `p1` logic changed.
+- **Static check:** Verified the original wrong comparison occurred once, and reverse replacement of the one changed line recovers the prior source verbatim. Published source and scope to be checked against GitHub.
+- **Live verification:** **Pending** for `//switch prev` and alias `//switch p` under 2- and 3-client conditions, including the last-to-first wrap. `//switch p1` and client discovery were previously confirmed in live FFXI on the prior version; not retested for this one-line change.
+- **Unchanged unresolved risks:** The `next` and `prev` functions still assume a valid client-list index and nonzero list length; failure handling remains unchanged. Simultaneous broadcast reloads via `all lr switch_focus` previously froze all clients and have not been shown fixed.
+- **Safe test:** Keep the known-good previous file; replace the Lua, then reload `switch_focus` on individual clients only (or load it during normal individual client startup). Check `//switch status`; try `//switch prev` between 2 or 3 available clients and `//switch p1` from a party follower. Avoid `all lr switch_focus`.
+- **Package:** GitHub source update only; no testing ZIP created for this single-line change. Preserve all historical test notes below.
+
 ## Latest confirmed live baseline and future ideas — 2026-10-20
 
 - **Live startup verified (v1.1.2-test):** Following the earlier all-client freeze, the user restarted the game clients. `switch_focus` loaded automatically during each client's individual startup, without reported freezing.
