@@ -2,7 +2,6 @@
 <settings>
     <global>
         <hideInCutscenes>false</hideInCutscenes>
-        <autohide>true</autohide>
         <colorDuration>0.8</colorDuration>
         <countDuration>0.4</countDuration>
         <fadeDuration>0.5</fadeDuration>
@@ -87,7 +86,6 @@
         <visibility>change</visibility>
     </global>
     <cioara>
-        <autohide>false</autohide>
         <gilText>
             <pos>
                 <x>-169</x>
@@ -106,7 +104,6 @@
         <visibility>input</visibility>
     </killala>
     <myrr>
-        <autohide>false</autohide>
         <gilText>
             <pos>
                 <x>-166</x>

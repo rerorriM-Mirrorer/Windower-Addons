@@ -1,4 +1,6 @@
 -- Mocked Windower regression suite. Run with Lua 5.1, not inside FFXI.
+package.path = 'gilfinder/?.lua;' .. package.path
+package.preload.files=function() return {new=function() return {exists=function() return false end} end} end
 local events, widgets, stored, saves, messages, commands = {}, {}, nil, 0, {}, {}
 local now, gil, buttons, focused = 0, 100, false, true
 os.clock=function() return now end
@@ -8,7 +10,7 @@ package.preload.config=function() return {load=function(d) stored=copy(d);return
 package.preload.controller=function() return {status='mock',held=function() return buttons and focused end,focused=function() return focused end} end
 local function new(s)
  local w={s=s,shown=false,content=''}
- for _,n in ipairs{'size','stroke_width','stroke_alpha','bg_alpha','alpha','draggable','color'} do w[n]=function(self,...) self[n..'_value']={...} end end
+ for _,n in ipairs{'size','stroke_width','stroke_alpha','bg_alpha','alpha','draggable','color','path'} do w[n]=function(self,...) self[n..'_value']={...} end end
  function w:text(t) if t==nil then return self.content end self.content=t end
  function w:extents() return #self.content*7,14 end
  function w:pos(x,y) self.x=x;self.y=y end
@@ -22,7 +24,7 @@ package.preload.images=function() return {new=new} end
 package.preload.texts=function() return {new=new} end
 package.preload.packets=function() return {parse=function(_,p) return p end} end
 _addon={}
-windower={addon_path='gilfinder/',get_windower_settings=function() return {ui_x_res=1280,ui_y_res=720} end,add_to_chat=function(_,m) messages[#messages+1]=m end,send_command=function(c) commands[#commands+1]=c end,register_event=function(n,f) events[n]=f end,ffxi={get_info=function() return {logged_in=true} end,get_player=function() return {status=0} end,get_items=function() return gil end}}
+windower={addon_path='gilfinder/',get_windower_settings=function() return {ui_x_res=1280,ui_y_res=720} end,add_to_chat=function(_,m) messages[#messages+1]=m end,send_command=function(c) commands[#commands+1]=c end,send_ipc_message=function() end,register_event=function(n,f) events[n]=f end,ffxi={get_info=function() return {logged_in=true,server=24} end,get_player=function() return {status=0,name='Cioara'} end,get_items=function() return gil end}}
 coroutine.schedule=function() end
 local function frame(t) now=t;events.prerender() end
 local function cmd(c,a) events['addon command'](c,a) end
@@ -61,7 +63,13 @@ cmd('mode','change');frame(1161);assert(not widgets[1].shown);cmd('counttime','0
 cmd('delay','0');assert(stored.hideDelay==60);cmd('delay','3601');assert(stored.hideDelay==60);cmd('delay','1');assert(stored.hideDelay==1);cmd('delay','3600');assert(stored.hideDelay==3600)
 cmd('scale','0');assert(stored.scale==1.5);cmd('counttime','-1');assert(stored.countDuration==0)
 assert(stored.gilText.text.size==9 and stored.gilText.text.alpha==255)
-cmd('show');cmd('restart');cmd('restart');frame(1161.26);assert(widgets[1].alpha_value[1]>0 and widgets[1].alpha_value[1]<255)
+cmd('mode','always');cmd('mode');assert(stored.visibility=='change');cmd('mode');assert(stored.visibility=='input');cmd('mode');assert(stored.visibility=='always' and stored.autohide==nil)
+cmd('glint','on');balance(11000);frame(1161.20)
+local seen=0;for i=4,23 do if widgets[i].shown then seen=seen+1 end end;assert(seen==1,'gain shows one glint frame')
+balance(10500);for i=4,23 do assert(not widgets[i].shown,'loss stops gain glint') end
+cmd('glint','off');cmd('glint','preview');assert(stored.glint==false,'preview preserves disabled preference')
+frame(1161.25);seen=0;for i=4,23 do if widgets[i].shown then seen=seen+1 end end;assert(seen==1)
+cmd('wallet');cmd('show');cmd('restart');cmd('restart');frame(1161.50);assert(widgets[1].alpha_value[1]>0 and widgets[1].alpha_value[1]<255)
 frame(1162);frame(1163);assert(#commands==1 and commands[1]=='lua reload gilfinder')
 events.unload();assert(saves>1 and widgets[1].destroyed and widgets[2].destroyed and widgets[3].destroyed)
 print('PASS: regression behavior, rename, cutscenes, edit idempotence/guides, help, recovery, graceful restart/cleanup, no implementation globals')

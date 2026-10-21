@@ -1,8 +1,9 @@
 # GilFinder
 
-Version 1.3.0-a.20261015.1. Original GilTracker by sylandro; modifications by A.
-A compact gil widget with animated balance changes, saved dragging, layout
-choices, scaling, and three visibility modes.
+Version 1.4.0-a.20261020.1. Original GilTracker by sylandro; modifications by A.
+A compact gil widget with animated balance changes, a gain glint, live multibox
+wallet, saved dragging, layout choices, scaling, and three visibility modes.
+Current verification and live checklist: TESTING.md shipped beside this file.
 
 ## Installation / rename from GilTracker
 
@@ -16,20 +17,54 @@ Leave the old addon unloaded. Its folder/settings are untouched. Do not load
 both widgets at once. The new folder name is separate from Windower's stock
 GilTracker, so stock GilTracker updates target the old folder.
 
-This personal package includes data/settings.xml based on settings(10).xml:
-Cioara uses always mode at (-169,-2137); Killala uses input mode at
-(-169,-2137); Myrr uses always mode at (-166,-2135). Other characters use the
-hardcoded global defaults from that XML. Those globals are change mode,
-60-second hold, 0.5-second fade, scale 1, amount left, 9px italic text, and
-0.4-second counting followed by a 0.8-second color return. Colors: green
-(166,207,179), pink (222,164,181), normal (253,252,250).
+## Updating and settings
 
-These are offsets from the right/bottom edges, not absolute screen positions.
-Fully off-screen placements recover automatically on smaller clients. In an
-existing GilFinder installation, back up data before deciding whether to use
-the included personal settings or retain your current preferences. Defaults
-merge through Windower config; no automatic import from the old addon runs.
-The texture path is rebuilt from the new addon folder, never the old PC path.
+Copy the complete gilfinder folder into addons, then `//gil restart` on each
+running client (or use `//lua reload gilfinder`). Load the update on EVERY
+client you want listed in the wallet. This package contains no active
+`data/settings.xml`, so your existing character settings are preserved.
+Fresh installations get hardcoded global defaults: change mode, 60-second
+hold, 0.5-second fade, scale 1, amount left, 9px italic text, and 0.4-second
+counting followed by 0.8-second color return. Glint defaults on, lasting 0.7s.
+
+For an optional fresh personal setup, copy docs/Personal-settings-template.xml
+to data/settings.xml before loading. That template preserves settings(10).xml
+preferences: Cioara always at (-169,-2137); Killala input at (-169,-2137);
+Myrr always at (-166,-2135). Do not copy it over newer personal settings.
+Coordinates are offsets from the right/bottom edges. Fully off-screen positions
+recover on smaller windows; valid positions stay unchanged.
+
+The old `autohide` XML flag is migrated out on load. Explicit `visibility` wins;
+boolean-only legacy sections are converted into an equivalent mode. The first
+migration saves data/settings-before-wallet.xml as a backup. All character
+sections, positions, scales, colors, and unrelated options remain in place.
+`visibility` is now the only saved setting controlling the mode. The old
+`//gil autohide` command remains a convenience for change/always.
+
+## Live wallet
+
+`//gil wallet` collects current balances from logged-in, inventory-ready
+characters running this GilFinder version on the SAME computer. After a
+one-second collection window it prints alphabetized names, servers, balances,
+and a total only in the requesting client's chat. It includes the requester
+once, even when IPC does not echo back. No game-server packets are sent.
+
+The header reports the number of responding characters; it cannot discover
+clients without GilFinder or know that a reply is missing. Offline, loading,
+zoning, older-addon and other-computer clients are not included. This is an
+on-demand snapshot, with no offline cache or transfer accounting. Each client
+reads its balance when asked; values can change after the snapshot.
+
+## Coin glint
+
+Gaining gil sweeps a restrained warm highlight across the coin over 0.7s.
+Losses stop a pending gain glint; initial loading does not trigger it.
+`//gil glint preview` lets you see it immediately without changing the balance
+or your enabled/disabled preference. `//gil glint on`, `off`, or bare `glint`
+sets/toggles it. The overlay follows position, scale, widget opacity and
+cutscene hiding; it cannot intercept mouse input. glintDuration in XML accepts
+positive finite seconds. Tiny preloaded masked frames avoid texture loading
+in the middle of a gain animation. No sound is added.
 
 ## Commands
 
@@ -38,6 +73,9 @@ Bare `//gil`, `//gil help`, and invalid commands show colored chat-only help.
 | Command | Behavior |
 | --- | --- |
 | `//gil status` | Version, mode, side, timing, scale, coordinates, editing and controller state |
+| `//gil mode` | Cycle always -> change -> input |
+| `//gil wallet` | Print responding live wallets and total |
+| `//gil glint [on\|off\|preview]` | Toggle gain highlight or preview it |
 | `//gil mode always` | Always visible |
 | `//gil mode change` | Show after gaining or spending gil |
 | `//gil mode input` | Show on keyboard/controller buttons; held buttons keep it visible |
@@ -83,6 +121,17 @@ Font sizes round to whole pixels; the stroke remains at least one pixel.
 No sounds or extra controller wrapper are installed.
 
 ## Changelog
+
+### 1.4.0-a.20261020.1 — Wallet & Glint Test 1
+
+- Added on-demand same-computer wallet over Windower IPC, with request isolation,
+  per-character deduplication and fresh integer balance sampling.
+- Added a masked gain glint, on/off/preview commands, visibility-aware rendering
+  and cleanup; preview leaves the enabled preference unchanged.
+- Removed the redundant saved autohide flag with a backed-up per-section XML
+  migration. Explicit visibility takes precedence; bare mode cycles settings.
+- Update package preserves existing data; moved personal seed XML into docs.
+- Refreshed WORKFLOW and testing status; previous records retained.
 
 ### 1.3.0-a.20261015.1 — GilFinder rename / personal defaults
 

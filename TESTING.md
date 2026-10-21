@@ -1,3 +1,87 @@
+# Current Development Status — GilFinder Wallet & Glint Test 1
+
+- Repository: rerorriM-Mirrorer/Windower-Addons.
+- Working branch: gilfinder-personal-2026-10-15 (dev/main unchanged).
+- Runtime: GilFinder 1.4.0-a.20261020.1; standard Windower Lua libraries;
+  no new external controller companion. Starting source: published 6820990.
+- Latest user-confirmed behavior: October 15, widget looked good and was kept
+  visible continuously. No user live confirmation of wallet/glint yet.
+- Automated checks: Lua 5.1 compilation; retained mocked behavior suite;
+  new wallet aggregation/isolation, glint render/assets, mode cycle, personal
+  profile and XML migration/backup checks all pass in Linux simulation.
+- Remaining live checks: real Windower IPC across focused/background clients,
+  native glint appearance/opacity at client resolutions, native config/XML
+  persistence, PS5 reader, gain packet timing and lifecycle cleanup.
+- Next step: install this build on each desired client; try //gil wallet and
+  //gil glint preview, then compare wallet rows with each character's gil.
+- Publication: final source commit is identified in the delivery/GitHub branch,
+  rather than self-referencing this status file.
+
+## Wallet & Glint Test 1 — October 20, 2026
+
+### Contents and installation
+
+Complete gilfinder folder: entry point, original coin, controller reader, new
+wallet/glint/migration modules, 20 tiny highlight frames, reproducible asset
+builder, tests and docs. WORKFLOW and this cumulative record are included
+inside the addon folder under the current packaging convention.
+
+Copy gilfinder into addons and retain existing data. No active settings.xml is
+included in this package. Restart/reload GilFinder on EVERY client you want to
+query; then run //gil wallet in the client where you want the chat report.
+Fresh installations use global defaults; optional original personal settings
+are in docs/Personal-settings-template.xml, for manual copying only.
+
+### Current tests and results
+
+Passed in Python/lupa Lua 5.1 on Linux:
+- All Lua modules compile, including unchanged controller module.
+- Original simulated HUD regression checks, updated with glint and mode cycle.
+- Wallet: three-client aggregation/total, requester-only display, self without
+  echo, duplicate query/reply filtering, stale/overlapping request isolation,
+  incomplete responder sets, identical names on different servers, current
+  sampled balance, invalid/unrelated messages, logout/restart cancellation.
+- Glint: preloaded frame progression, icon positioning/scale, hidden opacity,
+  enable/disable and preview preserving preference, gain vs loss, cleanup.
+- Assets: 20 correct-size RGBA frames, alpha constrained by original coin mask;
+  visually inspected an enlarged contact sheet of the rendered sweep.
+- Migration: explicit visibility beats old boolean; boolean-only global and
+  character sections convert; coordinates remain; backup created once;
+  subsequent conversion is a no-op. Personal profile fixtures retain modes.
+
+Simulation is not live acceptance. Real IPC delivery, server labels, native
+texture rendering and saved-data writes still need Windower/FFXI checks.
+
+### Live checklist
+
+1. In your current always-visible setup, confirm position, scale, colors and
+   mode survive reloading. data/settings-before-wallet.xml should preserve the
+   old config if an autohide flag needed migration.
+2. //gil glint preview: a single quiet light ribbon sweeps across the coin.
+   Try at small scales and after swapping amount side. No widget movement.
+3. Gain gil: green count plus glint. Spend gil: pink count, no gain glint.
+   Load or requery a wallet: no fake gain/glint. Disable glint and preview it;
+   its disabled setting should remain disabled afterward.
+4. Load the update on two or three characters on the same computer. //gil wallet
+   lists those inventory-ready responders and an accurate total in requesting
+   chat only. An offline/older-addon/zoning client is not silently counted.
+5. Run wallet twice quickly, or from two clients: reports should stay isolated.
+   No client switching or transfer accounting is involved.
+6. Bare //gil mode cycles always -> change -> input -> always. Existing //gil
+   autohide remains a command convenience, with no saved boolean authority.
+7. Recheck cutscene option, dragging, hidden click behavior, input mode, and
+   //gil restart / //gil unload cleanup. Keep original saved preferences.
+
+### User requests / delivery record
+
+October 15: save one visibility mode; bare mode cycling queued for next pass.
+October 18 discussion: coin glint and multibox balance query selected.
+October 20: user requested implementation, excluded transfer tracking.
+Source baseline is 6820990; previous cumulative records are retained below.
+Current canonical WORKFLOW read from ffxi-NPCmirror at delivery time.
+
+---
+
 # GilFinder testing record
 
 ## Rename Test 1 — October 15, 2026

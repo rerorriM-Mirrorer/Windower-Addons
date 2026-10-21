@@ -28,7 +28,7 @@
 
 _addon.name = 'gilfinder'
 _addon.author = 'sylandro; modifications by A'
-_addon.version = '1.3.0-a.20261015.1'
+_addon.version = '1.4.0-a.20261020.1'
 _addon.commands = {'gil'}
 _addon.language = 'English'
 
@@ -38,6 +38,7 @@ local images = require('images')
 local texts = require('texts')
 local packets = require('packets')
 local controller = require('controller')
+require('migrate').run()
 
 local GIL_ITEM_ID = 65535
 local CUTSCENE_STATUS_ID = 4
@@ -62,7 +63,8 @@ local is_hidden_by_key = false
 
 local defaults = {}
 defaults.hideInCutscenes = false
-defaults.autohide = true -- Compatibility with Test 1 commands/settings.
+defaults.glint = true
+defaults.glintDuration = 0.7
 defaults.visibility = 'change'
 defaults.side = 'left'
 defaults.countDuration = 0.4
@@ -115,7 +117,8 @@ defaults.gilImage.color.blue = 255
 defaults.gilImage.visible = true
 
 local settings = config.load(defaults)
-if not settings.autohide then settings.visibility = 'always' end
+-- Only visibility controls display. Legacy XML was migrated before loading.
+settings.autohide = nil
 config.save(settings)
 
 local get_separator, ready_if_valid_treasure_packet, update_if_valid_item_packet, refresh_gil, initialize, update_gil, show, hide, format_value, is_cutscene, toggle_display_if_cutscene, toggle_display_if_hide_key_is_pressed
@@ -168,6 +171,29 @@ local edit_text = texts.new({text={font='Arial',size=9,alpha=255,red=220,green=1
 edit_text:text('GilFinder: drag icon or amount | //gil lock')
 edit_text:hide()
 local function finite(n) return n and n == n and n > -math.huge and n < math.huge end
+local coin_glint = require('glint').new(windower.addon_path)
+local function wallet_sample()
+    local info, player = windower.ffxi.get_info(), windower.ffxi.get_player()
+    if not inventory_loaded or not info.logged_in or not player then return end
+    return {name=player.name, server=info.server, gil=windower.ffxi.get_items('gil')}
+end
+local wallet = require('wallet').new({sample=wallet_sample, now=os.clock,
+    schedule=function(fn,delay) coroutine.schedule(fn,delay) end,
+    send=function(message) windower.send_ipc_message(message) end,
+    report=function(message) windower.add_to_chat(207,'GilFinder: ' .. message) end,
+    display=function(rows)
+        windower.add_to_chat(0, string.color(('Live wallet: %d responding character(s), same computer'):format(#rows),167))
+        local total=0
+        local ok, resources = pcall(require,'resources')
+        for _, row in ipairs(rows) do
+            total=total+row.gil
+            local server = ok and resources.servers and resources.servers[row.server]
+            local label = server and (server.en or server.english) or ('server ' .. row.server)
+            windower.add_to_chat(0,string.color(row.name,200) .. ' [' .. label .. ']  ' .. format_value(row.gil) .. ' gil')
+        end
+        windower.add_to_chat(0,string.color('Total: ' .. format_value(total) .. ' gil',167))
+    end})
+windower.register_event('ipc message',function(message) if not lifecycle then wallet.receive(message) end end)
 local layout_x_res, layout_y_res
 local layout
 layout = function()
@@ -182,6 +208,7 @@ layout = function()
     -- Preserve the original icon anchor; changing sides never moves the icon.
     local icon_x = x + scale
     gil_image:pos(icon_x, y - 23 * scale / 6)
+    coin_glint.place(icon_x, y - 23 * scale / 6, 23 * scale)
     local width = gil_text:extents()
     local text_x = settings.side == 'right' and icon_x + 27 * scale or icon_x - scale
     if settings.side == 'right' and settings.gilText.flags.right then text_x = text_x + width end
@@ -252,11 +279,12 @@ local function render()
     if not inventory_loaded or is_hidden_by_key or (settings.hideInCutscenes and is_hidden_by_cutscene) then value = 0 end
     if lifecycle then value = math.min(value, lifecycle.opacity * math.max(0, 1 - (now - lifecycle.start) / settings.fadeDuration)) end
     opacity(value)
+    coin_glint.render(now,value * settings.gilImage.color.alpha / 255,settings.glint,settings.glintDuration)
     if value > 0 then show() else hide() end
     if editing and value > 0 then edit_text:show() else edit_text:hide() end
 end
 local function validate_settings()
-    if settings.autohide == false then settings.visibility = 'always' end
+    settings.autohide = nil
     local function number(key, fallback, minimum, maximum)
         local n = tonumber(settings[key])
         if not finite(n) then n = fallback end
@@ -269,9 +297,11 @@ local function validate_settings()
     if settings.fadeDuration <= 0 then settings.fadeDuration = 0.5 end
     number('countDuration', 0.4, 0)
     number('colorDuration', 0.8, 0)
+    number('glintDuration', 0.7, 0)
+    if settings.glintDuration <= 0 then settings.glintDuration = 0.7 end
     if settings.side ~= 'left' and settings.side ~= 'right' then settings.side = 'left' end
     if settings.visibility ~= 'always' and settings.visibility ~= 'change' and settings.visibility ~= 'input' then settings.visibility = 'change' end
-    settings.autohide = settings.visibility ~= 'always'
+
     for _, key in ipairs({'gainColor', 'lossColor'}) do
         for _, channel in ipairs({'red', 'green', 'blue'}) do
             local n = tonumber(settings[key][channel])
@@ -312,6 +342,8 @@ end)
 
 windower.register_event('logout', function(...)
     inventory_loaded = false
+    wallet.cancel()
+    coin_glint.stop()
     last_gil, last_change, last_input, preview_until, dragging = nil, nil, nil, nil, nil
     displayed_gil, animation, held_keys = nil, nil, {}
     hide()
@@ -328,6 +360,7 @@ end)
 windower.register_event('incoming chunk',function(id,org,_modi,_is_injected,_is_blocked)
     if (id == LOGIN_ZONE_PACKET) then
         inventory_loaded = false
+        coin_glint.stop()
         dragging = nil
         held_keys = {}
         hide()
@@ -388,6 +421,8 @@ update_gil = function()
     local now = os.clock()
     if last_gil ~= nil and gil ~= last_gil then
         animate(now)
+        if settings.glint and gil > last_gil then coin_glint.trigger(now)
+        elseif gil < last_gil then coin_glint.stop() end
         animation = {from=displayed_gil or last_gil, target=gil, start=now,
             color=gil > last_gil and settings.gainColor or settings.lossColor}
         last_change = now
@@ -407,6 +442,7 @@ hide = function()
     gil_text:hide()
     gil_image:hide()
     edit_text:hide()
+    coin_glint.render(os.clock(),0,settings.glint,settings.glintDuration)
 end
 
 format_value = function(amount)
@@ -479,6 +515,8 @@ windower.register_event('prerender', function()
     end
 end)
 windower.register_event('unload', function()
+    wallet.cancel()
+    coin_glint.destroy()
     config.save(settings)
     gil_text:destroy()
     gil_image:destroy()
@@ -490,7 +528,9 @@ local function report(message) windower.add_to_chat(207, 'GilFinder: ' .. messag
 local help_rows = {
     {'help', 'Show this command list'},
     {'status', 'Show version, mode, position and controller state'},
-    {'mode <always|change|input>', 'Choose visibility behavior'},
+    {'mode [always|change|input]', 'Set or cycle always -> change -> input'},
+    {'wallet', 'List live character balances and total on this computer'},
+    {'glint [on|off|preview]', 'Toggle coin glint or preview it'},
     {'side <left|right>', 'Place the amount beside the icon'},
     {'cutscenes [on|off]', 'Toggle hiding during cutscenes/dialogue (default off)'},
     {'delay <seconds>', 'Hold before fading; 1 to 3600 seconds'},
@@ -537,14 +577,32 @@ handlers.status = function()
     report(('Cutscene hiding %s | %s | edit %s | controller: %s'):format(
         settings.hideInCutscenes and 'on' or 'off', settings.locked and 'locked' or 'unlocked',
         editing and 'on' or 'off', controller.status))
+    report(('Glint %s (%ss) | wallet: live, same computer'):format(settings.glint and 'on' or 'off',settings.glintDuration))
 end
 handlers.mode = function(arg)
-    if arg ~= 'always' and arg ~= 'change' and arg ~= 'input' then return false end
-    settings.visibility, settings.autohide = arg, arg ~= 'always'
+    if arg ~= '' and arg ~= 'always' and arg ~= 'change' and arg ~= 'input' then return false end
+    if arg == '' then
+        arg = ({always='change',change='input',input='always'})[settings.visibility]
+    end
+    settings.visibility = arg
     preview()
     report('Visibility: ' .. arg)
 end
 handlers.visibility = handlers.mode
+handlers.wallet = function() wallet.request() end
+handlers.glint = function(arg)
+    if arg == 'preview' then
+        is_hidden_by_key = false
+        preview()
+        coin_glint.trigger(os.clock(),true)
+        return
+    end
+    local value=toggle(arg,settings.glint)
+    if value == nil then return false end
+    settings.glint=value
+    if not value then coin_glint.stop() end
+    report('Coin glint ' .. (value and 'on' or 'off'))
+end
 handlers.side = function(arg)
     if arg ~= 'left' and arg ~= 'right' then return false end
     settings.side = arg; preview(); report('Amount: ' .. arg)
@@ -589,6 +647,7 @@ handlers.autohide = function(arg)
 end
 local function lifecycle_command(kind)
     if lifecycle then return end
+    wallet.cancel()
     config.save(settings)
     lifecycle = {kind=kind, start=os.clock(), opacity=current_opacity, dispatched=false}
     editing, dragging = false, nil
@@ -596,13 +655,14 @@ local function lifecycle_command(kind)
 end
 handlers.restart = function() lifecycle_command('restart') end
 handlers.unload = function() lifecycle_command('unload') end
-local no_args = {help=true,status=true,lock=true,unlock=true,show=true,hide=true,auto=true,restart=true,unload=true}
+local no_args = {help=true,status=true,wallet=true,lock=true,unlock=true,show=true,hide=true,auto=true,restart=true,unload=true}
 windower.register_event('addon command', function(command, argument, ...)
     command = (command or 'help'):lower()
     local arg = (argument or ''):lower()
     if lifecycle then return end
     if select('#', ...) > 0 or not handlers[command] or (no_args[command] and arg ~= '') then help('Invalid command.'); return end
     if handlers[command](arg) == false then help('Invalid arguments for //gil ' .. command .. '.'); return end
+    if command == 'help' or command == 'status' or command == 'wallet' or lifecycle then return end
     config.save(settings)
     layout()
     render()
