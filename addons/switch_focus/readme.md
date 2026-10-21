@@ -43,6 +43,8 @@ Two separate live attempts using `all lr switch_focus` froze rendering and input
 
 ## Changelog
 
+- 2026-10-21 (one-line fix): In `//switch prev` / `//switch p`, compare `prev` instead of Lua's global `next` function in the loop condition. No other Lua changes. Live test pending; avoid simultaneous `all lr switch_focus`.
+
 - 2026-10-20 (reload safeguard, experimental): Deferred/coalesced `join` replies and added one late startup announcement. Version `1.1.2-test`; no live confirmation yet.
 
 - 2026-10-20 (chat formatting): Colored help and status output using our shared BattleStations-inspired chat palette; bare/invalid commands now display help. Testing version 1.1.1-test.
