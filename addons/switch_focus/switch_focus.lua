@@ -212,7 +212,7 @@ function switch.cmd.prev()
     local index = box_list:get_index_of(name)
 
     local prev = box_list[((index - 2) % box_list:len()) + 1]
-    while (next ~= name) do
+    while (prev ~= name) do
         switch_ack = false
         switch.cmd.to({prev})
 
