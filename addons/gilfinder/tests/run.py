@@ -59,3 +59,10 @@ for path in frames:
     assert im.size==coin.size
     assert all(a<=b for a,b in zip(im.getchannel('A').tobytes(),coin.getchannel('A').tobytes()))
 print('PASS: glint asset count, dimensions and coin alpha mask')
+
+# Integration coverage for the animated panel and native menu transition state.
+prefix=(test_dir/'behavior.lua').read_text().split("assert(_addon.name")[0]
+prefix=prefix.replace('local now, gil, buttons, focused = 0, 100, false, true', 'local now, gil, buttons, focused, menu = 0, 100, false, true, false\nlocal scheduled = {}')
+prefix=prefix.replace('logged_in=true,server=24','logged_in=true,server=24,menu_open=menu')
+prefix=prefix.replace('coroutine.schedule=function() end', 'coroutine.schedule=function(fn,delay) if delay>0 then scheduled[#scheduled+1]=fn end end\nlocal function finish() local jobs=scheduled;scheduled={};for _,fn in ipairs(jobs) do fn() end end')
+LuaRuntime().execute(prefix+(test_dir/'interactions.lua').read_text())

@@ -30,7 +30,7 @@ function wallet.new(api)
     local self = {}
     function self.request()
         local own = api.sample()
-        if not valid_sample(own) then api.report('Wallet unavailable until your character inventory is ready.'); return end
+        if not valid_sample(own) then api.report('Wallet unavailable until your character inventory is ready.'); return false end
         serial = serial + 1
         local token = own.name .. '-' .. own.server .. '-' .. instance .. '-' .. serial
         active = {token=token, rows={}}
@@ -38,6 +38,7 @@ function wallet.new(api)
         api.schedule(function() finish(token) end, 1)
         api.send('GFW1|Q|' .. token)
         api.report('Checking live wallets on this computer...')
+        return true
     end
     function self.receive(message)
         if type(message) ~= 'string' or #message > 256 then return end

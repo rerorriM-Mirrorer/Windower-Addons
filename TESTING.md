@@ -1,3 +1,55 @@
+# Current Development Status
+
+- Repository: rerorriM-Mirrorer/Windower-Addons; branch gilfinder-personal-2026-10-15.
+- Batch: Wallet Panel & Responsive Glint Test 2, v1.5.0-a.20261021.1.
+- Runtime: Windower 4 / Lua 5.1 on Windows; no external companion required.
+- Starting source checkpoint: 9c3b59d8e455309906f97e93e42c66ec75b0f441.
+- User-confirmed live baseline: coin glint and same-computer multiclient wallet
+  worked. Optional controller reader reported unavailable; that limitation remains.
+- Automated: Lua 5.1 compilation; mocked behavior/lifecycle, saved profiles,
+  IPC, migration, glint asset/timing, and panel/menu interaction suites pass.
+- Remaining: live FFXI animation, font extents, menu transitions and multiclient
+  panel acceptance on Franklet/Lionstag. No native FFXI session in this environment.
+- Next: install this complete test build, verify the checklist below, then tune
+  visual timing/placement from live feedback. Keep main unchanged.
+
+## 2026-10-21 - Wallet Panel & Responsive Glint Test 2
+
+Complete install package includes gilfinder code, coin, all 20 glint frames,
+controller/IPC/migration/panel modules, docs and repeatable tests. README,
+WORKFLOW and TESTING are inside gilfinder/. No active settings.xml is shipped.
+Copy over addons/gilfinder and reload each client. Existing saved settings and
+legacy visibility migration remain intact. Version is visible in //gil status.
+The final published commit is identified in the handoff and GitHub history.
+
+Automated checks: `python addons/gilfinder/tests/run.py` (Python with lupa and
+Pillow). All modules compile using Lua 5.1; both restart and unload dispatch once;
+four personal profiles preserve settings; IPC dedup/partial results/request
+isolation and migration backup/idempotence pass. Integration covers startup,
+command/menu/farewell glints, held-menu timeout, persistent show, hide override,
+column switching, bottom-edge unfolding, refresh, cancel-before-reply, timed
+roll-up, zoning and destruction. Simulated checks are not live Windows passes.
+
+Live checklist:
+
+1. //gil status reports 1.5.0-a.20261021.1; reload produces an initial glint.
+2. //gil wallet unrolls names/amounts and Total (count) on requester only.
+   Verify Franklet/Lionstag, alphabetical rows, right-aligned amounts, side left
+   and right, scale/drag, and upward opening near the bottom edge.
+3. wallet refresh updates fresh balances without replaying entrance; wallet off
+   rolls up. Rapid on/off while querying cannot reopen from a late reply.
+4. //gil auto, delay 2: open/close a menu to reveal and reset the timer. A held
+   menu times out; submenu navigation with unchanged menu_open is not a trigger.
+5. Expiry glints then rolls up/fades. New menu activity during departure restores
+   the wallet. //gil show stays visible; //gil hide stays hidden until explicitly
+   revealed. //gil auto input preserves existing keyboard/controller behavior.
+6. Gain and spend gil: green/pink counting and glint. Test glint off and forced
+   preview. Repeat with optional cutscene hiding, zoning/logout and restart.
+7. Return delay to your preferred value (default 60). Existing always-mode
+   characters stay always visible after installation.
+
+## Preserved previous delivery status and cumulative history
+
 # Current Development Status — GilFinder Wallet & Glint Test 1
 
 - Repository: rerorriM-Mirrorer/Windower-Addons.

@@ -1,0 +1,48 @@
+-- Executed with the behavior suite's mock prelude; native FFXI acceptance remains separate.
+local function glints() local n=0;for i=4,23 do if widgets[i].shown then n=n+1 end end;return n end
+events.config();events.load();frame(0.1);assert(glints()==1,'startup glint')
+frame(10);cmd('status');frame(10.1);assert(glints()==1,'command glint')
+cmd('auto');frame(71.3);assert(not widgets[1].shown)
+menu=true;frame(72);assert(widgets[1].shown,'menu opening wakes automatic HUD')
+frame(72.1);assert(glints()==1)
+frame(133.3);assert(not widgets[1].shown,'held menu does not keep HUD awake')
+menu=false;frame(134);assert(widgets[1].shown,'menu closing wakes automatic HUD')
+frame(194.1);assert(widgets[1].alpha_value[1]==255 and glints()==1,'farewell before fade')
+menu=true;frame(194.2);assert(widgets[1].alpha_value[1]==255,'menu interrupts departure')
+frame(255.5);assert(not widgets[1].shown)
+cmd('show');frame(1000);assert(widgets[1].shown and stored.visibility=='always','persistent show')
+cmd('hide');menu=false;frame(1001);assert(not widgets[1].shown,'hide overrides menu')
+cmd('auto');assert(stored.visibility=='change' and widgets[1].shown)
+cmd('wallet','on');finish();frame(1001.4)
+local n=#widgets;assert(n==27,'one character plus total, two text columns')
+local amount,name=widgets[n-2],widgets[n-3]
+assert(name.content=='Cioara' and amount.content=='100' and name.shown and amount.shown)
+assert(amount.x<name.x,'amount-left arrangement')
+assert(name.y<widgets[1].y,'bottom anchored panel grows upward')
+cmd('side','right');frame(1001.5);assert(name.x<amount.x,'amount-right arrangement')
+local old=name
+cmd('wallet','refresh');finish();frame(1001.51)
+assert(old.destroyed and widgets[#widgets-3].shown,'refresh replaces snapshot without entrance')
+cmd('wallet','off');frame(1001.6);assert(widgets[#widgets-3].shown,'dismissal rolls up')
+frame(1002.1);assert(widgets[#widgets-3].destroyed,'dismissal cleans rows')
+cmd('wallet','on');cmd('wallet','off');n=#widgets;finish();assert(#widgets==n,'late response cannot reopen panel')
+cmd('wallet','on');finish();frame(1002.4);cmd('auto');frame(1062.8);frame(1063.2)
+local fading_row=widgets[#widgets-3]
+menu=true;frame(1063.25);assert(not fading_row.destroyed and fading_row.alpha_value[1]==255,'menu restores wallet during roll-up')
+frame(1124.6)
+assert(widgets[#widgets-3].destroyed,'natural departure closes wallet')
+cmd('wallet','on');finish();events['incoming chunk'](0x0A,{})
+assert(widgets[#widgets-3].destroyed,'zone clears snapshot')
+-- Unequal names/amounts share fixed columns and update without entrance replay.
+local panel=require('wallet_panel').new()
+stored.side='right';panel.update({{name='A',server=24,gil=1},{name='Lionstag',server=24,gil=9000}},stored,tostring,2000)
+panel.render(2000.4,1,stored,500,100,1280,720)
+local an,aa,bn,ba=widgets[#widgets-5],widgets[#widgets-4],widgets[#widgets-3],widgets[#widgets-2]
+assert(an.x==bn.x and aa.x+#aa.content*7==ba.x+#ba.content*7,'fixed columns right-align amounts')
+assert(an.y>100 and bn.y>an.y,'top anchor unfolds downward')
+local left=an.x;panel.render(2001,1,stored,500,100,1280,720);assert(an.x==left)
+panel.update({{name='A',server=24,gil=3}},stored,tostring,2002)
+panel.render(2002,1,stored,500,100,1280,720);assert(widgets[#widgets-3].alpha_value[1]==255)
+panel.destroy()
+events.unload();for _,w in ipairs(widgets) do assert(w.destroyed) end
+print('PASS: startup/command/menu/farewell glints, menu transitions, persistent show, hide override, wallet columns/edge placement/refresh/cancel/roll-up/zone cleanup')

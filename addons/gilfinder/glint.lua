@@ -12,12 +12,17 @@ function glint.new(path)
     function self.place(x,y,size)
         for _, frame in ipairs(frames) do frame:pos(x,y);frame:size(size,size) end
     end
-    function self.trigger(now,preview) start = now; forced = preview == true end
+    function self.trigger(now,preview)
+        -- Coalesce simultaneous commands, reappearance and balance changes.
+        if start and now - start < (self.duration or 0.7) and not preview then return end
+        start = now; forced = preview == true
+    end
     function self.stop()
         start, forced = nil, false
         if current then frames[current]:hide();current=nil end
     end
     function self.render(now,opacity,enabled,duration)
+        self.duration = duration
         local index
         if (enabled or forced) and start and now - start < duration then
             index = math.min(20, math.floor((now - start)/duration*20)+1)

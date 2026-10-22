@@ -28,7 +28,7 @@
 
 _addon.name = 'gilfinder'
 _addon.author = 'sylandro; modifications by A'
-_addon.version = '1.4.0-a.20261020.1'
+_addon.version = '1.5.0-a.20261021.1'
 _addon.commands = {'gil'}
 _addon.language = 'English'
 
@@ -172,6 +172,19 @@ edit_text:text('GilFinder: drag icon or amount | //gil lock')
 edit_text:hide()
 local function finite(n) return n and n == n and n > -math.huge and n < math.huge end
 local coin_glint = require('glint').new(windower.addon_path)
+local wallet_panel = require('wallet_panel').new()
+local wallet_open = false
+local menu_open
+local departure_start
+local function glint(now)
+    if settings.glint then coin_glint.trigger(now or os.clock()) end
+end
+local function wake()
+    preview_until = os.clock() + settings.hideDelay
+    departure_start = nil
+    if wallet_open then wallet_panel.resume(os.clock()) end
+    glint()
+end
 local function wallet_sample()
     local info, player = windower.ffxi.get_info(), windower.ffxi.get_player()
     if not inventory_loaded or not info.logged_in or not player then return end
@@ -182,19 +195,13 @@ local wallet = require('wallet').new({sample=wallet_sample, now=os.clock,
     send=function(message) windower.send_ipc_message(message) end,
     report=function(message) windower.add_to_chat(207,'GilFinder: ' .. message) end,
     display=function(rows)
-        windower.add_to_chat(0, string.color(('Live wallet: %d responding character(s), same computer'):format(#rows),167))
-        local total=0
-        local ok, resources = pcall(require,'resources')
-        for _, row in ipairs(rows) do
-            total=total+row.gil
-            local server = ok and resources.servers and resources.servers[row.server]
-            local label = server and (server.en or server.english) or ('server ' .. row.server)
-            windower.add_to_chat(0,string.color(row.name,200) .. ' [' .. label .. ']  ' .. format_value(row.gil) .. ' gil')
-        end
-        windower.add_to_chat(0,string.color('Total: ' .. format_value(total) .. ' gil',167))
+        if not wallet_open then return end
+        wallet_panel.update(rows, settings, format_value, os.clock())
+        wake()
     end})
 windower.register_event('ipc message',function(message) if not lifecycle then wallet.receive(message) end end)
 local layout_x_res, layout_y_res
+local icon_left, icon_top
 local layout
 layout = function()
     local res = windower.get_windower_settings()
@@ -207,6 +214,7 @@ layout = function()
     local y = settings.gilText.pos.y + (settings.gilText.flags.bottom and res.ui_y_res or 0)
     -- Preserve the original icon anchor; changing sides never moves the icon.
     local icon_x = x + scale
+    icon_left, icon_top = icon_x, y - 23 * scale / 6
     gil_image:pos(icon_x, y - 23 * scale / 6)
     coin_glint.place(icon_x, y - 23 * scale / 6, 23 * scale)
     local width = gil_text:extents()
@@ -263,6 +271,16 @@ end
 local function render()
     local now = os.clock()
     animate(now)
+    -- menu_open is a native boolean, unrelated to player cutscene status 4.
+    local info = windower.ffxi.get_info()
+    if type(info.menu_open) == 'boolean' and inventory_loaded and info.logged_in then
+        local next_menu = info.menu_open
+        if menu_open ~= nil and next_menu ~= menu_open and settings.visibility == 'change' then
+            last_change = now
+            wake()
+        end
+        menu_open = next_menu
+    else menu_open = nil end
     if controller.focused and controller.focused() == false then held_keys = {} end
     if settings.visibility == 'input' and (next(held_keys) or controller.held(now)) then last_input = now end
     local value = 1
@@ -273,12 +291,30 @@ local function render()
         value = 0
         if activity then
             local elapsed = now - activity - settings.hideDelay
-            value = elapsed <= 0 and 1 or math.max(0, 1 - elapsed / settings.fadeDuration)
+            -- Finish one farewell sweep, then roll up the wallet during the fade.
+            if elapsed > 0 then
+                if not departure_start then departure_start = activity + settings.hideDelay; glint(departure_start) end
+                local lead = settings.glint and settings.glintDuration or 0
+                value = math.max(0, 1 - math.max(0, now - departure_start - lead) / settings.fadeDuration)
+                if now - departure_start >= lead and wallet_open then
+                    wallet.cancel()
+                    wallet_panel.close(departure_start + lead)
+                end
+            else
+                if departure_start and wallet_open then wallet_panel.resume(now) end
+                departure_start = nil; value = 1
+            end
         end
     end
     if not inventory_loaded or is_hidden_by_key or (settings.hideInCutscenes and is_hidden_by_cutscene) then value = 0 end
     if lifecycle then value = math.min(value, lifecycle.opacity * math.max(0, 1 - (now - lifecycle.start) / settings.fadeDuration)) end
+    if value > 0 and current_opacity == 0 and not departure_start then glint(now) end
+    if value == 0 and departure_start and wallet_open then
+        wallet_open = false; wallet.cancel(); wallet_panel.clear()
+    end
     opacity(value)
+    local res = windower.get_windower_settings()
+    wallet_panel.render(now, value, settings, icon_left, icon_top, res.ui_x_res, res.ui_y_res)
     coin_glint.render(now,value * settings.gilImage.color.alpha / 255,settings.glint,settings.glintDuration)
     if value > 0 then show() else hide() end
     if editing and value > 0 then edit_text:show() else edit_text:hide() end
@@ -343,6 +379,9 @@ end)
 windower.register_event('logout', function(...)
     inventory_loaded = false
     wallet.cancel()
+    wallet_open = false
+    wallet_panel.clear()
+    menu_open, departure_start = nil, nil
     coin_glint.stop()
     last_gil, last_change, last_input, preview_until, dragging = nil, nil, nil, nil, nil
     displayed_gil, animation, held_keys = nil, nil, {}
@@ -360,6 +399,8 @@ end)
 windower.register_event('incoming chunk',function(id,org,_modi,_is_injected,_is_blocked)
     if (id == LOGIN_ZONE_PACKET) then
         inventory_loaded = false
+        wallet.cancel(); wallet_open = false; wallet_panel.clear()
+        menu_open, departure_start = nil, nil
         coin_glint.stop()
         dragging = nil
         held_keys = {}
@@ -421,8 +462,11 @@ update_gil = function()
     local now = os.clock()
     if last_gil ~= nil and gil ~= last_gil then
         animate(now)
-        if settings.glint and gil > last_gil then coin_glint.trigger(now)
-        elseif gil < last_gil then coin_glint.stop() end
+        glint(now)
+        if settings.visibility == 'change' then
+            departure_start = nil
+            if wallet_open then wallet_panel.resume(now) end
+        end
         animation = {from=displayed_gil or last_gil, target=gil, start=now,
             color=gil > last_gil and settings.gainColor or settings.lossColor}
         last_change = now
@@ -516,6 +560,7 @@ windower.register_event('prerender', function()
 end)
 windower.register_event('unload', function()
     wallet.cancel()
+    wallet_panel.destroy()
     coin_glint.destroy()
     config.save(settings)
     gil_text:destroy()
@@ -529,7 +574,7 @@ local help_rows = {
     {'help', 'Show this command list'},
     {'status', 'Show version, mode, position and controller state'},
     {'mode [always|change|input]', 'Set or cycle always -> change -> input'},
-    {'wallet', 'List live character balances and total on this computer'},
+    {'wallet [on|off|refresh]', 'Toggle the live wallet panel on this computer'},
     {'glint [on|off|preview]', 'Toggle coin glint or preview it'},
     {'side <left|right>', 'Place the amount beside the icon'},
     {'cutscenes [on|off]', 'Toggle hiding during cutscenes/dialogue (default off)'},
@@ -541,10 +586,10 @@ local help_rows = {
     {'lock', 'Lock positioning and finish editing'},
     {'unlock', 'Enable dragging and positioning guides'},
     {'pos reset', 'Recover the widget to its default position'},
-    {'show', 'Preview the widget for the configured hold time'},
+    {'show', 'Keep the widget visible (always mode)'},
     {'hide', 'Hide until show, auto, or the hide-key toggle'},
-    {'auto', 'Resume the chosen visibility mode'},
-    {'autohide [on|off]', 'Toggle change/always mode'},
+    {'auto [change|input]', 'Use timed visibility; change includes menu transitions'},
+    {'autohide [on|off]', 'Compatibility alias for auto/show'},
     {'restart', 'Fade out and reload GilFinder'},
     {'unload', 'Fade out and unload GilFinder'},
 }
@@ -557,7 +602,7 @@ local function help(error_message)
             .. string.color(' -> ', 200) .. string.color(row[2], 0))
     end
 end
-local function preview() preview_until = os.clock() + settings.hideDelay end
+local function preview() wake() end
 local function set_edit(value)
     editing, settings.locked, dragging = value, not value, nil
     if value then is_hidden_by_key = false; preview() end
@@ -577,7 +622,7 @@ handlers.status = function()
     report(('Cutscene hiding %s | %s | edit %s | controller: %s'):format(
         settings.hideInCutscenes and 'on' or 'off', settings.locked and 'locked' or 'unlocked',
         editing and 'on' or 'off', controller.status))
-    report(('Glint %s (%ss) | wallet: live, same computer'):format(settings.glint and 'on' or 'off',settings.glintDuration))
+    report(('Glint %s (%ss) | wallet %s | live, same computer | menu %s'):format(settings.glint and 'on' or 'off',settings.glintDuration, wallet_open and 'open' or 'closed', tostring(menu_open)))
 end
 handlers.mode = function(arg)
     if arg ~= '' and arg ~= 'always' and arg ~= 'change' and arg ~= 'input' then return false end
@@ -589,7 +634,18 @@ handlers.mode = function(arg)
     report('Visibility: ' .. arg)
 end
 handlers.visibility = handlers.mode
-handlers.wallet = function() wallet.request() end
+handlers.wallet = function(arg)
+    if arg ~= '' and arg ~= 'on' and arg ~= 'off' and arg ~= 'refresh' then return false end
+    local open = arg == 'on' or arg == 'refresh' or (arg == '' and not wallet_open)
+    if not open then
+        wallet_open = false; wallet.cancel(); wallet_panel.close(os.clock())
+    else
+        is_hidden_by_key = false
+        wallet_open = true
+        wake()
+        if not wallet.request() then wallet_open=false;wallet_panel.clear() end
+    end
+end
 handlers.glint = function(arg)
     if arg == 'preview' then
         is_hidden_by_key = false
@@ -637,13 +693,19 @@ handlers.pos = function(arg)
     settings.gilText.pos.x, settings.gilText.pos.y = defaults.gilText.pos.x, defaults.gilText.pos.y
     is_hidden_by_key = false; preview(); report('Position reset.')
 end
-handlers.show = function() is_hidden_by_key = false; preview() end
-handlers.hide = function() is_hidden_by_key = true; dragging = nil end
-handlers.auto = function() is_hidden_by_key = false; preview_until = nil end
+handlers.show = function() is_hidden_by_key = false; settings.visibility = 'always'; preview() end
+handlers.hide = function() is_hidden_by_key = true; dragging = nil; wallet_open = false; wallet.cancel(); wallet_panel.clear() end
+handlers.auto = function(arg)
+    if arg ~= '' and arg ~= 'change' and arg ~= 'input' then return false end
+    settings.visibility = arg == 'input' and 'input' or 'change'
+    is_hidden_by_key = false
+    preview()
+    report('Visibility: ' .. settings.visibility)
+end
 handlers.autohide = function(arg)
     local value = toggle(arg, settings.visibility ~= 'always')
     if value == nil then return false end
-    handlers.mode(value and 'change' or 'always')
+    if value then handlers.auto('change') else handlers.show() end
 end
 local function lifecycle_command(kind)
     if lifecycle then return end
@@ -655,14 +717,19 @@ local function lifecycle_command(kind)
 end
 handlers.restart = function() lifecycle_command('restart') end
 handlers.unload = function() lifecycle_command('unload') end
-local no_args = {help=true,status=true,wallet=true,lock=true,unlock=true,show=true,hide=true,auto=true,restart=true,unload=true}
+local no_args = {help=true,status=true,lock=true,unlock=true,show=true,hide=true,restart=true,unload=true}
 windower.register_event('addon command', function(command, argument, ...)
     command = (command or 'help'):lower()
     local arg = (argument or ''):lower()
     if lifecycle then return end
     if select('#', ...) > 0 or not handlers[command] or (no_args[command] and arg ~= '') then help('Invalid command.'); return end
     if handlers[command](arg) == false then help('Invalid arguments for //gil ' .. command .. '.'); return end
-    if command == 'help' or command == 'status' or command == 'wallet' or lifecycle then return end
+    -- Successful interactions acknowledge responsiveness without undoing explicit hide.
+    if command ~= 'hide' and not (command == 'glint' and arg == 'off') then
+        glint()
+        if not is_hidden_by_key then preview() end
+    end
+    if command == 'help' or command == 'status' or lifecycle then render(); return end
     config.save(settings)
     layout()
     render()

@@ -1,7 +1,7 @@
 # GilFinder
 
-Version 1.4.0-a.20261020.1. Original GilTracker by sylandro; modifications by A.
-A compact gil widget with animated balance changes, a gain glint, live multibox
+Version 1.5.0-a.20261021.1. Original GilTracker by sylandro; modifications by A.
+A compact gil widget with animated balance changes, a responsive coin glint, live multibox
 wallet, saved dragging, layout choices, scaling, and three visibility modes.
 Current verification and live checklist: TESTING.md shipped beside this file.
 
@@ -43,28 +43,49 @@ sections, positions, scales, colors, and unrelated options remain in place.
 
 ## Live wallet
 
-`//gil wallet` collects current balances from logged-in, inventory-ready
-characters running this GilFinder version on the SAME computer. After a
-one-second collection window it prints alphabetized names, servers, balances,
-and a total only in the requesting client's chat. It includes the requester
-once, even when IPC does not echo back. No game-server packets are sent.
+`//gil wallet` toggles a wallet list beside the coin. `wallet on`, `off`, and
+`refresh` are explicit actions. It collects fresh balances from logged-in,
+inventory-ready characters running GilFinder on the SAME computer. After a
+one-second collection window, names and right-aligned amounts unfold into fixed
+columns over about 0.3 seconds, followed by Total (responding character count).
+Only the requesting client opens a panel. The IPC protocol remains compatible
+with Wallet & Glint Test 1; updating every client is recommended.
 
-The header reports the number of responding characters; it cannot discover
-clients without GilFinder or know that a reply is missing. Offline, loading,
-zoning, older-addon and other-computer clients are not included. This is an
-on-demand snapshot, with no offline cache or transfer accounting. Each client
-reads its balance when asked; values can change after the snapshot.
+The list follows `side`: amount left means amounts then names; amount right
+means names then amounts. It inherits font, scale and the coin's drag anchor.
+It opens downward where space permits, upward near the bottom, and shifts
+horizontally to fit. Refresh replaces the snapshot without replaying its entrance.
+Names include numeric server IDs when the results span multiple servers.
+
+Opening or refreshing resets the HUD timer and reveals it. The list remains
+open until dismissed or the HUD naturally fades; always mode keeps it open.
+Departure plays the coin glint, then rolls up the list while the HUD fades.
+New applicable activity can interrupt departure. Zoning/logout clears the list.
+It does not intercept mouse input; drag the coin or main amount to move it.
+
+Total covers responding characters only. Clients without GilFinder, offline,
+loading, zoning, and other-computer clients are excluded. This is an on-demand
+snapshot, with no offline cache or transfer accounting. Values can change after
+the snapshot; use `wallet refresh` to sample again. No game-server packets are sent.
 
 ## Coin glint
 
-Gaining gil sweeps a restrained warm highlight across the coin over 0.7s.
-Losses stop a pending gain glint; initial loading does not trigger it.
-`//gil glint preview` lets you see it immediately without changing the balance
-or your enabled/disabled preference. `//gil glint on`, `off`, or bare `glint`
-sets/toggles it. The overlay follows position, scale, widget opacity and
-cutscene hiding; it cannot intercept mouse input. glintDuration in XML accepts
-positive finite seconds. Tiny preloaded masked frames avoid texture loading
-in the middle of a gain animation. No sound is added.
+Automatic triggers:
+
+- First balance display on load/login, and reappearance after hiding.
+- Gil gained or spent, alongside green/pink counting.
+- Native menu opening or closing in change/automatic mode.
+- Accepted `//gil` commands, including wallet open/close/refresh.
+- A farewell sweep before natural timed fading and wallet roll-up.
+
+Overlapping triggers share a sweep. Explicit hiding keeps the HUD hidden;
+commands do not undo that override unless they explicitly reveal it (`show`,
+`auto`, wallet opening, positioning preview). Invalid commands do not glint.
+`//gil glint off` disables automatic glints. `glint preview` still plays one
+without changing the preference. `glint on` or bare `glint` enables/toggles it.
+The overlay follows position, scale, opacity and cutscene hiding, without mouse
+input or sound. glintDuration in XML accepts positive finite seconds (default
+0.7). Preloaded coin-masked frames avoid texture loading during animation.
 
 ## Commands
 
@@ -74,10 +95,10 @@ Bare `//gil`, `//gil help`, and invalid commands show colored chat-only help.
 | --- | --- |
 | `//gil status` | Version, mode, side, timing, scale, coordinates, editing and controller state |
 | `//gil mode` | Cycle always -> change -> input |
-| `//gil wallet` | Print responding live wallets and total |
-| `//gil glint [on\|off\|preview]` | Toggle gain highlight or preview it |
+| `//gil wallet` | Toggle wallet panel; `wallet on`, `off`, `refresh` also supported |
+| `//gil glint [on\|off\|preview]` | Toggle responsive highlight or preview it |
 | `//gil mode always` | Always visible |
-| `//gil mode change` | Show after gaining or spending gil |
+| `//gil mode change` | Show on gil changes and native menu open/close |
 | `//gil mode input` | Show on keyboard/controller buttons; held buttons keep it visible |
 | `//gil side left` / `//gil side right` | Amount to the left/right of the fixed icon |
 | `//gil cutscenes [on\|off]` | Toggle cutscene/dialogue hiding; default OFF |
@@ -88,9 +109,9 @@ Bare `//gil`, `//gil help`, and invalid commands show colored chat-only help.
 | `//gil edit [on\|off]` | Toggle persistent positioning guides; explicit states are idempotent |
 | `//gil unlock` / `//gil lock` | Start/end positioning with guides |
 | `//gil pos reset` | Restore the hardcoded default position and preview |
-| `//gil show` | Temporary preview |
+| `//gil show` | Keep visible; selects always mode |
 | `//gil hide` | Manually hide until show/auto or Scroll Lock toggle |
-| `//gil auto` | Clear manual hiding and resume the selected visibility mode |
+| `//gil auto [change\|input]` | Clear manual hiding and start timed mode; defaults to change |
 | `//gil autohide [on\|off]` | Compatibility toggle between change and always |
 | `//gil restart` | Fade out, then reload GilFinder once |
 | `//gil unload` | Fade out, then unload GilFinder once |
@@ -102,7 +123,11 @@ wakes the focused client. Triggers presented only as axes need wrapper key
 output. `status` reports reader availability.
 
 On first balance initialization, the widget previews for the configured hold
-time. Change mode restarts that timer on gains/losses. Another balance change
+time. Change mode restarts that timer on gains/losses and native menu open/close
+transitions. Leaving a menu open does not keep the widget visible. Windower
+reports whether any menu is open, so switching between submenus without a
+boolean transition is not a trigger. With glint on, expiry adds one farewell
+sweep before the configured fade. Another balance change
 retargets the count from the currently displayed number. Color follows the
 latest transaction direction, then returns to the configured normal color.
 
@@ -111,8 +136,8 @@ suppresses the widget while player status is 4; the normal timer continues
 running. Always/input/change modes all respect that optional suppression.
 
 Edit mode keeps the widget visible with a guide above it until editing ends.
-Dragging only intercepts visible widget hit areas. Scaling/side changes/show
-preview it temporarily. `hide` overrides modes, previews and editing.
+Dragging only intercepts visible main-widget hit areas. Scaling and side
+changes preview it temporarily; show selects always mode. `hide` overrides modes, previews and editing.
 Scroll Lock remains the manual visibility toggle.
 
 Windower's standard config, texts, images, packets and chat libraries are
@@ -121,6 +146,16 @@ Font sizes round to whole pixels; the stroke remains at least one pixel.
 No sounds or extra controller wrapper are installed.
 
 ## Changelog
+
+### 1.5.0-a.20261021.1 - Wallet Panel & Responsive Glint Test 2
+
+- Added animated fixed-column HUD wallet, total, side-following arrangement,
+  edge-aware direction, refresh, dismissal and cleanup.
+- Added startup, reappearance, loss, accepted-command, menu-transition and
+  farewell glints, coalesced when triggers overlap.
+- Change mode now wakes on native menu open/close; show keeps visible and
+  auto [change|input] selects timed behavior. Existing input mode retained.
+- Preserved same-computer IPC compatibility, saved settings and prior history.
 
 ### 1.4.0-a.20261020.1 — Wallet & Glint Test 1
 
