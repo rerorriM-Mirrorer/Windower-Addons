@@ -1,3 +1,21 @@
+# GilFinder glint-index guard — 2026-10-22
+
+**Branch:** `fix/gilfinder-glint-index-20261022`
+**Version:** `1.5.1-a.20261022.1`
+**Status:** Patch committed, **live FFXI retest pending**.
+
+**Reported in-game observation:** On Cioara during AddonManager's quiet-console `//am audit`, the user saw repeated `gilfinder/glint.lua:30` “attempt to index field … (nil value)” messages. The concurrently inconclusive AddonManager audit is recorded separately. The fact that these coincided does not establish that AddonManager caused GilFinder's error.
+
+**Source finding:** In the preceding published `glint.lua`, rendering computed an upper-bounded frame index but did not clamp below 1; if `now < start`, the result can be 0 or negative. When `current` is outside the preallocated 1–20 range, `frames[current]:hide()` at source line 30 attempts to call `hide` on a nil frame. It is a plausible cause, not proven to be the only runtime cause.
+
+**Fix:** Clamp rendered frame index to `1..20`, and access old/current frame objects defensively. Preserve the 20 preloaded textures, duration, trigger behavior, settings, IPC, and other features. Add a simulated timing-reversal regression in `addons/gilfinder/tests/glint.lua`.
+
+**Live checklist:** (1) Back up working `gilfinder/` and `data/`, install the new complete folder and reload GilFinder. (2) Confirm `//gil status` shows `1.5.1-a.20261022.1`. (3) Trigger a normal and preview glint, then menu and gil-change events. (4) Repeat `//am audit` with console capture; verify no repeated GilFinder Lua error. (5) Test client with wallet and visibility settings preserved. (6) Capture `console.log` excerpts if the error persists.
+
+**Automated evidence:** GilFinder `tests/glint.lua` now covers rendering just before the trigger timestamp, then forward again, ensuring frames 1–20 remain valid. Report the result of its GitHub Actions job at delivery; **no live FFXI result is claimed**.
+
+---
+
 # Current Development Status
 
 - Repository: rerorriM-Mirrorer/Windower-Addons; branch gilfinder-personal-2026-10-15.
