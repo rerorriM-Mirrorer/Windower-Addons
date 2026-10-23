@@ -18,5 +18,14 @@ g.render(.35,0,true,.7);assert(not frames[11].shown)
 g.render(.8,1,true,.7);for _,f in ipairs(frames) do assert(not f.shown) end
 g.trigger(1);g.render(1.1,1,false,.7);for _,f in ipairs(frames) do assert(not f.shown) end
 g.trigger(2,true);g.render(2.3,.5,false,.7);local count=0;for _,f in ipairs(frames) do if f.shown then count=count+1;assert(f.a==105) end end;assert(count==1)
+-- A render timestamp briefly earlier than the trigger used to produce
+-- index <= 0 and frames[current] = nil on a subsequent draw.
+g.stop()
+g.trigger(100)
+g.render(99,1,true,.7)
+assert(frames[1].shown, 'negative relative time must clamp to frame one')
+g.render(100.1,1,true,.7)
+assert(not frames[1].shown and frames[3].shown,
+    'frame progression must recover after clock/time ordering reversal')
 g.destroy();for _,f in ipairs(frames) do assert(f.dead and not f.shown) end
 print('PASS: glint frame timing, positioning/scaling, hidden alpha, disabled/forced preview, cleanup')
