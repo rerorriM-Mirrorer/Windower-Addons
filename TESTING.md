@@ -1,3 +1,35 @@
+# Current Development Status - GilFinder 1.6.1 columns and refresh
+
+- Repository: rerorriM-Mirrorer/Windower-Addons; branch gilfinder-column-fix-2026-10-23.
+- Runtime: Windower 4 / Lua 5.1; baseline 31a4b97614963d34ab946b6837b219b3bfcd0be5.
+- User live results: wallet works; gap, Sparks and CP queries work; badges accepted.
+  Wallet alignment still unsatisfactory; currency refresh wobbles observed.
+- Automated: Lua 5.1 compile and full simulated regression suite pass, including
+  shared main/wallet numeric axis, separate names, both sides, totals, unchanged
+  refresh position/opacity and no visible measurement substitutions.
+- Remaining: FFXI font/column and refresh visual acceptance. Resolution work on hold.
+- AGENTS.md absent at source checkpoint; current root WORKFLOW and TESTING read
+  directly from GitHub, canonical NPCMirror WORKFLOW consulted.
+
+## 2026-10-23 - 1.6.1 wallet axis and currency refresh
+
+Wallet names and amounts were already separate objects. Their numeric axis was
+independent of the main balance; now all wallet amounts share its right edge.
+Names occupy a separate column across the coin, following side (with edge recovery).
+Currency refresh preserves entrance progress. A hidden text object reserves a
+stable ten-digit amount slot; visible numbers are never used for measurement.
+
+Complete install, no active data folder. Copy gilfinder over existing addon and
+reload. Status must report 1.6.1-a.20261023.1.
+
+Live checklist: wallet on both sides with unequal balances, total on/off, gap
+positive/negative, drag and scale; verify ones-place alignment including main
+balance. Query sp/cp repeatedly and observe changing balances without entrance
+restarts, digit-width jitter or measurement flashes. Retest hide/show and wallet
+priority. All automated results above are Linux simulations, not live FFXI tests.
+
+Previous status and cumulative history follow unchanged.
+
 # Current Development Status - GilFinder 1.6.0 currency tray test
 
 - Repository: rerorriM-Mirrorer/Windower-Addons.

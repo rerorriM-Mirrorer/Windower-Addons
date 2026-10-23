@@ -28,7 +28,7 @@
 
 _addon.name = 'gilfinder'
 _addon.author = 'sylandro; modifications by A'
-_addon.version = '1.6.0-a.20261023.1'
+_addon.version = '1.6.1-a.20261023.1'
 _addon.commands = {'gil'}
 _addon.language = 'English'
 
@@ -231,7 +231,7 @@ currency_reader=currency_catalog.new({
     end})
 
 local layout_x_res, layout_y_res
-local icon_left, icon_top
+local icon_left, icon_top, amount_right
 local layout
 layout = function()
     local res = windower.get_windower_settings()
@@ -256,6 +256,7 @@ layout = function()
     gil_text:draggable(false)
     -- Recover an off-screen group without changing valid personal coordinates.
     local tx = text_x - (settings.gilText.flags.right and width or 0)
+    amount_right = tx + width
     local left, right = math.min(tx, icon_x), math.max(tx + width, icon_x + 23 * scale)
     local top, bottom = y - 23 * scale / 6, y + 23 * scale
     local dx, dy = 0, 0
@@ -358,7 +359,7 @@ local function render()
     end
     opacity(value)
     local res = windower.get_windower_settings()
-    wallet_panel.render(now, value, settings, icon_left, icon_top, res.ui_x_res, res.ui_y_res)
+    wallet_panel.render(now, value, settings, icon_left, icon_top, res.ui_x_res, res.ui_y_res, amount_right)
     currency_tray.render(now,value,settings,icon_left,icon_top,res.ui_x_res,res.ui_y_res,wallet_open)
     if not currency_tray.active() then currency_selection=nil end
     coin_glint.render(now,value * settings.gilImage.color.alpha / 255,settings.glint,settings.glintDuration)

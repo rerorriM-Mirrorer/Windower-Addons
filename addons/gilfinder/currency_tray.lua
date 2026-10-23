@@ -5,13 +5,16 @@ local function copy(t) if type(t)~='table' then return t end local r={} for k,v 
 local function clamp(v) return math.max(0,math.min(1,v)) end
 function tray.new(path)
     local rows,opened,paused={},nil,false
+    local measure
     local self={}
     function self.clear()
         for _,r in ipairs(rows) do r.name:destroy();r.amount:destroy();r.icon:destroy() end
+        if measure then measure:destroy();measure=nil end
         rows,opened,paused={},nil,false
     end
     function self.show(samples,settings,format,now,merge)
         local old={}
+        local continuing=merge and opened~=nil
         if merge then for _,r in ipairs(rows) do old[r.definition.id]=r end else self.clear() end
         for _,s in ipairs(samples) do
             local d=s.definition
@@ -35,7 +38,16 @@ function tray.new(path)
             end
             r.format=format
         end
-        opened=now
+        if not measure then
+            local style=copy(settings.gilText)
+            style.flags.right,style.flags.bottom,style.flags.draggable=false,false,false
+            style.pos={x=0,y=0}
+            measure=texts.new(style);measure:hide()
+            measure:text(format(8888888888))
+        end
+        -- A reply updates values; only a newly opened tray plays the entrance.
+        if not continuing then opened=now end
+        self.last_activity=now
     end
     function self.active() return opened~=nil end
     function self.render(now,opacity,settings,x,y,sw,sh,suspended)
@@ -44,10 +56,11 @@ function tray.new(path)
             paused=true
             for _,r in ipairs(rows) do r.name:hide();r.amount:hide();r.icon:hide() end
             return
-        elseif paused then opened,paused=now,false end
+        elseif paused then opened,paused=now,false;self.last_activity=now end
         local elapsed=now-opened
-        if elapsed>=settings.currencyDelay+0.3 then self.clear();return end
-        local exit=clamp((elapsed-settings.currencyDelay)/0.3)
+        local idle=now-(self.last_activity or opened)
+        if idle>=settings.currencyDelay+0.3 then self.clear();return end
+        local exit=clamp((idle-settings.currencyDelay)/0.3)
         local nw,aw,height=0,0,23*settings.scale
         for _,r in ipairs(rows) do
             for _,w in ipairs({r.name,r.amount}) do
@@ -57,9 +70,11 @@ function tray.new(path)
             local p=settings.countDuration==0 and 1 or clamp((now-(r.changed or now))/settings.countDuration)
             r.displayed=r.target and ((r.from or r.target)+(r.target-(r.from or r.target))*p) or nil
             r.amount:text(r.displayed and r.format(math.floor(r.displayed+0.5)) or '--')
-            -- Measure the final value too, so counting does not move columns.
-            local final=r.target and r.format(r.target) or '--'
-            local current=r.amount:text();r.amount:text(final);local width=r.amount:extents();r.amount:text(current)
+            -- Reserve a full 10-digit numeric slot using a hidden measurement
+            -- primitive. Never substitute measurement text into a visible amount.
+            measure:size(math.max(1,math.floor(settings.gilText.text.size*settings.scale+0.5)))
+            measure:stroke_width(math.max(1,settings.gilText.text.stroke.width*settings.scale))
+            local width=measure:extents()
             local name_width=r.name:extents();nw=math.max(nw,name_width);aw=math.max(aw,width)
             local color=r.direction==1 and settings.gainColor or settings.lossColor
             local mix=r.direction~=0 and (1-clamp((now-(r.changed or now)-settings.countDuration)/math.max(.001,settings.colorDuration))) or 0

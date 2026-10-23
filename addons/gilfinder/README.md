@@ -207,6 +207,14 @@ No sounds or extra controller wrapper are installed.
 
 ## Changelog
 
+### 1.6.1-a.20261023.1 — Wallet axis and refresh stability
+
+- Wallet amounts share the main gil balance's ones-place axis; names have their
+  own column across the coin, following side.
+- Currency refreshes preserve entrance progress and use a hidden measurement
+  object with reserved numeric width, avoiding visible measurement flashes.
+- Live alignment and refresh appearance await FFXI confirmation.
+
 ### 1.6.0-a.20261023.1 - Wallet formatting and first currency tray
 
 - Native right anchors align wallet amounts on both sides; totals optional/off.

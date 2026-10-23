@@ -98,3 +98,4 @@ for name in ['sparks','sandoria','bastok','windurst']:
     im=Image.open(Path('gilfinder/images/currencies')/(name+'.png'))
     assert im.size==(23,23) and im.mode=='RGBA'
 print('PASS: four provisional currency badge assets')
+LuaRuntime().execute(prefix+(test_dir/'columns.lua').read_text())
