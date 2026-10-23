@@ -1,6 +1,6 @@
 -- Executed with the behavior suite's mock prelude; native FFXI acceptance remains separate.
 local function glints() local n=0;for i=4,23 do if widgets[i].shown then n=n+1 end end;return n end
-events.config();events.load();frame(0.1);assert(glints()==1,'startup glint')
+events.config();stored.walletTotal=true;events.load();frame(0.1);assert(glints()==1,'startup glint')
 frame(10);cmd('status');frame(10.1);assert(glints()==1,'command glint')
 cmd('auto');frame(71.3);assert(not widgets[1].shown)
 menu=true;frame(72);assert(widgets[1].shown,'menu opening wakes automatic HUD')
@@ -17,9 +17,9 @@ cmd('wallet','on');finish();frame(1001.4)
 local n=#widgets;assert(n==27,'one character plus total, two text columns')
 local amount,name=widgets[n-2],widgets[n-3]
 assert(name.content=='Cioara' and amount.content=='100' and name.shown and amount.shown)
-assert(amount.x<name.x,'amount-left arrangement')
+assert(amount.x+1280<name.x,'amount-left arrangement')
 assert(name.y<widgets[1].y,'bottom anchored panel grows upward')
-cmd('side','right');frame(1001.5);assert(name.x<amount.x,'amount-right arrangement')
+cmd('side','right');frame(1001.5);assert(name.x<amount.x+1280,'amount-right arrangement')
 local old=name
 cmd('wallet','refresh');finish();frame(1001.51)
 assert(old.destroyed and widgets[#widgets-3].shown,'refresh replaces snapshot without entrance')
@@ -38,7 +38,7 @@ local panel=require('wallet_panel').new()
 stored.side='right';panel.update({{name='A',server=24,gil=1},{name='Lionstag',server=24,gil=9000}},stored,tostring,2000)
 panel.render(2000.4,1,stored,500,100,1280,720)
 local an,aa,bn,ba=widgets[#widgets-5],widgets[#widgets-4],widgets[#widgets-3],widgets[#widgets-2]
-assert(an.x==bn.x and aa.x+#aa.content*7==ba.x+#ba.content*7,'fixed columns right-align amounts')
+assert(an.x==bn.x and aa.x==ba.x and aa.s.flags.right and ba.s.flags.right,'fixed columns right-align amounts')
 assert(an.y>100 and bn.y>an.y,'top anchor unfolds downward')
 local left=an.x;panel.render(2001,1,stored,500,100,1280,720);assert(an.x==left)
 panel.update({{name='A',server=24,gil=3}},stored,tostring,2002)

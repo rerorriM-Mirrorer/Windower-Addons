@@ -8,6 +8,7 @@ end
 local function clamp(v) return math.max(0, math.min(1,v)) end
 function panel.new()
     local rows, opened, closing = {}, nil, nil
+    local snapshot, formatter
     local self = {}
     function self.clear()
         for _,row in ipairs(rows) do row.name:destroy(); row.amount:destroy() end
@@ -15,6 +16,7 @@ function panel.new()
     end
     function self.update(samples, settings, format, now)
         -- Measure the complete snapshot before revealing any row: no column jitter.
+        snapshot, formatter = samples, format
         local was_open = opened ~= nil and closing == nil
         self.clear()
         opened = was_open and now - 1 or now
@@ -25,7 +27,9 @@ function panel.new()
             local style=copy(settings.gilText)
             style.flags.right, style.flags.bottom, style.flags.draggable = false,false,false
             style.pos={x=0,y=0}
-            local row={name=texts.new(copy(style)),amount=texts.new(copy(style))}
+            local amount_style=copy(style)
+            amount_style.flags.right=true
+            local row={name=texts.new(copy(style)),amount=texts.new(amount_style)}
             row.name:text(name);row.amount:text(format(amount))
             row.name:hide();row.amount:hide()
             rows[#rows+1]=row
@@ -34,7 +38,10 @@ function panel.new()
             total=total+sample.gil
             add(sample.name .. (count>1 and (' [' .. sample.server .. ']') or ''),sample.gil)
         end
-        add(('Total (%d)'):format(#samples),total)
+        if settings.walletTotal then add(('Total (%d)'):format(#samples),total) end
+    end
+    function self.restyle(settings, now)
+        if opened and snapshot then self.update(snapshot,settings,formatter,now) end
     end
     function self.resume(now)
         if opened and closing then opened,closing=now-1,nil end
@@ -70,9 +77,9 @@ function panel.new()
             local row_y=base+direction*(i-1)*height*(closing and t or 1)-direction*5*scale*(1-t)
             local nw=row.name:extents();local aw=row.amount:extents()
             local nx,ax
-            if settings.side=='left' then ax=left+amount_w-aw;nx=left+amount_w+gap
-            else nx=left;ax=left+name_w+gap+amount_w-aw end
-            row.name:pos(nx,row_y);row.amount:pos(ax,row_y)
+            if settings.side=='left' then ax=left+amount_w;nx=left+amount_w+gap
+            else nx=left;ax=left+name_w+gap+amount_w end
+            row.name:pos(nx,row_y);row.amount:pos(ax-screen_w,row_y)
             local alpha=opacity*t
             for _,w in ipairs({row.name,row.amount}) do
                 w:alpha(math.floor(settings.gilText.text.alpha*alpha))
