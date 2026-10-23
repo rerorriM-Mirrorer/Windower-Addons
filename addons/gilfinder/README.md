@@ -1,6 +1,6 @@
 # GilFinder
 
-Version 1.5.0-a.20261021.1. Original GilTracker by sylandro; modifications by A.
+Version 1.5.1-a.20261022.1. Original GilTracker by sylandro; modifications by A.
 A compact gil widget with animated balance changes, a responsive coin glint, live multibox
 wallet, saved dragging, layout choices, scaling, and three visibility modes.
 Current verification and live checklist: TESTING.md shipped beside this file.
@@ -67,6 +67,8 @@ Total covers responding characters only. Clients without GilFinder, offline,
 loading, zoning, and other-computer clients are excluded. This is an on-demand
 snapshot, with no offline cache or transfer accounting. Values can change after
 the snapshot; use `wallet refresh` to sample again. No game-server packets are sent.
+
+**Glint stability fix (2026-10-22):** The animation clamps all rendered frame indices to 1–20 and safely skips unavailable frames. This prevents a repeated prerender nil-index error if timestamp/order anomalies occur. Underlying time reversal has not been independently confirmed in-game. Keep prior saved data intact.
 
 ## Coin glint
 
@@ -147,7 +149,7 @@ No sounds or extra controller wrapper are installed.
 
 ## Changelog
 
-### 1.5.0-a.20261021.1 - Wallet Panel & Responsive Glint Test 2
+### 1.5.1-a.20261022.1 - Wallet Panel & Responsive Glint Test 2
 
 - Added animated fixed-column HUD wallet, total, side-following arrangement,
   edge-aware direction, refresh, dismissal and cleanup.
