@@ -28,7 +28,7 @@
 
 _addon.name = 'gilfinder'
 _addon.author = 'sylandro; modifications by A'
-_addon.version = '1.5.0-a.20261021.1'
+_addon.version = '1.5.1-a.20261022.1'
 _addon.commands = {'gil'}
 _addon.language = 'English'
 
