@@ -1,3 +1,63 @@
+# Current Development Status - GilFinder 1.6.0 currency tray test
+
+- Repository: rerorriM-Mirrorer/Windower-Addons.
+- Branch: gilfinder-currencies-2026-10-23; existing branches/main unchanged.
+- Runtime: Windower 4 / Lua 5.1; no external addon required.
+- Starting/source checkpoint: 4e82393ef1a6d94076863c72744c7c32181fbb0c (1.5.2).
+- Most recent user-confirmed live behavior: unfolding/multiclient gil wallet works.
+  No new live confirmation of glint fixes, native wallet column anchors or currencies.
+- Automated: Lua 5.1 compile; existing regression/lifecycle/glint/IPC/migration/
+  profile suites; new currency request/state/search/packet validation, tray UI,
+  signed gap and wallet total/default tests pass in local Linux simulation.
+- Remaining: native font/ones-place alignment on both sides; currency replies,
+  query timing and purchase-update latency; no FFXI runtime available here.
+- Next: run the checklist below on a test client. Fractional resolution baseline
+  remains ON HOLD until user supplies Cioara's preferred defaults.
+
+## 2026-10-23 - Wallet formatting and currency tray first pass
+
+Contains complete gilfinder/ install with all prior glint fixes, native wallet
+amount anchors, total on/off (default off), signed main-text gap, currency state
+and tray modules, four provisional badges and their generator, tests and docs.
+No active data/settings.xml is included; existing settings are preserved.
+Final source commit is linked in the handoff; this status records its baseline.
+
+Verified with python addons/gilfinder/tests/run.py using lupa.lua51/Pillow:
+all modules compile; prior behavior, restart/unload, four XML profiles, wallet
+IPC, migration, glint timing/fault-injection/clock ordering, panel interactions
+pass. New checks cover aliases/substring/suggestions; silent first samples;
+batched gain/loss; invalid and failed parses; request throttle/deferred refresh;
+zero vs unknown; default total off and explicit on/off; native amount flag and
+shared anchors; positive/negative gap and stable coin anchor; tray timeout,
+wallet priority and lifecycle cleanup. Four 23x23 RGBA badge assets verified.
+These are simulated checks, not Windows/Windower live acceptance.
+
+Live checklist:
+
+1. Copy gilfinder/ into Windower/addons, reload; //gil status shows 1.6.0-a.20261023.1.
+2. //gil wallet: amounts of different lengths share their ones-place edge in
+   both side left and side right. Test with proportional/italic personal fonts.
+3. //gil wallet total on, then off: toggle only total, keep rows/alignment stable.
+   New installations and previous configs without a choice default to off.
+4. //gil gap 5 and gap -2 on both sides: text moves, coin/glint stay fixed.
+   Return to a preferred gap (default 1).
+5. //gil sp, cp, curr, windurst: compare values against native currency menu.
+   Zero is valid; -- is unknown. Verify requests/replies and no console spam.
+6. //gil sparsk suggests Sparks; //gil curr conquest shows three separate nations.
+7. Earn/spend Sparks and buy with CP through NPCmirror or native interaction:
+   first sample silent, actual changes count with green/pink; verify latency.
+   Replies may arrive naturally or after menu transition/60s fallback query.
+8. Open gil wallet while currencies change: no overlapping lists; queued tray
+   appears after dismissal. Explicit currency query replaces the wallet panel.
+9. Delay 8s by default then roll-up; currencydelay adjusts that hold separately.
+   Check side, scale, bottom edge direction, hide, logout/zone/restart/unload.
+10. Retest AddonManager audit and glint events to confirm prior fixes remain.
+
+Packet rationale and unverified live cases are in docs/PACKETS.md. No purchasing
+or multiclient currency IPC is implemented here; multiclient wallet remains gil.
+
+## Previous cumulative records (preserved)
+
 # Current Development Status - GilFinder 1.5.2
 
 - Repository: rerorriM-Mirrorer/Windower-Addons.

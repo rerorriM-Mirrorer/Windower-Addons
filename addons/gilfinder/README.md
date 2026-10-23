@@ -1,6 +1,6 @@
 # GilFinder
 
-Version 1.5.2-a.20261022.1. Original GilTracker by sylandro; modifications by A.
+Version 1.6.0-a.20261023.1. Original GilTracker by sylandro; modifications by A.
 A compact gil widget with animated balance changes, a responsive coin glint, live multibox
 wallet, saved dragging, layout choices, scaling, and three visibility modes.
 Current verification and live checklist: TESTING.md shipped beside this file.
@@ -47,7 +47,7 @@ sections, positions, scales, colors, and unrelated options remain in place.
 `refresh` are explicit actions. It collects fresh balances from logged-in,
 inventory-ready characters running GilFinder on the SAME computer. After a
 one-second collection window, names and right-aligned amounts unfold into fixed
-columns over about 0.3 seconds, followed by Total (responding character count).
+columns over about 0.3 seconds, followed by an optional total (off by default).
 Only the requesting client opens a panel. The IPC protocol remains compatible
 with Wallet & Glint Test 1; updating every client is recommended.
 
@@ -69,6 +69,59 @@ snapshot, with no offline cache or transfer accounting. Values can change after
 the snapshot; use `wallet refresh` to sample again. No game-server packets are sent.
 
 **Glint stability fix (2026-10-22):** The animation clamps all rendered frame indices to 1–20 and safely skips unavailable frames. This prevents a repeated prerender nil-index error if timestamp/order anomalies occur. Underlying time reversal has not been independently confirmed in-game. Keep prior saved data intact.
+
+Wallet amounts now use native right justification: each row's ones place shares
+one fixed column anchor on either side. Names occupy a separate column.
+`//gil wallet total on|off` controls the combined total (bare `wallet total`
+toggles). It defaults OFF, including existing installations with no saved choice.
+The total preference updates an open panel without a new IPC query.
+
+`//gil gap <UI units>` adjusts main amount-to-coin spacing on either side.
+Positive values separate them; negative values overlap them. Default 1, scaled
+with the widget. Right-side spacing was previously hardcoded to 4 and now uses
+the same setting as the left. It never moves the coin/glint anchor. This controls
+the main amount, not the independent wallet column spacing.
+
+## Sparks and Conquest Points - first currency tray
+
+`//gil sp` / `//gil sparks` reveals Sparks of Eminence. `//gil cp` reveals three
+separate Conquest Point balances: San d'Oria, Bastok, Windurst. Nation-specific
+shortcuts: `//gil sandoria`, `//gil bastok`, `//gil windurst` (`sandy`/`windy`
+also accepted). `//gil curr` shows all four; `//gil curr <search>` searches labels.
+
+Exact names and aliases win, otherwise all substring matches appear. A near
+spelling suggests a command without choosing it. Existing addon commands keep
+priority. Search is case insensitive and punctuation/spacing insensitive.
+
+Currency changes unroll into a tray beside the coin, count from their previous
+amount with gain/loss colors, hold 8 seconds, then roll up. `//gil currencydelay
+<seconds>` changes that separate hold (1..3600). Rows follow side/scale/font and
+open upward when there is insufficient room below. Provisional 23px SP/SD/BA/WI
+badges identify the currencies; final lore-inspired art and individual glints
+are deferred. The existing gil coin glints on observed changes when enabled.
+
+The first received sample establishes a silent baseline. Unknown values display
+`--`, never a fabricated zero. Explicit queries show the last observed value
+while asking for a fresh snapshot; a missing reply times out in chat after about
+3 seconds. `status` reports sample count/oldest age. No offline currency cache
+is saved. Zoning/logout clears samples and presentation.
+
+Uses Windower's currency-menu request (0x10F) and native replies (0x113), plus
+passive Sparks updates (0x110). Requests occur after inventory initialization,
+on menu open/close in every visibility mode, on explicit currency queries, and
+via a 60-second fallback. Requests are separated by at least 2 seconds; a query
+during that interval is deferred. Changes appear when a fresh server sample is
+observed, which can lag a purchase. No purchase packets are sent. NPCmirror does
+not need to call GilFinder; its purchases can be observed like other purchases.
+
+An open gil wallet takes priority. Currency changes queue while it is open,
+then receive a fresh display hold when it closes. Explicit currency queries
+close the gil wallet to use that space. `hide` clears both. Currency queries
+are for the current character; the existing multiclient wallet remains gil-only
+in this first pass. No requirement to install Currencies separately.
+
+Cioara's fractional/resolution layout work remains on hold. This build retains
+existing positioning and recovery behavior.
 
 ## Coin glint
 
@@ -98,6 +151,11 @@ Bare `//gil`, `//gil help`, and invalid commands show colored chat-only help.
 | `//gil status` | Version, mode, side, timing, scale, coordinates, editing and controller state |
 | `//gil mode` | Cycle always -> change -> input |
 | `//gil wallet` | Toggle wallet panel; `wallet on`, `off`, `refresh` also supported |
+| `//gil wallet total [on\|off]` | Toggle combined total; default off |
+| `//gil gap <UI units>` | Positive separates main amount and coin; negative overlaps |
+| `//gil sp` / `//gil cp` | Reveal Sparks / three nation Conquest Point balances |
+| `//gil curr [search]` | Show supported currencies or search their labels |
+| `//gil currencydelay <seconds>` | Currency tray hold, default 8; 1..3600 |
 | `//gil glint [on\|off\|preview]` | Toggle responsive highlight or preview it |
 | `//gil mode always` | Always visible |
 | `//gil mode change` | Show on gil changes and native menu open/close |
@@ -148,6 +206,17 @@ Font sizes round to whole pixels; the stroke remains at least one pixel.
 No sounds or extra controller wrapper are installed.
 
 ## Changelog
+
+### 1.6.0-a.20261023.1 - Wallet formatting and first currency tray
+
+- Native right anchors align wallet amounts on both sides; totals optional/off.
+- Added signed scaled gap control between the main amount and the fixed coin.
+- Added Sparks and three nation CP samples, exact aliases/substrings/suggestions,
+  query/observed-change tray, counting/colors and provisional badges.
+- Added bounded currency requests, sample/unknown diagnostics, silent baseline,
+  timeout and cleanup; wallet retains presentation priority.
+- Preserved 1.5.2 glint guards/timestamp fix and existing saved settings.
+- Resolution/fractional baseline remains deferred pending Cioara's settings.
 
 ### 1.5.2-a.20261022.1 - Glint cleanup and timestamp review
 

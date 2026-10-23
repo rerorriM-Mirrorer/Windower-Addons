@@ -46,7 +46,7 @@ for name in ['global','cioara','killala','myrr']:
     assert widgets[1]['shown'] is True
     print('Personal XML profile PASS:',name)
 
-for name in ['wallet.lua','migration.lua','glint.lua']:
+for name in ['wallet.lua','migration.lua','glint.lua','currencies.lua']:
     LuaRuntime().execute((test_dir / name).read_text())
 
 from PIL import Image
@@ -90,3 +90,11 @@ assert(not future,'menu glint must not start after its render timestamp')
 events.unload()
 print('PASS: progressing-clock menu trigger/render ordering')
 """)
+
+# Currency UI and wallet formatting/controls share the normal Windower mock.
+ui_prefix=prefix.replace("package.preload.packets=function() return {parse=function(_,p) return p end} end", "local requests=0;package.preload.packets=function() return {parse=function(_,p) return p end,new=function(_,id) assert(id==0x10F);return {} end,inject=function() requests=requests+1 end} end")
+LuaRuntime().execute(ui_prefix+(test_dir/'currency_ui.lua').read_text())
+for name in ['sparks','sandoria','bastok','windurst']:
+    im=Image.open(Path('gilfinder/images/currencies')/(name+'.png'))
+    assert im.size==(23,23) and im.mode=='RGBA'
+print('PASS: four provisional currency badge assets')

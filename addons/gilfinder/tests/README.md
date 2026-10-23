@@ -13,3 +13,8 @@ mock prelude from behavior.lua and injects a controllable scheduler/menu state.
 upvalue fault injection. run.py adds a progressing-clock menu integration check
 that observes trigger/render timestamp ordering directly, independently of the
 index clamp. Both regressions were checked to fail against v1.5.1 source.
+
+1.6.0 adds currencies.lua state/search/request tests and currency_ui.lua mocked
+integration. Currency UI tests distinguish zero from unknown, verify total
+on/off, signed gap and fixed coin, native amount right flags, query/animation,
+wallet priority, timeout and cleanup. Provisional badge dimensions are checked.

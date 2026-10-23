@@ -28,7 +28,7 @@
 
 _addon.name = 'gilfinder'
 _addon.author = 'sylandro; modifications by A'
-_addon.version = '1.5.2-a.20261022.1'
+_addon.version = '1.6.0-a.20261023.1'
 _addon.commands = {'gil'}
 _addon.language = 'English'
 
@@ -63,6 +63,9 @@ local is_hidden_by_key = false
 
 local defaults = {}
 defaults.hideInCutscenes = false
+defaults.currencyDelay = 8
+defaults.walletTotal = false
+defaults.gap = 1
 defaults.glint = true
 defaults.glintDuration = 0.7
 defaults.visibility = 'change'
@@ -201,6 +204,32 @@ local wallet = require('wallet').new({sample=wallet_sample, now=os.clock,
         wake()
     end})
 windower.register_event('ipc message',function(message) if not lifecycle then wallet.receive(message) end end)
+local currency_catalog=require('currencies')
+local currency_tray=require('currency_tray').new(windower.addon_path)
+local currency_selection, currency_deadline
+local currency_reader
+currency_reader=currency_catalog.new({
+    ready=function() return inventory_loaded and not lifecycle and windower.ffxi.get_info().logged_in end,
+    request=function() packets.inject(packets.new('outgoing',0x10F,{})) end,
+    parse=function(_,data) return packets.parse('incoming',data) end,
+    updated=function(changes,now)
+        if currency_selection then
+            local samples=currency_reader.rows(currency_selection)
+            for _,sample in ipairs(samples) do for _,change in ipairs(changes) do
+                if sample.definition.id==change.definition.id then sample.previous=change.previous end
+            end end
+            currency_tray.show(samples,settings,format_value,now,true)
+            local complete=true
+            for _,sample in ipairs(samples) do
+                if not sample.seen or (currency_deadline and sample.seen<currency_deadline-3) then complete=false end
+            end
+            if complete then currency_deadline=nil end
+        elseif #changes>0 then
+            currency_tray.show(changes,settings,format_value,now,true)
+        end
+        if #changes>0 and not is_hidden_by_key then wake(now) end
+    end})
+
 local layout_x_res, layout_y_res
 local icon_left, icon_top
 local layout
@@ -219,7 +248,7 @@ layout = function()
     gil_image:pos(icon_x, y - 23 * scale / 6)
     coin_glint.place(icon_x, y - 23 * scale / 6, 23 * scale)
     local width = gil_text:extents()
-    local text_x = settings.side == 'right' and icon_x + 27 * scale or icon_x - scale
+    local text_x = settings.side == 'right' and icon_x + (23 + settings.gap) * scale or icon_x - settings.gap * scale
     if settings.side == 'right' and settings.gilText.flags.right then text_x = text_x + width end
     if settings.side == 'left' and not settings.gilText.flags.right then text_x = text_x - width end
     gil_text:pos(text_x - (settings.gilText.flags.right and res.ui_x_res or 0), settings.gilText.pos.y)
@@ -271,15 +300,23 @@ local function animate(now)
 end
 local function render()
     local now = os.clock()
+    currency_reader.tick(now)
+    if currency_deadline and now>=currency_deadline then
+        currency_deadline=nil
+        windower.add_to_chat(207,'GilFinder: Currency reply timed out; -- means unknown. Try //gil curr again.')
+    end
     animate(now)
     -- menu_open is a native boolean, unrelated to player cutscene status 4.
     local info = windower.ffxi.get_info()
     if type(info.menu_open) == 'boolean' and inventory_loaded and info.logged_in then
         local next_menu = info.menu_open
-        if menu_open ~= nil and next_menu ~= menu_open and settings.visibility == 'change' then
-            last_change = now
-            -- Keep trigger and render on this same captured timestamp.
-            wake(now)
+        if menu_open ~= nil and next_menu ~= menu_open then
+            currency_reader.request(now)
+            if settings.visibility == 'change' then
+                last_change = now
+                -- Keep trigger and render on this same captured timestamp.
+                wake(now)
+            end
         end
         menu_open = next_menu
     else menu_open = nil end
@@ -313,10 +350,17 @@ local function render()
     if value > 0 and current_opacity == 0 and not departure_start then glint(now) end
     if value == 0 and departure_start and wallet_open then
         wallet_open = false; wallet.cancel(); wallet_panel.clear()
+        -- Give queued currency changes their turn after the wallet finishes.
+        if currency_tray.active() and inventory_loaded and not lifecycle and not is_hidden_by_key
+            and not (settings.hideInCutscenes and is_hidden_by_cutscene) then
+            wake(now);value=1
+        end
     end
     opacity(value)
     local res = windower.get_windower_settings()
     wallet_panel.render(now, value, settings, icon_left, icon_top, res.ui_x_res, res.ui_y_res)
+    currency_tray.render(now,value,settings,icon_left,icon_top,res.ui_x_res,res.ui_y_res,wallet_open)
+    if not currency_tray.active() then currency_selection=nil end
     coin_glint.render(now,value * settings.gilImage.color.alpha / 255,settings.glint,settings.glintDuration)
     if value > 0 then show() else hide() end
     if editing and value > 0 then edit_text:show() else edit_text:hide() end
@@ -328,6 +372,9 @@ local function validate_settings()
         if not finite(n) then n = fallback end
         settings[key] = math.max(minimum, maximum and math.min(maximum, n) or n)
     end
+    number('currencyDelay',8,1,3600)
+    number('gap', 1, -10000, 10000)
+    settings.walletTotal = settings.walletTotal == true
     number('scale', 1, 0)
     if settings.scale <= 0 then settings.scale = 1 end
     number('hideDelay', 60, 1, 3600)
@@ -383,6 +430,7 @@ windower.register_event('logout', function(...)
     wallet.cancel()
     wallet_open = false
     wallet_panel.clear()
+    currency_reader.reset();currency_tray.clear();currency_selection,currency_deadline=nil,nil
     menu_open, departure_start = nil, nil
     coin_glint.stop()
     last_gil, last_change, last_input, preview_until, dragging = nil, nil, nil, nil, nil
@@ -399,9 +447,11 @@ windower.register_event('remove item', function(_bag,_index,id,...)
 end)
 
 windower.register_event('incoming chunk',function(id,org,_modi,_is_injected,_is_blocked)
+    if (id==0x113 or id==0x110) and not _is_injected and not _is_blocked then currency_reader.receive(id,org,os.clock()) end
     if (id == LOGIN_ZONE_PACKET) then
         inventory_loaded = false
         wallet.cancel(); wallet_open = false; wallet_panel.clear()
+        currency_reader.reset();currency_tray.clear();currency_selection,currency_deadline=nil,nil
         menu_open, departure_start = nil, nil
         coin_glint.stop()
         dragging = nil
@@ -563,6 +613,7 @@ end)
 windower.register_event('unload', function()
     wallet.cancel()
     wallet_panel.destroy()
+    currency_tray.destroy()
     coin_glint.destroy()
     config.save(settings)
     gil_text:destroy()
@@ -577,6 +628,10 @@ local help_rows = {
     {'status', 'Show version, mode, position and controller state'},
     {'mode [always|change|input]', 'Set or cycle always -> change -> input'},
     {'wallet [on|off|refresh]', 'Toggle the live wallet panel on this computer'},
+    {'wallet total [on|off]', 'Toggle the combined total; default off'},
+    {'gap <UI units>', 'Space from coin to amount; negative overlaps'},
+    {'curr [search]', 'Show Sparks and nation Conquest Points; cp/sp shortcuts'},
+    {'currencydelay <seconds>', 'Currency tray hold; default 8 seconds'},
     {'glint [on|off|preview]', 'Toggle coin glint or preview it'},
     {'side <left|right>', 'Place the amount beside the icon'},
     {'cutscenes [on|off]', 'Toggle hiding during cutscenes/dialogue (default off)'},
@@ -625,6 +680,9 @@ handlers.status = function()
         settings.hideInCutscenes and 'on' or 'off', settings.locked and 'locked' or 'unlocked',
         editing and 'on' or 'off', controller.status))
     report(('Glint %s (%ss) | wallet %s | live, same computer | menu %s'):format(settings.glint and 'on' or 'off',settings.glintDuration, wallet_open and 'open' or 'closed', tostring(menu_open)))
+    report(('Gap %s | wallet total %s'):format(settings.gap,settings.walletTotal and 'on' or 'off'))
+    local count,age=currency_reader.status(os.clock())
+    report(('Currency samples %d/4 | oldest %s | tray hold %ss'):format(count,age and ('%.1fs'):format(age) or 'unknown',settings.currencyDelay))
 end
 handlers.mode = function(arg)
     if arg ~= '' and arg ~= 'always' and arg ~= 'change' and arg ~= 'input' then return false end
@@ -636,7 +694,16 @@ handlers.mode = function(arg)
     report('Visibility: ' .. arg)
 end
 handlers.visibility = handlers.mode
-handlers.wallet = function(arg)
+handlers.wallet = function(arg, option)
+    if arg == 'total' then
+        local value=toggle(option or '',settings.walletTotal)
+        if value==nil then return false end
+        settings.walletTotal=value
+        wallet_panel.restyle(settings,os.clock())
+        report('Wallet total ' .. (value and 'on' or 'off'))
+        return
+    end
+    if option then return false end
     if arg ~= '' and arg ~= 'on' and arg ~= 'off' and arg ~= 'refresh' then return false end
     local open = arg == 'on' or arg == 'refresh' or (arg == '' and not wallet_open)
     if not open then
@@ -673,7 +740,7 @@ handlers.cutscenes = function(arg)
     report('Cutscene hiding ' .. (value and 'on' or 'off'))
 end
 for _, spec in ipairs({{'delay','hideDelay',1,3600}, {'scale','scale',0},
-    {'counttime','countDuration',0}, {'colortime','colorDuration',0}}) do
+    {'counttime','countDuration',0}, {'colortime','colorDuration',0}, {'gap','gap',-10000,10000}, {'currencydelay','currencyDelay',1,3600}}) do
     local command, key, minimum, maximum = spec[1], spec[2], spec[3], spec[4]
     handlers[command] = function(arg)
         local n = tonumber(arg)
@@ -696,7 +763,7 @@ handlers.pos = function(arg)
     is_hidden_by_key = false; preview(); report('Position reset.')
 end
 handlers.show = function() is_hidden_by_key = false; settings.visibility = 'always'; preview() end
-handlers.hide = function() is_hidden_by_key = true; dragging = nil; wallet_open = false; wallet.cancel(); wallet_panel.clear() end
+handlers.hide = function() currency_tray.clear();currency_selection,currency_deadline=nil,nil;is_hidden_by_key = true; dragging = nil; wallet_open = false; wallet.cancel(); wallet_panel.clear() end
 handlers.auto = function(arg)
     if arg ~= '' and arg ~= 'change' and arg ~= 'input' then return false end
     settings.visibility = arg == 'input' and 'input' or 'change'
@@ -719,13 +786,42 @@ local function lifecycle_command(kind)
 end
 handlers.restart = function() lifecycle_command('restart') end
 handlers.unload = function() lifecycle_command('unload') end
+local function currency_command(term)
+    local selection=currency_catalog.search(term)
+    if #selection==0 then
+        local suggestion=currency_catalog.suggest(term)
+        help('No supported currency matches ' .. term .. (suggestion and ('. Try //gil ' .. suggestion.id) or '.'))
+        return
+    end
+    local now=os.clock()
+    local ok,err=currency_reader.request(now)
+    if not ok then report(err);return end
+    wallet_open=false;wallet.cancel();wallet_panel.clear()
+    is_hidden_by_key=false
+    currency_selection=selection;currency_deadline=now+3
+    currency_tray.show(currency_reader.rows(selection),settings,format_value,now,false)
+    wake(now)
+    layout();render()
+end
 local no_args = {help=true,status=true,lock=true,unlock=true,show=true,hide=true,restart=true,unload=true}
 windower.register_event('addon command', function(command, argument, ...)
     command = (command or 'help'):lower()
     local arg = (argument or ''):lower()
     if lifecycle then return end
-    if select('#', ...) > 0 or not handlers[command] or (no_args[command] and arg ~= '') then help('Invalid command.'); return end
-    if handlers[command](arg) == false then help('Invalid arguments for //gil ' .. command .. '.'); return end
+    if command=='curr' or command=='currency' or command=='currencies' then
+        local terms={};if argument then terms[#terms+1]=argument end
+        for _,term in ipairs({...}) do terms[#terms+1]=term end
+        currency_command(table.concat(terms,' '));return
+    end
+    if not handlers[command] then
+        local terms={command};if argument then terms[#terms+1]=argument end
+        for _,term in ipairs({...}) do terms[#terms+1]=term end
+        local term=table.concat(terms,' ')
+        if #currency_catalog.search(term)>0 or currency_catalog.suggest(term) then currency_command(term);return end
+    end
+    local extra={...}
+    if (#extra > 0 and not (command=='wallet' and arg=='total' and #extra==1)) or not handlers[command] or (no_args[command] and arg ~= '') then help('Invalid command.'); return end
+    if handlers[command](arg,extra[1] and tostring(extra[1]):lower()) == false then help('Invalid arguments for //gil ' .. command .. '.'); return end
     -- Successful interactions acknowledge responsiveness without undoing explicit hide.
     if command ~= 'hide' and not (command == 'glint' and arg == 'off') then
         glint()
