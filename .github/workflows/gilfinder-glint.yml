@@ -1,0 +1,31 @@
+name: GilFinder glint checks
+on:
+  push:
+    branches:
+      - 'fix/gilfinder-glint-*'
+  workflow_dispatch:
+
+jobs:
+  gilfinder:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install simulated test dependencies
+        run: python -m pip install --disable-pip-version-check lupa Pillow
+      - name: Run complete GilFinder simulated tests
+        run: python addons/gilfinder/tests/run.py
+      - name: Assemble addon testing package
+        run: |
+          mkdir -p package/gilfinder
+          cp -r addons/gilfinder/. package/gilfinder/
+          cp WORKFLOW.md TESTING.md package/gilfinder/
+          (cd package && zip -qr ../GilFinder-glint-guard.zip gilfinder)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GilFinder-glint-guard
+          path: GilFinder-glint-guard.zip
