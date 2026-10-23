@@ -25,13 +25,19 @@ function glint.new(path)
         self.duration = duration
         local index
         if (enabled or forced) and start and now - start < duration then
-            index = math.min(20, math.floor((now - start)/duration*20)+1)
+            -- Defensive lower clamp: a brief clock/order reversal must not
+            -- create frame 0 or a negative frame index (nil texture).
+            index = math.max(1, math.min(20, math.floor((now - start)/duration*20)+1))
         elseif start then self.stop() end
-        if current and current ~= index then frames[current]:hide() end
+        -- An invalid historical frame must never crash prerender repeatedly.
+        if current and current ~= index and frames[current] then frames[current]:hide() end
         current = index
-        if current then
-            frames[current]:alpha(math.floor(210*opacity))
-            if opacity > 0 then frames[current]:show() else frames[current]:hide() end
+        local frame = current and frames[current]
+        if frame then
+            frame:alpha(math.floor(210*opacity))
+            if opacity > 0 then frame:show() else frame:hide() end
+        else
+            current = nil
         end
     end
     function self.destroy()
