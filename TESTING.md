@@ -1,3 +1,52 @@
+# Current Development Status - GilFinder 1.5.2
+
+- Repository: rerorriM-Mirrorer/Windower-Addons.
+- Branch: fix/gilfinder-glint-index-20261022; main and personal branch unchanged.
+- Runtime: Windower 4, Lua 5.1; no new companion requirements.
+- Starting/source checkpoint: 87c4425a9b78555c5e787768a3af5fbbac75285f (v1.5.1).
+- Latest live feedback: user confirms the unfolding wallet works great. Reported
+  a further error around line 20; exact message and installed source unknown.
+  User is currently testing v1.5.1 from the AddonManager conversation.
+- Automated: full local Lua 5.1/mock regression suite passes, including glint
+  timing reversal, invalid-index cleanup and progressing-clock menu ordering.
+  Each new regression also fails against the corresponding v1.5.1 source.
+- Remaining: live FFXI acceptance of v1.5.2, including AddonManager audit,
+  menu transitions, glint stop/off, restart/unload. This is Linux simulation.
+- Next step: install the complete v1.5.2 test package and confirm no repeat error;
+  capture full message/version if a further error appears.
+
+## 2026-10-22 - v1.5.2 glint cleanup and timestamp review
+
+Compared the actual Library v1.5.1 ZIP with published fix branch baseline.
+The drawing guard clamps frame 1..20, but stop() still unconditionally indexes
+frames[current]. That is another unchecked path, not proof of the precise
+reported line-20 cause (line 20 in the ZIP is the stop function declaration).
+Guard cleanup, clear its index first and test injected old indices 0, -1, 21.
+The old source fails this test with glint.lua:22 nil-frame indexing.
+
+Identified a concrete ordering path: render captures os.clock(), then a native
+menu transition invokes wake(), which previously captured a later os.clock().
+The trigger could therefore be later than that render's now without any clock
+reversal. wake(now) now accepts and uses the existing render timestamp for both
+activity and glint. A mocked clock advancing on each call reproduces the old
+ordering and passes the fix. Keep v1.5.1's lower clamp as additional protection.
+
+No evidence establishes AddonManager as the cause. Wallet presentation, IPC,
+visibility preferences, positions and animation assets remain unchanged.
+
+Checks run: python addons/gilfinder/tests/run.py with lupa.lua51 and Pillow;
+module compilation, both lifecycle paths, four personal XML profiles, IPC,
+migration, 20 asset masks, glint, panel/menu integration and clock ordering pass.
+Fault-injection and advancing-clock tests fail against their old source versions.
+
+Complete installation: copy gilfinder/ over Windower/addons/gilfinder; reload
+on each client. No active settings.xml is included. //gil status must show
+1.5.2-a.20261022.1. Try wallet, glint preview/off/on, menu transitions, then
+//am audit; restart/unload should stop cleanly. Preserve full error text if any.
+The handoff records the actual published commit; this file identifies baseline.
+
+## Previous delivery records (preserved)
+
 # GilFinder glint-index guard — 2026-10-22
 
 **Branch:** `fix/gilfinder-glint-index-20261022`

@@ -28,7 +28,7 @@
 
 _addon.name = 'gilfinder'
 _addon.author = 'sylandro; modifications by A'
-_addon.version = '1.5.1-a.20261022.1'
+_addon.version = '1.5.2-a.20261022.1'
 _addon.commands = {'gil'}
 _addon.language = 'English'
 
@@ -179,11 +179,12 @@ local departure_start
 local function glint(now)
     if settings.glint then coin_glint.trigger(now or os.clock()) end
 end
-local function wake()
-    preview_until = os.clock() + settings.hideDelay
+local function wake(now)
+    now = now or os.clock()
+    preview_until = now + settings.hideDelay
     departure_start = nil
-    if wallet_open then wallet_panel.resume(os.clock()) end
-    glint()
+    if wallet_open then wallet_panel.resume(now) end
+    glint(now)
 end
 local function wallet_sample()
     local info, player = windower.ffxi.get_info(), windower.ffxi.get_player()
@@ -277,7 +278,8 @@ local function render()
         local next_menu = info.menu_open
         if menu_open ~= nil and next_menu ~= menu_open and settings.visibility == 'change' then
             last_change = now
-            wake()
+            -- Keep trigger and render on this same captured timestamp.
+            wake(now)
         end
         menu_open = next_menu
     else menu_open = nil end

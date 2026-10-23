@@ -66,3 +66,27 @@ prefix=prefix.replace('local now, gil, buttons, focused = 0, 100, false, true', 
 prefix=prefix.replace('logged_in=true,server=24','logged_in=true,server=24,menu_open=menu')
 prefix=prefix.replace('coroutine.schedule=function() end', 'coroutine.schedule=function(fn,delay) if delay>0 then scheduled[#scheduled+1]=fn end end\nlocal function finish() local jobs=scheduled;scheduled={};for _,fn in ipairs(jobs) do fn() end end')
 LuaRuntime().execute(prefix+(test_dir/'interactions.lua').read_text())
+
+# A progressing clock exposes wake() taking a later timestamp inside render().
+clock_prefix=prefix.replace('os.clock=function() return now end',
+    'local tick=0;os.clock=function() tick=tick+0.00001;return now+tick end')
+clock_prefix=clock_prefix.replace("dofile('gilfinder/gilfinder.lua')", """
+local factory=require('glint').new
+local future=false
+require('glint').new=function(path)
+ local g=factory(path)
+ local trigger,render=g.trigger,g.render
+ local started
+ g.trigger=function(t,preview) started=t;trigger(t,preview) end
+ g.render=function(t,...) if started and t<started then future=true end;render(t,...) end
+ return g
+end
+dofile('gilfinder/gilfinder.lua')
+""")
+LuaRuntime().execute(clock_prefix+"""
+events.config();events.load();frame(1)
+menu=true;frame(2)
+assert(not future,'menu glint must not start after its render timestamp')
+events.unload()
+print('PASS: progressing-clock menu trigger/render ordering')
+""")

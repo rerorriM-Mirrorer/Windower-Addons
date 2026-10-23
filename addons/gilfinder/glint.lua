@@ -19,7 +19,9 @@ function glint.new(path)
     end
     function self.stop()
         start, forced = nil, false
-        if current then frames[current]:hide();current=nil end
+        local frame = current and frames[current]
+        current = nil
+        if frame then frame:hide() end
     end
     function self.render(now,opacity,enabled,duration)
         self.duration = duration

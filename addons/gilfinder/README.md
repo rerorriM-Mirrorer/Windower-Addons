@@ -1,6 +1,6 @@
 # GilFinder
 
-Version 1.5.1-a.20261022.1. Original GilTracker by sylandro; modifications by A.
+Version 1.5.2-a.20261022.1. Original GilTracker by sylandro; modifications by A.
 A compact gil widget with animated balance changes, a responsive coin glint, live multibox
 wallet, saved dragging, layout choices, scaling, and three visibility modes.
 Current verification and live checklist: TESTING.md shipped beside this file.
@@ -148,6 +148,15 @@ Font sizes round to whole pixels; the stroke remains at least one pixel.
 No sounds or extra controller wrapper are installed.
 
 ## Changelog
+
+### 1.5.2-a.20261022.1 - Glint cleanup and timestamp review
+
+- Guard stop/cleanup frame access as well as drawing; clear stale indices safely.
+- Reuse the render timestamp for menu-triggered wakes and glints so the trigger
+  cannot start slightly later than its first draw. Retain the frame lower clamp.
+- Add invalid-index cleanup and progressing-clock integration regressions.
+- User confirms unfolding wallet works; further line-20 report requires live
+  retest/full error text to match its exact source. Settings and wallet retained.
 
 ### 1.5.1-a.20261022.1 - Wallet Panel & Responsive Glint Test 2
 
